@@ -1,3 +1,29 @@
+#include <stdint.h>
+
+#define CONCAT(X, Y) X##Y
+#define DISPATCH() \
+  if(cycle_cnt > cycles_) goto EXIT;            \
+  opcode = *((uint32_t*)&mem8[PC]);             \
+  switch(opcode & 0x0FF00000) { OPCODE(DISPATCH_CASE) }
+#define DISPATCH_CASE(OP) case OP: goto CONCAT(label_,OP);
+#define OPCODE(X)                               \
+	X(OP_SWI0)                              \
+	X(OP_SWI1)                              \
+	X(OP_SWI2)                              \
+	X(OP_SWI3)                              \
+	X(OP_SWI4)                              \
+	X(OP_SWI5)                              \
+	X(OP_SWI6)                              \
+	X(OP_SWI7)                              \
+	X(OP_SWI8)                              \
+	X(OP_SWI9)                              \
+	X(OP_SWIA)                              \
+	X(OP_SWIB)                              \
+	X(OP_SWIC)                              \
+	X(OP_SWID)                              \
+	X(OP_SWIE)                              \
+	X(OP_SWIF)                              \
+	X(OP_JMP)
 
 /*
   ARM60 supports six modes of operation:
@@ -52,7 +78,6 @@ enum
     EX_ADDR_IRQ                   = 0x00000018UL,
     EX_ADDR_FIQ                   = 0x0000001CUL
   };
-
 
 /*
   All ARM60 instructions are conditionally executed, which means that
@@ -111,35 +136,105 @@ enum
     COND_NV = 0xF
   };
 
+enum
+  {
+    OP_SWI0 = 0x0F000000,
+    OP_SWI1 = 0x0F100000,
+    OP_SWI2 = 0x0F200000,
+    OP_SWI3 = 0x0F300000,
+    OP_SWI4 = 0x0F400000,
+    OP_SWI5 = 0x0F500000,
+    OP_SWI6 = 0x0F600000,
+    OP_SWI7 = 0x0F700000,
+    OP_SWI8 = 0x0F800000,
+    OP_SWI9 = 0x0F900000,
+    OP_SWIA = 0x0FA00000,
+    OP_SWIB = 0x0FB00000,
+    OP_SWIC = 0x0FC00000,
+    OP_SWID = 0x0FD00000,
+    OP_SWIE = 0x0FE00000,
+    OP_SWIF = 0x0FF00000,
+
+    OS_CDP0 = 0x0E000000,
+    OS_CDP1 = 0x0E100000,
+    OS_CDP2 = 0x0E200000,
+    OS_CDP3 = 0x0E300000,
+    OS_CDP4 = 0x0E400000,
+    OS_CDP5 = 0x0E500000,
+    OS_CDP6 = 0x0E600000,
+    OS_CDP7 = 0x0E700000,
+    OS_CDP8 = 0x0E800000,
+    OS_CDP9 = 0x0E900000,
+    OS_CDPA = 0x0EA00000,
+    OS_CDPB = 0x0EB00000,
+    OS_CDPC = 0x0EC00000,
+    OS_CDPD = 0x0ED00000,
+    OS_CDPE = 0x0EE00000,
+    OS_CDPF = 0x0EF00000,
+
+    OP_JMP  = 0x00000000
+  };
+
 uint32_t
-freedo_arm2_dispatch(void)
+freedo_arm2_loop(const uint32_t cycles_)
 {
   uint32_t opcode;
-  uint32_t cond;
-  uint32_t op;
+  uint32_t PC;
+  uint32_t cycle_cnt;
+  uint8_t *mem8;
 
-  cond = (opcode & 0xF0000000);
-  op   = (opcode & 0x0FF00000);
-  switch(cp)
-    {
-      /* SWI */
-    case 0x0F000000:
-    case 0x0F100000:
-    case 0x0F200000:
-    case 0x0F300000:
-    case 0x0F400000:
-    case 0x0F500000:
-    case 0x0F600000:
-    case 0x0F700000:
-    case 0x0F800000:
-    case 0x0F900000:
-    case 0x0FA00000:
-    case 0x0FB00000:
-    case 0x0FC00000:
-    case 0x0FD00000:
-    case 0x0FE00000:
-    case 0x0FF00000:
-      swi(opcode & 0x00FFFFFF);
-      break;
-    }
+  cycle_cnt = 0;
+  DISPATCH();
+
+ label_OP_SWI0:
+ label_OP_SWI1:
+ label_OP_SWI2:
+ label_OP_SWI3:
+ label_OP_SWI4:
+ label_OP_SWI5:
+ label_OP_SWI6:
+ label_OP_SWI7:
+ label_OP_SWI8:
+ label_OP_SWI9:
+ label_OP_SWIA:
+ label_OP_SWIB:
+ label_OP_SWIC:
+ label_OP_SWID:
+ label_OP_SWIE:
+ label_OP_SWIF:
+  {
+    // MODE = MODE_SVC
+    // R14_svc = PC + 4
+    PC = EX_ADDR_SOFTWARE_INTERRUPT;
+    // cycle_cnt += 2S + 1N
+  }
+  DISPATCH();
+
+ label_OP_CDP0:
+ label_OP_CDP1:
+ label_OP_CDP2:
+ label_OP_CDP3:
+ label_OP_CDP4:
+ label_OP_CDP5:
+ label_OP_CDP6:
+ label_OP_CDP7:
+ label_OP_CDP8:
+ label_OP_CDP9:
+ label_OP_CDPA:
+ label_OP_CDPB:
+ label_OP_CDPC:
+ label_OP_CDPD:
+ label_OP_CDPE:
+ label_OP_CDPF:
+  {
+    const uint32_t CRm = (opcode & 0xF);
+  }
+  DISPATCH();
+
+ label_OP_JMP:
+  DISPATCH();
+
+ EXIT:
+
+  return cycle_cnt;
 }
