@@ -73,41 +73,41 @@ enum
   the Z flag and the instruction will not be executed.
 */
 
+/*
+  0000 = EQ - Z set (equal)
+  0001 = NE - Z clear (not equal)
+  0010 = CS - C set (unsigned higher or same)
+  0011 = CC - C clear (unsigned lower)
+  0100 = MI - N set (negative)
+  0101 = PL - N clear (positive or zero)
+  0110 = VS - V set (overflow)
+  0111 = VC - V clear (no overflow)
+  1000 = HI - C set and Z clear (unsigned higher)
+  1001 = LS - C clear or Z set (unsigned lower or same)
+  1010 = GE - N set and V set, or N clear and V clear (greater or equal)
+  1011 = LT - N set and V clear, or N clear and V set (less than)
+  1100 = GT - Z clear, and either N set and V set, or N clear and V clear (greater than)
+  1101 = LE - Z set, or N set and V clear, or N clear and V set (less than or equal)
+  1110 = AL - always
+  1111 = NV - never
+*/
 enum
   {
-    /* 0000 = EQ - Z set (equal) */
     COND_EQ = 0x0,
-    /* 0001 = NE - Z clear (not equal) */
     COND_NE = 0x1,
-    /* 0010 = CS - C set (unsigned higher or same) */
     COND_CS = 0x2,
-    /* 0011 = CC - C clear (unsigned lower) */
     COND_CC = 0x3,
-    /* 0100 = MI - N set (negative) */
     COND_MI = 0x4,
-    /* 0101 = PL - N clear (positive or zero) */
     COND_PL = 0x5,
-    /* 0110 = VS - V set (overflow) */
     COND_VS = 0x6,
-    /* 0111 = VC - V clear (no overflow) */
     COND_VC = 0x7,
-    /* 1000 = HI - C set and Z clear (unsigned higher) */
     COND_HI = 0x8,
-    /* 1001 = LS - C clear or Z set (unsigned lower or same) */
     COND_LS = 0x9,
-    /* 1010 = GE - N set and V set, or N clear and V clear (greater or equal) */
     COND_GE = 0xA,
-    /* 1011 = LT - N set and V clear, or N clear and V set (less than) */
     COND_LT = 0xB,
-    /* 1100 = GT - Z clear, and either N set and V set, or N clear
-       and V clear (greater than) */
     COND_GT = 0xC,
-    /* 1101 = LE - Z set, or N set and V clear, or N clear
-       and V set (less than or equal) */
     COND_LE = 0xD,
-    /* 1110 = AL - always */
     COND_AL = 0xE,
-    /* 1111 = NV - never */
     COND_NV = 0xF
   };
 
@@ -115,9 +115,31 @@ uint32_t
 freedo_arm2_dispatch(void)
 {
   uint32_t opcode;
+  uint32_t cond;
+  uint32_t op;
 
-  switch(opcode)
+  cond = (opcode & 0xF0000000);
+  op   = (opcode & 0x0FF00000);
+  switch(cp)
     {
-
+      /* SWI */
+    case 0x0F000000:
+    case 0x0F100000:
+    case 0x0F200000:
+    case 0x0F300000:
+    case 0x0F400000:
+    case 0x0F500000:
+    case 0x0F600000:
+    case 0x0F700000:
+    case 0x0F800000:
+    case 0x0F900000:
+    case 0x0FA00000:
+    case 0x0FB00000:
+    case 0x0FC00000:
+    case 0x0FD00000:
+    case 0x0FE00000:
+    case 0x0FF00000:
+      swi(opcode & 0x00FFFFFF);
+      break;
     }
 }
