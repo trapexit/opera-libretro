@@ -228,6 +228,12 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_CDPF:
   {
     const uint32_t CRm = (opcode & 0xF);
+    const uint32_t CP  = ((opcode & 0x000E0) >>  4);
+    const uint32_t CPN = ((opcode & 0x00F00) >>  8);
+    const uint32_t CRd = ((opcode & 0x0F000) >> 12);
+    const uint32_t CRn = ((opcode & 0xF0000) >> 16);
+
+    
   }
   DISPATCH();
 
