@@ -23,6 +23,22 @@
 	X(OP_SWID)                              \
 	X(OP_SWIE)                              \
 	X(OP_SWIF)                              \
+        X(OP_CDP0) \
+        X(OP_CDP1) \
+        X(OP_CDP2) \
+        X(OP_CDP3) \
+        X(OP_CDP4) \
+        X(OP_CDP5) \
+        X(OP_CDP6) \
+        X(OP_CDP7) \
+        X(OP_CDP8) \
+        X(OP_CDP9) \
+        X(OP_CDPA) \
+        X(OP_CDPB) \
+        X(OP_CDPC) \
+        X(OP_CDPD) \
+        X(OP_CDPE) \
+        X(OP_CDPF) \
 	X(OP_JMP)
 
 /*
@@ -155,22 +171,45 @@ enum
     OP_SWIE = 0x0FE00000,
     OP_SWIF = 0x0FF00000,
 
-    OS_CDP0 = 0x0E000000,
-    OS_CDP1 = 0x0E100000,
-    OS_CDP2 = 0x0E200000,
-    OS_CDP3 = 0x0E300000,
-    OS_CDP4 = 0x0E400000,
-    OS_CDP5 = 0x0E500000,
-    OS_CDP6 = 0x0E600000,
-    OS_CDP7 = 0x0E700000,
-    OS_CDP8 = 0x0E800000,
-    OS_CDP9 = 0x0E900000,
-    OS_CDPA = 0x0EA00000,
-    OS_CDPB = 0x0EB00000,
-    OS_CDPC = 0x0EC00000,
-    OS_CDPD = 0x0ED00000,
-    OS_CDPE = 0x0EE00000,
-    OS_CDPF = 0x0EF00000,
+    OP_CDP0 = 0x0E000000,
+    OP_CDP1 = 0x0E100000,
+    OP_CDP2 = 0x0E200000,
+    OP_CDP3 = 0x0E300000,
+    OP_CDP4 = 0x0E400000,
+    OP_CDP5 = 0x0E500000,
+    OP_CDP6 = 0x0E600000,
+    OP_CDP7 = 0x0E700000,
+    OP_CDP8 = 0x0E800000,
+    OP_CDP9 = 0x0E900000,
+    OP_CDPA = 0x0EA00000,
+    OP_CDPB = 0x0EB00000,
+    OP_CDPC = 0x0EC00000,
+    OP_CDPD = 0x0ED00000,
+    OP_CDPE = 0x0EE00000,
+    OP_CDPF = 0x0EF00000,
+
+    OP_LDC_PREI_DOWN_ST_NW = 0x0D100000,
+    OP_LDC_PREI_DOWN_ST_WB = 0x0D300000,
+    OP_LDC_PREI_DOWN_LT_NW = 0x0D500000,
+    OP_LDC_PREI_DOWN_LT_WB = 0x0D700000,
+    OP_LDC_PREI_UP_ST_NW   = 0x0D900000,
+    OP_LDC_PREI_UP_ST_WB   = 0x0DB00000,
+    OP_LDC_PREI_UP_LT_NW   = 0x0DD00000,
+    OP_LDC_PREI_UP_LT_WB   = 0x0DF00000,
+
+    OP_LDC_POSTI_DOWN_ST_NW = 0x0D100000,
+    OP_LDC_POSTI_DOWN_ST_WB = 0x0D,
+    OP_LDC_POSTI_DOWN_LT_NW = 0x,
+    OP_LDC_POSTI_DOWN_LT_WB = 0x,
+    OP_LDC_POSTI_UP_ST_NW   = 0x0D,
+    OP_LDC_POSTI_UP_ST_WB   = 0x,
+    OP_LDC_POSTI_UP_LT_NW   = 0x,
+    OP_LDC_POSTI_UP_LT_WB   = 0x,
+
+    OP_STC_PREI_DOWN_ = 0x0C000000,
+    OP_STC_PREI_UP_ = 0x,
+    OP_STC_POSTI_DOWN_ = 0x,
+    OP_STC_POSTI_UP_ = 0x,
 
     OP_JMP  = 0x00000000
   };
@@ -233,7 +272,7 @@ freedo_arm2_loop(const uint32_t cycles_)
     const uint32_t CRd = ((opcode & 0x0F000) >> 12);
     const uint32_t CRn = ((opcode & 0xF0000) >> 16);
 
-    
+    // cycle_cnt += 1S + bI
   }
   DISPATCH();
 
