@@ -8,9 +8,9 @@
 static
 INLINE
 int32_t
-sign_extend_24_32(const int32_t x_)
+sign_extend_26_32(const int32_t x_)
 {
-  struct {int32_t x:24;} s;
+  struct {int32_t x:26;} s;
 
   return s.x = x_;
 }
