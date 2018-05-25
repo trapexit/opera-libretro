@@ -322,6 +322,7 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_B_F:
   {
     PC += sign_extend_24_32(((opcode & 0x00FFFFFF) << 2));
+    // cycle_cnt += 2S + 1N
   }
   DISPATCH();
 
@@ -341,6 +342,11 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_BL_D:
  label_OP_BL_E:
  label_OP_BL_F:
+  {
+    // R14 = PC + 4
+    PC += sign_extend_24_32(((opcode & 0x00FFFFFF) << 2));
+    // cycle_cnt += 2S + 1N    
+  }  
   DISPATCH();
 
  label_OP_SWI_0:
