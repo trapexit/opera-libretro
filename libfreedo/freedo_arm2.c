@@ -1,3 +1,5 @@
+#include "sign_extend.h"
+
 #include <stdint.h>
 
 #define CONCAT(X, Y) X##Y
@@ -7,39 +9,71 @@
   switch(opcode & 0x0FF00000) { OPCODE(DISPATCH_CASE) }
 #define DISPATCH_CASE(OP) case OP: goto CONCAT(label_,OP);
 #define OPCODE(X)                               \
-	X(OP_SWI0)                              \
-	X(OP_SWI1)                              \
-	X(OP_SWI2)                              \
-	X(OP_SWI3)                              \
-	X(OP_SWI4)                              \
-	X(OP_SWI5)                              \
-	X(OP_SWI6)                              \
-	X(OP_SWI7)                              \
-	X(OP_SWI8)                              \
-	X(OP_SWI9)                              \
-	X(OP_SWIA)                              \
-	X(OP_SWIB)                              \
-	X(OP_SWIC)                              \
-	X(OP_SWID)                              \
-	X(OP_SWIE)                              \
-	X(OP_SWIF)                              \
-        X(OP_CDP0) \
-        X(OP_CDP1) \
-        X(OP_CDP2) \
-        X(OP_CDP3) \
-        X(OP_CDP4) \
-        X(OP_CDP5) \
-        X(OP_CDP6) \
-        X(OP_CDP7) \
-        X(OP_CDP8) \
-        X(OP_CDP9) \
-        X(OP_CDPA) \
-        X(OP_CDPB) \
-        X(OP_CDPC) \
-        X(OP_CDPD) \
-        X(OP_CDPE) \
-        X(OP_CDPF) \
-	X(OP_JMP)
+  X(OP_B_0)                                     \
+  X(OP_B_1)                                     \
+  X(OP_B_2)                                     \
+  X(OP_B_3)                                     \
+  X(OP_B_4)                                     \
+  X(OP_B_5)                                     \
+  X(OP_B_6)                                     \
+  X(OP_B_7)                                     \
+  X(OP_B_8)                                     \
+  X(OP_B_9)                                     \
+  X(OP_B_A)                                     \
+  X(OP_B_B)                                     \
+  X(OP_B_C)                                     \
+  X(OP_B_D)                                     \
+  X(OP_B_E)                                     \
+  X(OP_B_F)                                     \
+  X(OP_BL_0)                                    \
+  X(OP_BL_1)                                    \
+  X(OP_BL_2)                                    \
+  X(OP_BL_3)                                    \
+  X(OP_BL_4)                                    \
+  X(OP_BL_5)                                    \
+  X(OP_BL_6)                                    \
+  X(OP_BL_7)                                    \
+  X(OP_BL_8)                                    \
+  X(OP_BL_9)                                    \
+  X(OP_BL_A)                                    \
+  X(OP_BL_B)                                    \
+  X(OP_BL_C)                                    \
+  X(OP_BL_D)                                    \
+  X(OP_BL_E)                                    \
+  X(OP_BL_F)                                    \
+  X(OP_SWI_0)                                   \
+  X(OP_SWI_1)                                   \
+  X(OP_SWI_2)                                   \
+  X(OP_SWI_3)                                   \
+  X(OP_SWI_4)                                   \
+  X(OP_SWI_5)                                   \
+  X(OP_SWI_6)                                   \
+  X(OP_SWI_7)                                   \
+  X(OP_SWI_8)                                   \
+  X(OP_SWI_9)                                   \
+  X(OP_SWI_A)                                   \
+  X(OP_SWI_B)                                   \
+  X(OP_SWI_C)                                   \
+  X(OP_SWI_D)                                   \
+  X(OP_SWI_E)                                   \
+  X(OP_SWI_F)                                   \
+  X(OP_CDP_0)                                   \
+  X(OP_CDP_1)                                   \
+  X(OP_CDP_2)                                   \
+  X(OP_CDP_3)                                   \
+  X(OP_CDP_4)                                   \
+  X(OP_CDP_5)                                   \
+  X(OP_CDP_6)                                   \
+  X(OP_CDP_7)                                   \
+  X(OP_CDP_8)                                   \
+  X(OP_CDP_9)                                   \
+  X(OP_CDP_A)                                   \
+  X(OP_CDP_B)                                   \
+  X(OP_CDP_C)                                   \
+  X(OP_CDP_D)                                   \
+  X(OP_CDP_E)                                   \
+  X(OP_CDP_F)                                   \
+  X(OP_JMP)
 
 /*
   ARM60 supports six modes of operation:
@@ -154,62 +188,107 @@ enum
 
 enum
   {
-    OP_SWI0 = 0x0F000000,
-    OP_SWI1 = 0x0F100000,
-    OP_SWI2 = 0x0F200000,
-    OP_SWI3 = 0x0F300000,
-    OP_SWI4 = 0x0F400000,
-    OP_SWI5 = 0x0F500000,
-    OP_SWI6 = 0x0F600000,
-    OP_SWI7 = 0x0F700000,
-    OP_SWI8 = 0x0F800000,
-    OP_SWI9 = 0x0F900000,
-    OP_SWIA = 0x0FA00000,
-    OP_SWIB = 0x0FB00000,
-    OP_SWIC = 0x0FC00000,
-    OP_SWID = 0x0FD00000,
-    OP_SWIE = 0x0FE00000,
-    OP_SWIF = 0x0FF00000,
+    OP_B_0 = 0x0A000000,
+    OP_B_1 = 0x0A100000,
+    OP_B_2 = 0x0A200000,
+    OP_B_3 = 0x0A300000,
+    OP_B_4 = 0x0A400000,
+    OP_B_5 = 0x0A500000,
+    OP_B_6 = 0x0A600000,
+    OP_B_7 = 0x0A700000,
+    OP_B_8 = 0x0A800000,
+    OP_B_9 = 0x0A900000,
+    OP_B_A = 0x0AA00000,
+    OP_B_B = 0x0AB00000,
+    OP_B_C = 0x0AC00000,
+    OP_B_D = 0x0AD00000,
+    OP_B_E = 0x0AE00000,
+    OP_B_F = 0x0AF00000,
 
-    OP_CDP0 = 0x0E000000,
-    OP_CDP1 = 0x0E100000,
-    OP_CDP2 = 0x0E200000,
-    OP_CDP3 = 0x0E300000,
-    OP_CDP4 = 0x0E400000,
-    OP_CDP5 = 0x0E500000,
-    OP_CDP6 = 0x0E600000,
-    OP_CDP7 = 0x0E700000,
-    OP_CDP8 = 0x0E800000,
-    OP_CDP9 = 0x0E900000,
-    OP_CDPA = 0x0EA00000,
-    OP_CDPB = 0x0EB00000,
-    OP_CDPC = 0x0EC00000,
-    OP_CDPD = 0x0ED00000,
-    OP_CDPE = 0x0EE00000,
-    OP_CDPF = 0x0EF00000,
+    OP_BL_0 = 0x0B000000,
+    OP_BL_1 = 0x0B100000,
+    OP_BL_2 = 0x0B200000,
+    OP_BL_3 = 0x0B300000,
+    OP_BL_4 = 0x0B400000,
+    OP_BL_5 = 0x0B500000,
+    OP_BL_6 = 0x0B600000,
+    OP_BL_7 = 0x0B700000,
+    OP_BL_8 = 0x0B800000,
+    OP_BL_9 = 0x0B900000,
+    OP_BL_A = 0x0BA00000,
+    OP_BL_B = 0x0BB00000,
+    OP_BL_C = 0x0BC00000,
+    OP_BL_D = 0x0BD00000,
+    OP_BL_E = 0x0BE00000,
+    OP_BL_F = 0x0BF00000,
 
-    OP_LDC_PREI_DOWN_ST_NW = 0x0D100000,
-    OP_LDC_PREI_DOWN_ST_WB = 0x0D300000,
-    OP_LDC_PREI_DOWN_LT_NW = 0x0D500000,
-    OP_LDC_PREI_DOWN_LT_WB = 0x0D700000,
-    OP_LDC_PREI_UP_ST_NW   = 0x0D900000,
-    OP_LDC_PREI_UP_ST_WB   = 0x0DB00000,
-    OP_LDC_PREI_UP_LT_NW   = 0x0DD00000,
-    OP_LDC_PREI_UP_LT_WB   = 0x0DF00000,
+    OP_SWI_0 = 0x0F000000,
+    OP_SWI_1 = 0x0F100000,
+    OP_SWI_2 = 0x0F200000,
+    OP_SWI_3 = 0x0F300000,
+    OP_SWI_4 = 0x0F400000,
+    OP_SWI_5 = 0x0F500000,
+    OP_SWI_6 = 0x0F600000,
+    OP_SWI_7 = 0x0F700000,
+    OP_SWI_8 = 0x0F800000,
+    OP_SWI_9 = 0x0F900000,
+    OP_SWI_A = 0x0FA00000,
+    OP_SWI_B = 0x0FB00000,
+    OP_SWI_C = 0x0FC00000,
+    OP_SWI_D = 0x0FD00000,
+    OP_SWI_E = 0x0FE00000,
+    OP_SWI_F = 0x0FF00000,
 
-    OP_LDC_POSTI_DOWN_ST_NW = 0x0D100000,
-    OP_LDC_POSTI_DOWN_ST_WB = 0x0D,
-    OP_LDC_POSTI_DOWN_LT_NW = 0x,
-    OP_LDC_POSTI_DOWN_LT_WB = 0x,
-    OP_LDC_POSTI_UP_ST_NW   = 0x0D,
-    OP_LDC_POSTI_UP_ST_WB   = 0x,
-    OP_LDC_POSTI_UP_LT_NW   = 0x,
-    OP_LDC_POSTI_UP_LT_WB   = 0x,
+    OP_CDP_0 = 0x0E000000,
+    OP_CDP_1 = 0x0E100000,
+    OP_CDP_2 = 0x0E200000,
+    OP_CDP_3 = 0x0E300000,
+    OP_CDP_4 = 0x0E400000,
+    OP_CDP_5 = 0x0E500000,
+    OP_CDP_6 = 0x0E600000,
+    OP_CDP_7 = 0x0E700000,
+    OP_CDP_8 = 0x0E800000,
+    OP_CDP_9 = 0x0E900000,
+    OP_CDP_A = 0x0EA00000,
+    OP_CDP_B = 0x0EB00000,
+    OP_CDP_C = 0x0EC00000,
+    OP_CDP_D = 0x0ED00000,
+    OP_CDP_E = 0x0EE00000,
+    OP_CDP_F = 0x0EF00000,
 
-    OP_STC_PREI_DOWN_ = 0x0C000000,
-    OP_STC_PREI_UP_ = 0x,
-    OP_STC_POSTI_DOWN_ = 0x,
-    OP_STC_POSTI_UP_ = 0x,
+    OP_LDC_PRE_DOWN_ST_NW  = 0x0D100000,
+    OP_LDC_PRE_DOWN_ST_WB  = 0x0D300000,
+    OP_LDC_PRE_DOWN_LT_NW  = 0x0D500000,
+    OP_LDC_PRE_DOWN_LT_WB  = 0x0D700000,
+    OP_LDC_PRE_UP_ST_NW    = 0x0D900000,
+    OP_LDC_PRE_UP_ST_WB    = 0x0DB00000,
+    OP_LDC_PRE_UP_LT_NW    = 0x0DD00000,
+    OP_LDC_PRE_UP_LT_WB    = 0x0DF00000,
+    OP_LDC_POST_DOWN_ST_NW = 0x0C100000,
+    OP_LDC_POST_DOWN_ST_WB = 0x0C300000,
+    OP_LDC_POST_DOWN_LT_NW = 0x0C500000,
+    OP_LDC_POST_DOWN_LT_WB = 0x0C700000,
+    OP_LDC_POST_UP_ST_NW   = 0x0C900000,
+    OP_LDC_POST_UP_ST_WB   = 0x0CB00000,
+    OP_LDC_POST_UP_LT_NW   = 0x0CD00000,
+    OP_LDC_POST_UP_LT_WB   = 0x0CF00000,
+
+    OP_STC_PRE_DOWN_ST_NW  = 0x0D000000,
+    OP_STC_PRE_DOWN_ST_WB  = 0x0D200000,
+    OP_STC_PRE_DOWN_LT_NW  = 0x0D400000,
+    OP_STC_PRE_DOWN_LT_WB  = 0x0D600000,
+    OP_STC_PRE_UP_ST_NW    = 0x0D800000,
+    OP_STC_PRE_UP_ST_WB    = 0x0DA00000,
+    OP_STC_PRE_UP_LT_NW    = 0x0DC00000,
+    OP_STC_PRE_UP_LT_WB    = 0x0DE00000,
+    OP_STC_POST_DOWN_ST_NW = 0x0C000000,
+    OP_STC_POST_DOWN_ST_WB = 0x0C200000,
+    OP_STC_POST_DOWN_LT_NW = 0x0C400000,
+    OP_STC_POST_DOWN_LT_WB = 0x0C600000,
+    OP_STC_POST_UP_ST_NW   = 0x0C800000,
+    OP_STC_POST_UP_ST_WB   = 0x0CA00000,
+    OP_STC_POST_UP_LT_NW   = 0x0CC00000,
+    OP_STC_POST_UP_LT_WB   = 0x0CE00000,
 
     OP_JMP  = 0x00000000
   };
@@ -225,22 +304,61 @@ freedo_arm2_loop(const uint32_t cycles_)
   cycle_cnt = 0;
   DISPATCH();
 
- label_OP_SWI0:
- label_OP_SWI1:
- label_OP_SWI2:
- label_OP_SWI3:
- label_OP_SWI4:
- label_OP_SWI5:
- label_OP_SWI6:
- label_OP_SWI7:
- label_OP_SWI8:
- label_OP_SWI9:
- label_OP_SWIA:
- label_OP_SWIB:
- label_OP_SWIC:
- label_OP_SWID:
- label_OP_SWIE:
- label_OP_SWIF:
+ label_OP_B_0:
+ label_OP_B_1:
+ label_OP_B_2:
+ label_OP_B_3:
+ label_OP_B_4:
+ label_OP_B_5:
+ label_OP_B_6:
+ label_OP_B_7:
+ label_OP_B_8:
+ label_OP_B_9:
+ label_OP_B_A:
+ label_OP_B_B:
+ label_OP_B_C:
+ label_OP_B_D:
+ label_OP_B_E:
+ label_OP_B_F:
+  {
+    PC += sign_extend_24_32(((opcode & 0x00FFFFFF) << 2));
+  }
+  DISPATCH();
+
+ label_OP_BL_0:
+ label_OP_BL_1:
+ label_OP_BL_2:
+ label_OP_BL_3:
+ label_OP_BL_4:
+ label_OP_BL_5:
+ label_OP_BL_6:
+ label_OP_BL_7:
+ label_OP_BL_8:
+ label_OP_BL_9:
+ label_OP_BL_A:
+ label_OP_BL_B:
+ label_OP_BL_C:
+ label_OP_BL_D:
+ label_OP_BL_E:
+ label_OP_BL_F:
+  DISPATCH();
+
+ label_OP_SWI_0:
+ label_OP_SWI_1:
+ label_OP_SWI_2:
+ label_OP_SWI_3:
+ label_OP_SWI_4:
+ label_OP_SWI_5:
+ label_OP_SWI_6:
+ label_OP_SWI_7:
+ label_OP_SWI_8:
+ label_OP_SWI_9:
+ label_OP_SWI_A:
+ label_OP_SWI_B:
+ label_OP_SWI_C:
+ label_OP_SWI_D:
+ label_OP_SWI_E:
+ label_OP_SWI_F:
   {
     // MODE = MODE_SVC
     // R14_svc = PC + 4
@@ -249,22 +367,22 @@ freedo_arm2_loop(const uint32_t cycles_)
   }
   DISPATCH();
 
- label_OP_CDP0:
- label_OP_CDP1:
- label_OP_CDP2:
- label_OP_CDP3:
- label_OP_CDP4:
- label_OP_CDP5:
- label_OP_CDP6:
- label_OP_CDP7:
- label_OP_CDP8:
- label_OP_CDP9:
- label_OP_CDPA:
- label_OP_CDPB:
- label_OP_CDPC:
- label_OP_CDPD:
- label_OP_CDPE:
- label_OP_CDPF:
+ label_OP_CDP_0:
+ label_OP_CDP_1:
+ label_OP_CDP_2:
+ label_OP_CDP_3:
+ label_OP_CDP_4:
+ label_OP_CDP_5:
+ label_OP_CDP_6:
+ label_OP_CDP_7:
+ label_OP_CDP_8:
+ label_OP_CDP_9:
+ label_OP_CDP_A:
+ label_OP_CDP_B:
+ label_OP_CDP_C:
+ label_OP_CDP_D:
+ label_OP_CDP_E:
+ label_OP_CDP_F:
   {
     const uint32_t CRm = (opcode & 0xF);
     const uint32_t CP  = ((opcode & 0x000E0) >>  4);
