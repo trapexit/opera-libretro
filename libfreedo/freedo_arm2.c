@@ -41,6 +41,10 @@
   X(OP_BL_D)                                    \
   X(OP_BL_E)                                    \
   X(OP_BL_F)                                    \
+  X(OP_AND_REG_DAC) \
+  X(OP_AND_REG_SCC) \
+  X(OP_AND_IMM_DAC) \
+  X(OP_AND_IMM_SCC) \
   X(OP_SWI_0)                                   \
   X(OP_SWI_1)                                   \
   X(OP_SWI_2)                                   \
@@ -72,8 +76,7 @@
   X(OP_CDP_C)                                   \
   X(OP_CDP_D)                                   \
   X(OP_CDP_E)                                   \
-  X(OP_CDP_F)                                   \
-  X(OP_JMP)
+  X(OP_CDP_F)
 
 /*
   ARM60 supports six modes of operation:
@@ -369,8 +372,6 @@ enum
     OP_STC_POST_UP_ST_WB   = 0x0CA00000,
     OP_STC_POST_UP_LT_NW   = 0x0CC00000,
     OP_STC_POST_UP_LT_WB   = 0x0CE00000,
-
-    OP_JMP  = 0x00000000
   };
 
 uint32_t
@@ -401,7 +402,7 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_B_E:
  label_OP_B_F:
   {
-    PC += sign_extend_26_32((opcode & 0x00FFFFFF) << 2);
+    // R15 += sign_extend_26_32((opcode & 0x00FFFFFF) << 2);
     // cycle_cnt += 2S + 1N
   }
   DISPATCH();
@@ -424,9 +425,155 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_BL_F:
   {
     // R14 = PC + 4
-    PC += sign_extend_26_32((opcode & 0x00FFFFFF) << 2);
+    // R15 += sign_extend_26_32((opcode & 0x00FFFFFF) << 2);
     // cycle_cnt += 2S + 1N
   }
+  DISPATCH();
+
+ label_OP_AND_REG_DAC:
+  DISPATCH();
+
+ label_OP_AND_REG_SCC:
+  DISPATCH();
+
+ label_OP_AND_IMM_DAC:
+  DISPATCH();
+ label_OP_AND_IMM_SCC:
+  DISPATCH();
+
+ label_OP_EOR_REG_DAC:
+  DISPATCH();
+ label_OP_EOR_REG_SCC:
+  DISPATCH();
+ label_OP_EOR_IMM_DAC:
+  DISPATCH();
+ label_OP_EOR_IMM_SCC:
+  DISPATCH();
+
+ label_OP_SUB_REG_DAC:
+  DISPATCH();
+ label_OP_SUB_REG_SCC:
+  DISPATCH();
+ label_OP_SUB_IMM_DAC:
+  DISPATCH();
+ label_OP_SUB_IMM_SCC:
+  DISPATCH();
+
+ label_OP_RSB_REG_DAC:
+  DISPATCH();
+ label_OP_RSB_REG_SCC:
+  DISPATCH();
+ label_OP_RSB_IMM_DAC:
+  DISPATCH();
+ label_OP_RSB_IMM_SCC:
+  DISPATCH();
+
+ label_OP_ADD_REG_DAC:
+  DISPATCH();
+ label_OP_ADD_REG_SCC:
+  DISPATCH();
+ label_OP_ADD_IMM_DAC:
+  DISPATCH();
+ label_OP_ADD_IMM_SCC:
+  DISPATCH();
+
+ label_OP_ADC_REG_DAC:
+  DISPATCH();
+ label_OP_ADC_REG_SCC:
+  DISPATCH();
+ label_OP_ADC_IMM_DAC:
+  DISPATCH();
+ label_OP_ADC_IMM_SCC:
+  DISPATCH();
+
+ label_OP_SBC_REG_DAC:
+  DISPATCH();
+ label_OP_SBC_REG_SCC:
+  DISPATCH();
+ label_OP_SBC_IMM_DAC:
+  DISPATCH();
+ label_OP_SBC_IMM_SCC:
+  DISPATCH();
+
+ label_OP_RSC_REG_DAC:
+  DISPATCH();
+ label_OP_RSC_REG_SCC:
+  DISPATCH();
+ label_OP_RSC_IMM_DAC:
+  DISPATCH();
+ label_OP_RSC_IMM_SCC:
+  DISPATCH();
+
+ label_OP_TST_REG_DAC:
+  DISPATCH();
+ label_OP_TST_REG_SCC:
+  DISPATCH();
+ label_OP_TST_IMM_DAC:
+  DISPATCH();
+ label_OP_TST_IMM_SCC:
+  DISPATCH();
+
+ label_OP_TEQ_REG_DAC:
+  DISPATCH();
+ label_OP_TEQ_REG_SCC:
+  DISPATCH();
+ label_OP_TEQ_IMM_DAC:
+  DISPATCH();
+ label_OP_TEQ_IMM_SCC:
+  DISPATCH();
+
+ label_OP_CMP_REG_DAC:
+  DISPATCH();
+ label_OP_CMP_REG_SCC:
+  DISPATCH();
+ label_OP_CMP_IMM_DAC:
+  DISPATCH();
+ label_OP_CMP_IMM_SCC:
+  DISPATCH();
+
+ label_OP_CMN_REG_DAC:
+  DISPATCH();
+ label_OP_CMN_REG_SCC:
+  DISPATCH();
+ label_OP_CMN_IMM_DAC:
+  DISPATCH();
+ label_OP_CMN_IMM_SCC:
+  DISPATCH();
+
+ label_OP_ORR_REG_DAC:
+  DISPATCH();
+ label_OP_ORR_REG_SCC:
+  DISPATCH();
+ label_OP_ORR_IMM_DAC:
+  DISPATCH();
+ label_OP_ORR_IMM_SCC:
+  DISPATCH();
+
+ label_OP_MOV_REG_DAC:
+  DISPATCH();
+ label_OP_MOV_REG_SCC:
+  DISPATCH();
+ label_OP_MOV_IMM_DAC:
+  DISPATCH();
+ label_OP_MOV_IMM_SCC:
+  DISPATCH();
+
+ label_OP_BIC_REG_DAC:
+  DISPATCH();
+ label_OP_BIC_REG_SCC:
+  DISPATCH();
+ label_OP_BIC_IMM_DAC:
+  DISPATCH();
+ label_OP_BIC_IMM_SCC:
+  DISPATCH();
+
+ label_OP_MVN_REG_DAC:
+  DISPATCH();
+ label_OP_MVN_REG_SCC:
+  DISPATCH();
+ label_OP_MVN_IMM_DAC:
+  DISPATCH();
+ label_OP_MVN_IMM_SCC:
   DISPATCH();
 
  label_OP_SWI_0:
@@ -478,9 +625,6 @@ freedo_arm2_loop(const uint32_t cycles_)
 
     // cycle_cnt += 1S + bI
   }
-  DISPATCH();
-
- label_OP_JMP:
   DISPATCH();
 
  EXIT:
