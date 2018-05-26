@@ -41,10 +41,70 @@
   X(OP_BL_D)                                    \
   X(OP_BL_E)                                    \
   X(OP_BL_F)                                    \
-  X(OP_AND_REG_DAC) \
-  X(OP_AND_REG_SCC) \
-  X(OP_AND_IMM_DAC) \
-  X(OP_AND_IMM_SCC) \
+  X(OP_AND_REG_DAC)                             \
+  X(OP_AND_REG_SCC)                             \
+  X(OP_AND_IMM_DAC)                             \
+  X(OP_AND_IMM_SCC)                             \
+  X(OP_EOR_REG_DAC)                             \
+  X(OP_EOR_REG_SCC)                             \
+  X(OP_EOR_IMM_DAC)                             \
+  X(OP_EOR_IMM_SCC)                             \
+  X(OP_SUB_REG_DAC)                             \
+  X(OP_SUB_REG_SCC)                             \
+  X(OP_SUB_IMM_DAC)                             \
+  X(OP_SUB_IMM_SCC)                             \
+  X(OP_RSB_REG_DAC)                             \
+  X(OP_RSB_REG_SCC)                             \
+  X(OP_RSB_IMM_DAC)                             \
+  X(OP_RSB_IMM_SCC)                             \
+  X(OP_ADD_REG_DAC)                             \
+  X(OP_ADD_REG_SCC)                             \
+  X(OP_ADD_IMM_DAC)                             \
+  X(OP_ADD_IMM_SCC)                             \
+  X(OP_ADC_REG_DAC)                             \
+  X(OP_ADC_REG_SCC)                             \
+  X(OP_ADC_IMM_DAC)                             \
+  X(OP_ADC_IMM_SCC)                             \
+  X(OP_SBC_REG_DAC)                             \
+  X(OP_SBC_REG_SCC)                             \
+  X(OP_SBC_IMM_DAC)                             \
+  X(OP_SBC_IMM_SCC)                             \
+  X(OP_RSC_REG_DAC)                             \
+  X(OP_RSC_REG_SCC)                             \
+  X(OP_RSC_IMM_DAC)                             \
+  X(OP_RSC_IMM_SCC)                             \
+  X(OP_TST_REG_DAC)                             \
+  X(OP_TST_REG_SCC)                             \
+  X(OP_TST_IMM_DAC)                             \
+  X(OP_TST_IMM_SCC)                             \
+  X(OP_TEQ_REG_DAC)                             \
+  X(OP_TEQ_REG_SCC)                             \
+  X(OP_TEQ_IMM_DAC)                             \
+  X(OP_TEQ_IMM_SCC)                             \
+  X(OP_CMP_REG_DAC)                             \
+  X(OP_CMP_REG_SCC)                             \
+  X(OP_CMP_IMM_DAC)                             \
+  X(OP_CMP_IMM_SCC)                             \
+  X(OP_CMN_REG_DAC)                             \
+  X(OP_CMN_REG_SCC)                             \
+  X(OP_CMN_IMM_DAC)                             \
+  X(OP_CMN_IMM_SCC)                             \
+  X(OP_ORR_REG_DAC)                             \
+  X(OP_ORR_REG_SCC)                             \
+  X(OP_ORR_IMM_DAC)                             \
+  X(OP_ORR_IMM_SCC)                             \
+  X(OP_MOV_REG_DAC)                             \
+  X(OP_MOV_REG_SCC)                             \
+  X(OP_MOV_IMM_DAC)                             \
+  X(OP_MOV_IMM_SCC)                             \
+  X(OP_BIC_REG_DAC)                             \
+  X(OP_BIC_REG_SCC)                             \
+  X(OP_BIC_IMM_DAC)                             \
+  X(OP_BIC_IMM_SCC)                             \
+  X(OP_MVN_REG_DAC)                             \
+  X(OP_MVN_REG_SCC)                             \
+  X(OP_MVN_IMM_DAC)                             \
+  X(OP_MVN_IMM_SCC)                             \
   X(OP_SWI_0)                                   \
   X(OP_SWI_1)                                   \
   X(OP_SWI_2)                                   \
