@@ -6,7 +6,7 @@
 #define DISPATCH() \
   if(cycle_cnt > cycles_) goto EXIT;            \
   opcode = *((uint32_t*)&mem8[PC]);             \
-  switch(opcode & 0x0FF00000) { OPCODE(DISPATCH_CASE) }
+  switch((opcode & 0x0FF00000) >> 20) { OPCODE(DISPATCH_CASE) }
 #define DISPATCH_CASE(OP) case OP: goto CONCAT(label_,OP);
 #define OPCODE(X)                               \
   X(OP_B_0)                                     \
@@ -371,6 +371,11 @@ enum
     OP_MSR_REG_CPSR = 0x03200000,
     OP_MSR_REG_SPSR = 0x03600000,
 
+    OP_MUL_DAC = 0x00000000,
+    OP_MUL_SCC = 0x00100000,
+    OP_MLA_DAC = 0x00200000,
+    OP_MLA_SCC = 0x00300000,
+
     OP_SWI_0 = 0x0F000000,
     OP_SWI_1 = 0x0F100000,
     OP_SWI_2 = 0x0F200000,
@@ -632,6 +637,12 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_MSR_IMM_SPSR:
  label_OP_MSR_REG_CPSR:
  label_OP_MSR_REG_SPSR:
+  DISPATCH();
+
+ label_OP_MUL_DAC:
+ label_OP_MUL_SCC:
+ label_OP_MLA_DAC:
+ label_OP_MLA_SCC:
   DISPATCH();
 
  label_OP_SWI_0:
