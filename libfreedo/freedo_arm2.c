@@ -73,21 +73,13 @@
   X(OP_RSC_REG_SCC)                             \
   X(OP_RSC_IMM_DAC)                             \
   X(OP_RSC_IMM_SCC)                             \
-  X(OP_TST_REG_DAC)                             \
   X(OP_TST_REG_SCC)                             \
-  X(OP_TST_IMM_DAC)                             \
   X(OP_TST_IMM_SCC)                             \
-  X(OP_TEQ_REG_DAC)                             \
   X(OP_TEQ_REG_SCC)                             \
-  X(OP_TEQ_IMM_DAC)                             \
   X(OP_TEQ_IMM_SCC)                             \
-  X(OP_CMP_REG_DAC)                             \
   X(OP_CMP_REG_SCC)                             \
-  X(OP_CMP_IMM_DAC)                             \
   X(OP_CMP_IMM_SCC)                             \
-  X(OP_CMN_REG_DAC)                             \
   X(OP_CMN_REG_SCC)                             \
-  X(OP_CMN_IMM_DAC)                             \
   X(OP_CMN_IMM_SCC)                             \
   X(OP_ORR_REG_DAC)                             \
   X(OP_ORR_REG_SCC)                             \
@@ -105,6 +97,12 @@
   X(OP_MVN_REG_SCC)                             \
   X(OP_MVN_IMM_DAC)                             \
   X(OP_MVN_IMM_SCC)                             \
+  X(OP_MRS_CPSR)                                \
+  X(OP_MRS_SPSR)                                \
+  X(OP_MSR_IMM_CPSR)                            \
+  X(OP_MSR_IMM_SPSR)                            \
+  X(OP_MSR_REG_CPSR)                            \
+  X(OP_MSR_REG_SPSR)                            \
   X(OP_SWI_0)                                   \
   X(OP_SWI_1)                                   \
   X(OP_SWI_2)                                   \
@@ -325,24 +323,24 @@ enum
     OP_RSC_IMM_DAC = 0x02E00000,
     OP_RSC_IMM_SCC = 0x02F00000,
 
-    OP_TST_REG_DAC = 0x01000000,
+    //    OP_TST_REG_DAC = 0x01000000,
     OP_TST_REG_SCC = 0x01100000,
-    OP_TST_IMM_DAC = 0x03000000,
+    //    OP_TST_IMM_DAC = 0x03000000,
     OP_TST_IMM_SCC = 0x03100000,
 
-    OP_TEQ_REG_DAC = 0x01200000,
+    //    OP_TEQ_REG_DAC = 0x01200000,
     OP_TEQ_REG_SCC = 0x01300000,
-    OP_TEQ_IMM_DAC = 0x03200000,
+    //    OP_TEQ_IMM_DAC = 0x03200000,
     OP_TEQ_IMM_SCC = 0x03300000,
 
-    OP_CMP_REG_DAC = 0x01400000,
+    //    OP_CMP_REG_DAC = 0x01400000,
     OP_CMP_REG_SCC = 0x01500000,
-    OP_CMP_IMM_DAC = 0x03400000,
+    //    OP_CMP_IMM_DAC = 0x03400000,
     OP_CMP_IMM_SCC = 0x03500000,
 
-    OP_CMN_REG_DAC = 0x01600000,
+    //    OP_CMN_REG_DAC = 0x01600000,
     OP_CMN_REG_SCC = 0x01700000,
-    OP_CMN_IMM_DAC = 0x03600000,
+    //    OP_CMN_IMM_DAC = 0x03600000,
     OP_CMN_IMM_SCC = 0x03700000,
 
     OP_ORR_REG_DAC = 0x01800000,
@@ -364,6 +362,14 @@ enum
     OP_MVN_REG_SCC = 0x01F00000,
     OP_MVN_IMM_DAC = 0x03E00000,
     OP_MVN_IMM_SCC = 0x03F00000,
+
+    OP_MRS_CPSR     = 0x01000000,
+    OP_MRS_SPSR     = 0x01400000,
+
+    OP_MSR_IMM_CPSR = 0x01200000,
+    OP_MSR_IMM_SPSR = 0x01600000,
+    OP_MSR_REG_CPSR = 0x03200000,
+    OP_MSR_REG_SPSR = 0x03600000,
 
     OP_SWI_0 = 0x0F000000,
     OP_SWI_1 = 0x0F100000,
@@ -564,38 +570,22 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_RSC_IMM_SCC:
   DISPATCH();
 
- label_OP_TST_REG_DAC:
-  DISPATCH();
  label_OP_TST_REG_SCC:
-  DISPATCH();
- label_OP_TST_IMM_DAC:
   DISPATCH();
  label_OP_TST_IMM_SCC:
   DISPATCH();
 
- label_OP_TEQ_REG_DAC:
-  DISPATCH();
  label_OP_TEQ_REG_SCC:
-  DISPATCH();
- label_OP_TEQ_IMM_DAC:
   DISPATCH();
  label_OP_TEQ_IMM_SCC:
   DISPATCH();
 
- label_OP_CMP_REG_DAC:
-  DISPATCH();
  label_OP_CMP_REG_SCC:
-  DISPATCH();
- label_OP_CMP_IMM_DAC:
   DISPATCH();
  label_OP_CMP_IMM_SCC:
   DISPATCH();
 
- label_OP_CMN_REG_DAC:
-  DISPATCH();
  label_OP_CMN_REG_SCC:
-  DISPATCH();
- label_OP_CMN_IMM_DAC:
   DISPATCH();
  label_OP_CMN_IMM_SCC:
   DISPATCH();
@@ -634,6 +624,14 @@ freedo_arm2_loop(const uint32_t cycles_)
  label_OP_MVN_IMM_DAC:
   DISPATCH();
  label_OP_MVN_IMM_SCC:
+  DISPATCH();
+
+ label_OP_MRS_CPSR:
+ label_OP_MRS_SPSR:
+ label_OP_MSR_IMM_CPSR:
+ label_OP_MSR_IMM_SPSR:
+ label_OP_MSR_REG_CPSR:
+ label_OP_MSR_REG_SPSR:
   DISPATCH();
 
  label_OP_SWI_0:
