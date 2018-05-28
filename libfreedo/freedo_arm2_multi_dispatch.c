@@ -201,6 +201,30 @@ handle_IMM_POST_LDR_STR(const uint32_t opcode_)
 static
 INLINE
 uint32_t
+handle_IMM_PRE_LDR_STR(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_POST_LDR_STR(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_PRE_LDR_STR(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
 handle_single_data_swap(const uint32_t opcode_)
 {
   return 0;
@@ -210,6 +234,14 @@ static
 INLINE
 uint32_t
 handle_multiply(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_undefined(const uint32_t opcode_)
 {
   return 0;
 }
@@ -262,6 +294,7 @@ INLINE
 uint32_t
 handle_OP_5(const uint32_t opcode_)
 {
+  return handle_IMM_PRE_LDR_STR(opcode_);
   return 0;
 }
 
@@ -270,7 +303,9 @@ INLINE
 uint32_t
 handle_OP_6(const uint32_t opcode_)
 {
-  return 0;
+  if((opcode_ & 0x06000010) == 0x06000010)
+    return handle_undefined(opcode_);
+  return handle_REG_POST_LDR_STR(opcode_);
 }
 
 static
@@ -278,7 +313,7 @@ INLINE
 uint32_t
 handle_OP_7(const uint32_t opcode_)
 {
-  return 0;
+  return handle_REG_PRE_LDR_STR(opcode_);
 }
 
 static
