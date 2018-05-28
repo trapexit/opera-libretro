@@ -364,8 +364,9 @@ INLINE
 uint32_t
 handle_OP_0(const uint32_t opcode_)
 {
+  if((opcode_ & 0x00000090) == 0x00000090)
+    return handle_multiply(opcode_);
   return handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
-  return handle_multiply(opcode_);
 }
 
 static
