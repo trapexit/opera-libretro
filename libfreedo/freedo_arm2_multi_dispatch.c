@@ -291,6 +291,7 @@ handle_Branch_with_Link(const uint32_t opcode_)
   const uint32_t offset = (opcode_ & 0x00FFFFFF);
 
   CPU.REGS[R14] = (CPU.REGS[R15] + 4);
+  CPU.REGS[R15] += sign_extend_26_32(offset << 2);  
 
   return (0); // 2S + 1N
 }
@@ -374,8 +375,9 @@ INLINE
 uint32_t
 handle_OP_1(const uint32_t opcode_)
 {
+  if((opcode_ & 0x01000090) == 0x01000090)
+    return handle_single_data_swap(opcode_);    
   return handle_IMM_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(opcode_);
-  return handle_single_data_swap(opcode_);
 }
 
 static
