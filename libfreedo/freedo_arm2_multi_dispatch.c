@@ -29,7 +29,10 @@
 struct CPU_s
 {
   uint32_t  MODE;
-  uint32_t  REGS[6][16];
+  uint32_t *REGS;
+  uint32_t  REGBANKS[6][16];
+  uint32_t  CPSR[6];
+  uint32_t  SPSR[6];
 };
 
 typedef struct CPU_s CPU_t;
@@ -48,12 +51,12 @@ static CPU_t CPU;
 
 enum
   {
-    MODE_USR = 1,
-    MODE_FIQ = 2,
-    MODE_IRQ = 3,
-    MODE_SVC = 4,
-    MODE_ABT = 5,
-    MODE_UND = 6
+    MODE_USR = 0,
+    MODE_FIQ = 1,
+    MODE_IRQ = 2,
+    MODE_SVC = 3,
+    MODE_ABT = 4,
+    MODE_UND = 5
   };
 
 /*
@@ -145,6 +148,26 @@ enum
     COND_LE = 0xD,
     COND_AL = 0xE,
     COND_NV = 0xF
+  };
+
+enum
+  {
+    R0  = 0x0,
+    R1  = 0x1,
+    R2  = 0x2,
+    R3  = 0x3,
+    R4  = 0x4,
+    R5  = 0x5,
+    R6  = 0x6,
+    R7  = 0x7,
+    R8  = 0x8,
+    R9  = 0x9,
+    R10 = 0xA,
+    R11 = 0xB,
+    R12 = 0xC,
+    R13 = 0xD,
+    R14 = 0xE,
+    R15 = 0xF
   };
 
 enum
@@ -253,7 +276,11 @@ INLINE
 uint32_t
 handle_Branch(const uint32_t opcode_)
 {
-  return 0;
+  const uint32_t offset = (opcode_ & 0x00FFFFFF);
+
+  CPU.REGS[R15] += sign_extend_26_32(offset << 2);
+
+  return (0); // 2S + 1N
 }
 
 static
@@ -261,7 +288,11 @@ INLINE
 uint32_t
 handle_Branch_with_Link(const uint32_t opcode_)
 {
-  return 0;
+  const uint32_t offset = (opcode_ & 0x00FFFFFF);
+
+  CPU.REGS[R14] = (CPU.REGS[R15] + 4);
+
+  return (0); // 2S + 1N
 }
 
 static
