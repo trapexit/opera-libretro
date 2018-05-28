@@ -240,6 +240,102 @@ handle_OP_3(const uint32_t opcode_)
   return handle_REG_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(opcode_);
 }
 
+static
+INLINE
+uint32_t
+handle_OP_4(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_5(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_6(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_7(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_8(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_9(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_A(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_B(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_C(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_D(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_E(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_OP_F(const uint32_t opcode_)
+{
+  return 0;
+}
+
 uint32_t
 freedo_arm2_loop(const uint32_t cycles_)
 {
@@ -252,36 +348,52 @@ freedo_arm2_loop(const uint32_t cycles_)
   DISPATCH();
 
  label_OP_0:
+  handle_OP_0(opcode);
   DISPATCH();
  label_OP_1:
+  handle_OP_1(opcode);  
   DISPATCH();
  label_OP_2:
+  handle_OP_2(opcode);
   DISPATCH();
  label_OP_3:
+  handle_OP_3(opcode);
   DISPATCH();
  label_OP_4:
+  handle_OP_4(opcode);
   DISPATCH();
  label_OP_5:
+  handle_OP_5(opcode);
   DISPATCH();
  label_OP_6:
+  handle_OP_6(opcode);
   DISPATCH();
  label_OP_7:
+  handle_OP_7(opcode);
   DISPATCH();
  label_OP_8:
+  handle_OP_8(opcode);
   DISPATCH();
  label_OP_9:
+  handle_OP_9(opcode);
   DISPATCH();
  label_OP_A:
+  handle_OP_A(opcode);
   DISPATCH();
  label_OP_B:
+  handle_OP_B(opcode);
   DISPATCH();
  label_OP_C:
+  handle_OP_C(opcode);
   DISPATCH();
  label_OP_D:
+  handle_OP_D(opcode);
   DISPATCH();
  label_OP_E:
+  handle_OP_E(opcode);
   DISPATCH();
  label_OP_F:
+  handle_OP_F(opcode);
   DISPATCH();
 
  EXIT:
