@@ -190,12 +190,91 @@ enum
     OP_F = 0xF
   };
 
+static
+INLINE
+uint32_t
+ROR(const uint32_t n_,
+    const uint32_t s_)
+{
+  return ((n_ >> s_) | (n_ << (32 - s_)));
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_AND_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rotate_,
+                   const uint32_t imm_)
+{
+  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & ROR(imm_,rotate_));
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_AND_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rotate_,
+                   const uint32_t imm_)
+{
+  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & ROR(imm_,rotate_));
+
+  return 0;
+}
 
 static
 INLINE
 uint32_t
 handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
+  const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
+  const uint32_t Rn     = ((opcode_ & 0x000F0000) >> 16);
+  const uint32_t Rd     = ((opcode_ & 0x0000F000) >> 12);
+  const uint32_t rotate = ((opcode_ & 0x00000F00) >>  7);
+  const uint32_t imm    = ((opcode_ & 0x000000FF) >>  0);
+
+  switch(opcode)
+    {
+      /* AND, do not alter condition codes */
+    case 0x0:
+      return handle_IMM_AND_DAC(Rn,Rd,rotate,imm);
+      /* AND, set condition codes */
+    case 0x1:
+      return handle_IMM_AND_SCC(Rn,Rd,rotate,imm);
+      /* EOR, do not alter condition codes */
+    case 0x2:
+      /* EOR, set condition codes */
+    case 0x3:
+      /* SUB, do not alter condition codes */
+    case 0x4:
+      /* SUB, set condition codes */
+    case 0x5:
+      /* RSB, do not alter condition codes */
+    case 0x6:
+      /* RSB, set condition codes */
+    case 0x7:
+      /* ADD, do not alter condition codes */
+    case 0x8:
+      /* ADD, set condition codes */
+    case 0x9:
+      /* ADC, do not alter condition codes */
+    case 0xA:
+      /* ADC, set condition codes */
+    case 0xB:
+      /* SBC, do not alter condition codes */
+    case 0xC:
+      /* SBC, set condition codes */
+    case 0xD:
+      /* RSC, do not alter condition codes */
+    case 0xE:
+      /* RSC, set condition codes */
+    case 0xF:
+      break;
+    }
+
   return 0;
 }
 
@@ -204,6 +283,49 @@ INLINE
 uint32_t
 handle_REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
+  const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
+  const uint32_t Rn     = ((opcode_ & 0x000F0000) >> 16);
+  const uint32_t Rd     = ((opcode_ & 0x0000F000) >> 12);
+  const uint32_t shift  = ((opcode_ & 0x00000FF0) >>  4);
+  const uint32_t Rm     = ((opcode_ & 0x0000000F) >>  0);
+
+  switch(opcode)
+    {
+      /* AND, do not alter condition codes */
+    case 0x0:
+      /* AND, set condition codes */
+    case 0x1:
+      /* EOR, do not alter condition codes */
+    case 0x2:
+      /* EOR, set condition codes */
+    case 0x3:
+      /* SUB, do not alter condition codes */
+    case 0x4:
+      /* SUB, set condition codes */
+    case 0x5:
+      /* RSB, do not alter condition codes */
+    case 0x6:
+      /* RSB, set condition codes */
+    case 0x7:
+      /* ADD, do not alter condition codes */
+    case 0x8:
+      /* ADD, set condition codes */
+    case 0x9:
+      /* ADC, do not alter condition codes */
+    case 0xA:
+      /* ADC, set condition codes */
+    case 0xB:
+      /* SBC, do not alter condition codes */
+    case 0xC:
+      /* SBC, set condition codes */
+    case 0xD:
+      /* RSC, do not alter condition codes */
+    case 0xE:
+      /* RSC, set condition codes */
+    case 0xF:
+      break;
+    }
+
   return 0;
 }
 
@@ -291,7 +413,7 @@ handle_Branch_with_Link(const uint32_t opcode_)
   const uint32_t offset = (opcode_ & 0x00FFFFFF);
 
   CPU.REGS[R14] = (CPU.REGS[R15] + 4);
-  CPU.REGS[R15] += sign_extend_26_32(offset << 2);  
+  CPU.REGS[R15] += sign_extend_26_32(offset << 2);
 
   return (0); // 2S + 1N
 }
@@ -367,7 +489,7 @@ handle_OP_0(const uint32_t opcode_)
 {
   if((opcode_ & 0x00000090) == 0x00000090)
     return handle_multiply(opcode_);
-  return handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
+  return handle_REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
 }
 
 static
@@ -376,7 +498,7 @@ uint32_t
 handle_OP_1(const uint32_t opcode_)
 {
   if((opcode_ & 0x01000090) == 0x01000090)
-    return handle_single_data_swap(opcode_);    
+    return handle_single_data_swap(opcode_);
   return handle_IMM_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(opcode_);
 }
 
@@ -385,7 +507,7 @@ INLINE
 uint32_t
 handle_OP_2(const uint32_t opcode_)
 {
-  return handle_REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
+  return handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
 }
 
 static
@@ -393,7 +515,7 @@ INLINE
 uint32_t
 handle_OP_3(const uint32_t opcode_)
 {
-  return handle_REG_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(opcode_);
+  return handle_IMM_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(opcode_);
 }
 
 static
