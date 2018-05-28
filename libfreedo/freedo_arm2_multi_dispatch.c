@@ -204,10 +204,9 @@ INLINE
 uint32_t
 handle_IMM_AND_DAC(const uint32_t Rn_,
                    const uint32_t Rd_,
-                   const uint32_t rotate_,
-                   const uint32_t imm_)
+                   const uint32_t rot_imm_)
 {
-  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & ROR(imm_,rotate_));
+  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & rot_imm_);
 
   return 0;
 }
@@ -217,10 +216,9 @@ INLINE
 uint32_t
 handle_IMM_AND_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
-                   const uint32_t rotate_,
-                   const uint32_t imm_)
+                   const uint32_t rot_imm_)
 {
-  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & ROR(imm_,rotate_));
+  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & rot_imm_);
 
   return 0;
 }
@@ -230,20 +228,22 @@ INLINE
 uint32_t
 handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
+  uint32_t rot_imm;
   const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
   const uint32_t Rn     = ((opcode_ & 0x000F0000) >> 16);
   const uint32_t Rd     = ((opcode_ & 0x0000F000) >> 12);
   const uint32_t rotate = ((opcode_ & 0x00000F00) >>  7);
   const uint32_t imm    = ((opcode_ & 0x000000FF) >>  0);
 
+  rot_imm = ROR(imm,rotate);
   switch(opcode)
     {
       /* AND, do not alter condition codes */
     case 0x0:
-      return handle_IMM_AND_DAC(Rn,Rd,rotate,imm);
+      return handle_IMM_AND_DAC(Rn,Rd,rot_imm);
       /* AND, set condition codes */
     case 0x1:
-      return handle_IMM_AND_SCC(Rn,Rd,rotate,imm);
+      return handle_IMM_AND_SCC(Rn,Rd,rot_imm);
       /* EOR, do not alter condition codes */
     case 0x2:
       /* EOR, set condition codes */
