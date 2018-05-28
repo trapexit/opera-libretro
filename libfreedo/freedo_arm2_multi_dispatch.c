@@ -273,6 +273,30 @@ handle_PRE_LDC_STC(const uint32_t opcode_)
 static
 INLINE
 uint32_t
+handle_coproc_data_operation(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_coproc_register_transfer(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_software_interrupt(const uint32_t opcode_)
+{
+  return 0;
+}
+  
+static
+INLINE
+uint32_t
 handle_single_data_swap(const uint32_t opcode_)
 {
   return 0;
@@ -419,7 +443,9 @@ INLINE
 uint32_t
 handle_OP_E(const uint32_t opcode_)
 {
-  return 0;
+  if((opcode_ & 0x0E000000) == 0x0E000000)
+    return handle_coproc_data_operation(opcode_);
+  return handle_coproc_register_transfer(opcode_);
 }
 
 static
@@ -427,7 +453,7 @@ INLINE
 uint32_t
 handle_OP_F(const uint32_t opcode_)
 {
-  return 0;
+  return handle_software_interrupt(opcode_);
 }
 
 uint32_t
