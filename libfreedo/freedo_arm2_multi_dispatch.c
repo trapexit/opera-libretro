@@ -257,6 +257,22 @@ handle_Branch_with_Link(const uint32_t opcode_)
 static
 INLINE
 uint32_t
+handle_POST_LDC_STC(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_PRE_LDC_STC(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
 handle_single_data_swap(const uint32_t opcode_)
 {
   return 0;
@@ -387,7 +403,7 @@ INLINE
 uint32_t
 handle_OP_C(const uint32_t opcode_)
 {
-  return 0;
+  return handle_POST_LDC_STC(opcode_);
 }
 
 static
@@ -395,7 +411,7 @@ INLINE
 uint32_t
 handle_OP_D(const uint32_t opcode_)
 {
-  return 0;
+  return handle_PRE_LDC_STC(opcode_);
 }
 
 static
