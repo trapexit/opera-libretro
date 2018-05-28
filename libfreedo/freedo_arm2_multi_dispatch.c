@@ -241,6 +241,22 @@ handle_PRE_LDM_STM(const uint32_t opcode_)
 static
 INLINE
 uint32_t
+handle_Branch(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_Branch_with_Link(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
 handle_single_data_swap(const uint32_t opcode_)
 {
   return 0;
@@ -355,7 +371,7 @@ INLINE
 uint32_t
 handle_OP_A(const uint32_t opcode_)
 {
-  return 0;
+  return handle_Branch(opcode_);
 }
 
 static
@@ -363,7 +379,7 @@ INLINE
 uint32_t
 handle_OP_B(const uint32_t opcode_)
 {
-  return 0;
+  return handle_Branch_with_Link(opcode_);
 }
 
 static
