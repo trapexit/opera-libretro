@@ -313,6 +313,8 @@ INLINE
 uint32_t
 handle_OP_7(const uint32_t opcode_)
 {
+  if((opcode_ & 0x06000010) == 0x06000010)
+    return handle_undefined(opcode_);    
   return handle_REG_PRE_LDR_STR(opcode_);
 }
 
