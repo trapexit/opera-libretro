@@ -193,6 +193,14 @@ handle_REG_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(const uint32_t opcode_)
 static
 INLINE
 uint32_t
+handle_IMM_POST_LDR_STR(const uint32_t opcode_)
+{
+  return 0;
+}
+
+static
+INLINE
+uint32_t
 handle_single_data_swap(const uint32_t opcode_)
 {
   return 0;
@@ -245,6 +253,7 @@ INLINE
 uint32_t
 handle_OP_4(const uint32_t opcode_)
 {
+  return handle_IMM_POST_LDR_STR(opcode_);
   return 0;
 }
 
@@ -351,7 +360,7 @@ freedo_arm2_loop(const uint32_t cycles_)
   handle_OP_0(opcode);
   DISPATCH();
  label_OP_1:
-  handle_OP_1(opcode);  
+  handle_OP_1(opcode);
   DISPATCH();
  label_OP_2:
   handle_OP_2(opcode);
