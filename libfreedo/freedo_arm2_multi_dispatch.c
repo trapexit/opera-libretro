@@ -26,6 +26,16 @@
   X(OP_E)                                       \
   X(OP_F)
 
+struct CPU_s
+{
+  uint32_t  MODE;
+  uint32_t  REGS[6][16];
+};
+
+typedef struct CPU_s CPU_t;
+
+static CPU_t CPU;
+
 /*
   ARM60 supports six modes of operation:
   * User mode (usr): the normal program execution state
@@ -293,7 +303,7 @@ handle_software_interrupt(const uint32_t opcode_)
 {
   return 0;
 }
-  
+
 static
 INLINE
 uint32_t
@@ -386,7 +396,7 @@ uint32_t
 handle_OP_7(const uint32_t opcode_)
 {
   if((opcode_ & 0x06000010) == 0x06000010)
-    return handle_undefined(opcode_);    
+    return handle_undefined(opcode_);
   return handle_REG_PRE_LDR_STR(opcode_);
 }
 
