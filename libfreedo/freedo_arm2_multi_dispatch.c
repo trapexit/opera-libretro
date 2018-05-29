@@ -357,6 +357,65 @@ handle_IMM_ADC_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
+handle_IMM_SBC_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_SBC_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_RSC_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ -
+                      CPU.REGS->R[Rn_] +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_RSC_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ -
+                      CPU.REGS->R[Rn_] +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+  return 0;
+}
+
+
+static
+INLINE
+uint32_t
 handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
   uint32_t rot_imm;
@@ -377,32 +436,46 @@ handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return handle_IMM_AND_SCC(Rn,Rd,rot_imm);
       /* EOR, do not alter condition codes */
     case 0x2:
+      return handle_IMM_EOR_DAC(Rn,Rd,rot_imm);
       /* EOR, set condition codes */
     case 0x3:
+      return handle_IMM_EOR_SCC(Rn,Rd,rot_imm);
       /* SUB, do not alter condition codes */
     case 0x4:
+      return handle_IMM_SUB_DAC(Rn,Rd,rot_imm);
       /* SUB, set condition codes */
     case 0x5:
+      return handle_IMM_SUB_SCC(Rn,Rd,rot_imm);
       /* RSB, do not alter condition codes */
     case 0x6:
+      return handle_IMM_RSB_DAC(Rn,Rd,rot_imm);
       /* RSB, set condition codes */
     case 0x7:
+      return handle_IMM_RSB_SCC(Rn,Rd,rot_imm);
       /* ADD, do not alter condition codes */
     case 0x8:
+      return handle_IMM_ADD_DAC(Rn,Rd,rot_imm);
       /* ADD, set condition codes */
     case 0x9:
+      return handle_IMM_ADD_SCC(Rn,Rd,rot_imm);      
       /* ADC, do not alter condition codes */
     case 0xA:
+      return handle_IMM_ADC_DAC(Rn,Rd,rot_imm);      
       /* ADC, set condition codes */
     case 0xB:
+      return handle_IMM_ADC_SCC(Rn,Rd,rot_imm);      
       /* SBC, do not alter condition codes */
     case 0xC:
+      return handle_IMM_SBC_DAC(Rn,Rd,rot_imm);      
       /* SBC, set condition codes */
     case 0xD:
+      return handle_IMM_SBC_SCC(Rn,Rd,rot_imm);            
       /* RSC, do not alter condition codes */
     case 0xE:
+      return handle_IMM_RSC_DAC(Rn,Rd,rot_imm);            
       /* RSC, set condition codes */
     case 0xF:
+      return handle_IMM_RSC_SCC(Rn,Rd,rot_imm);            
       break;
     }
 
