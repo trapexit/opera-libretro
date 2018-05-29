@@ -333,7 +333,9 @@ handle_IMM_ADC_DAC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_ + 1);
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1));
 
   return 0;
 }
@@ -345,7 +347,9 @@ handle_IMM_ADC_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_ + 1);
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1));
 
   return 0;
 }
