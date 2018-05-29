@@ -26,13 +26,20 @@
   X(OP_E)                                       \
   X(OP_F)
 
+struct REGS_s
+{
+  uint32_t R[16];
+  uint32_t CPSR;
+  uint32_t SPSR;
+};
+
+typedef struct REGS_s REGS_t;
+
 struct CPU_s
 {
   uint32_t  MODE;
-  uint32_t *REGS;
-  uint32_t  REGBANKS[6][16];
-  uint32_t  CPSR[6];
-  uint32_t  SPSR[6];
+  REGS_t   *REG_BANKS[6];
+  REGS_t   *REGS;
 };
 
 typedef struct CPU_s CPU_t;
@@ -206,7 +213,7 @@ handle_IMM_AND_DAC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & rot_imm_);
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
 
   return 0;
 }
@@ -218,7 +225,127 @@ handle_IMM_AND_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS[Rd_] = (CPU.REGS[Rn_] & rot_imm_);
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_EOR_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_EOR_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_SUB_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_SUB_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_RSB_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_RSB_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_ADD_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_ADD_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_ADC_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_ + 1);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_IMM_ADC_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_ + 1);
 
   return 0;
 }
@@ -400,7 +527,7 @@ handle_Branch(const uint32_t opcode_)
 {
   const uint32_t offset = (opcode_ & 0x00FFFFFF);
 
-  CPU.REGS[R15] += sign_extend_26_32(offset << 2);
+  CPU.REGS->R[R15] += sign_extend_26_32(offset << 2);
 
   return (0); // 2S + 1N
 }
@@ -412,8 +539,8 @@ handle_Branch_with_Link(const uint32_t opcode_)
 {
   const uint32_t offset = (opcode_ & 0x00FFFFFF);
 
-  CPU.REGS[R14] = (CPU.REGS[R15] + 4);
-  CPU.REGS[R15] += sign_extend_26_32(offset << 2);
+  CPU.REGS->R[R14] = (CPU.REGS->R[R15] + 4);
+  CPU.REGS->R[R15] += sign_extend_26_32(offset << 2);
 
   return (0); // 2S + 1N
 }
