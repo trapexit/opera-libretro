@@ -412,6 +412,211 @@ handle_IMM_RSC_SCC(const uint32_t Rn_,
   return 0;
 }
 
+static
+INLINE
+uint32_t
+handle_REG_AND_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_AND_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_EOR_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_EOR_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_SUB_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_SUB_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_RSB_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_RSB_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_ADD_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_ADD_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_ADC_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1));
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_ADC_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1));
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_SBC_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_SBC_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
+                      rot_imm_ +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_RSC_DAC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ -
+                      CPU.REGS->R[Rn_] +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+handle_REG_RSC_SCC(const uint32_t Rn_,
+                   const uint32_t Rd_,
+                   const uint32_t rot_imm_)
+{
+  CPU.REGS->R[Rd_] = (rot_imm_ -
+                      CPU.REGS->R[Rn_] +
+                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      1);
+  return 0;
+}
 
 static
 INLINE
@@ -457,29 +662,80 @@ handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return handle_IMM_ADD_DAC(Rn,Rd,rot_imm);
       /* ADD, set condition codes */
     case 0x9:
-      return handle_IMM_ADD_SCC(Rn,Rd,rot_imm);      
+      return handle_IMM_ADD_SCC(Rn,Rd,rot_imm);
       /* ADC, do not alter condition codes */
     case 0xA:
-      return handle_IMM_ADC_DAC(Rn,Rd,rot_imm);      
+      return handle_IMM_ADC_DAC(Rn,Rd,rot_imm);
       /* ADC, set condition codes */
     case 0xB:
-      return handle_IMM_ADC_SCC(Rn,Rd,rot_imm);      
+      return handle_IMM_ADC_SCC(Rn,Rd,rot_imm);
       /* SBC, do not alter condition codes */
     case 0xC:
-      return handle_IMM_SBC_DAC(Rn,Rd,rot_imm);      
+      return handle_IMM_SBC_DAC(Rn,Rd,rot_imm);
       /* SBC, set condition codes */
     case 0xD:
-      return handle_IMM_SBC_SCC(Rn,Rd,rot_imm);            
+      return handle_IMM_SBC_SCC(Rn,Rd,rot_imm);
       /* RSC, do not alter condition codes */
     case 0xE:
-      return handle_IMM_RSC_DAC(Rn,Rd,rot_imm);            
+      return handle_IMM_RSC_DAC(Rn,Rd,rot_imm);
       /* RSC, set condition codes */
     case 0xF:
-      return handle_IMM_RSC_SCC(Rn,Rd,rot_imm);            
+      return handle_IMM_RSC_SCC(Rn,Rd,rot_imm);
       break;
     }
 
   return 0;
+}
+
+/*
+  See section 4.4.2 of ARM60 data sheet
+  s_   = 8bit shift field from opcode
+  val_ = Rm
+
+  bit 0: 0 = imm, 1 = Rs
+  bit 1,2: 00 = logical left
+           01 = logical right
+           10 = arithmetic right
+           11 = rotate right
+  bit 5-7: 5bit unsigned integer
+  or
+  bit 4-7: Rs
+*/
+
+static
+INLINE
+uint32_t
+SHIFT(const uint32_t s_,
+      const uint32_t val_)
+{
+  switch(s_ & 0x7)
+    {
+      /* IMM, logical left */
+    case 0x0:
+      return (val_ << (s_ >> 3));
+      break;
+      /* REG, logical left */
+    case 0x1:
+      /* IMM, logical right */
+    case 0x2:
+      return (val_ >> (s_ >> 3));
+      /* REG, logical right */
+    case 0x3:
+      /* IMM, arithmetic right */
+      /* WARNING: signed right shifts are often but not always
+         arithmetic. It might be required to use a more thorough
+         computation. */
+    case 0x4:
+      return ((int32_t)val_ >> (((s_ == 0) ? 32 : s_) >> 3));
+      /* REG, arithmetic right */
+    case 0x5:
+      /* IMM, rotate right */
+    case 0x6:
+      return ROR(val_,(s_ >> 3));
+      /* REG, rotate right */
+    case 0x7:
+      break;
+    }
 }
 
 static
