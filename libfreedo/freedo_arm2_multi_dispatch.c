@@ -713,28 +713,38 @@ SHIFT(const uint32_t s_,
       /* IMM, logical left */
     case 0x0:
       return (val_ << (s_ >> 3));
-      break;
       /* REG, logical left */
     case 0x1:
+      return (val_ << (CPU.REGS->R[s_ >> 4] & 0xFF));
       /* IMM, logical right */
     case 0x2:
       return (val_ >> (s_ >> 3));
       /* REG, logical right */
     case 0x3:
+      return (val_ >> (CPU.REGS->R[s_ >> 4] & 0xFF));
       /* IMM, arithmetic right */
       /* WARNING: signed right shifts are often but not always
          arithmetic. It might be required to use a more thorough
          computation. */
     case 0x4:
-      return ((int32_t)val_ >> (((s_ == 0) ? 32 : s_) >> 3));
+      {
+        const uint32_t s = (s_ >> 3);
+
+        return ((int32_t)val_ >> ((s == 0) ? 32 : s));
+      }
       /* REG, arithmetic right */
     case 0x5:
+      {
+        const uint32_t s = (CPU.REGS->R[s_ >> 4] & 0xFF);
+
+        return ((int32_t)val_ >> ((s == 0) ? 32 : s));
+      }
       /* IMM, rotate right */
     case 0x6:
       return ROR(val_,(s_ >> 3));
       /* REG, rotate right */
     case 0x7:
-      break;
+      return ROR(val_,(CPU.REGS->R[s_ >> 4] & 0xFF));
     }
 }
 
