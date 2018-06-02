@@ -234,7 +234,7 @@ calculate_CPSR_CV_SUB(const uint32_t val_,
 {
   return ((CPU.REGS->CPSR & CPSR_CV_MASK) |
           ((((op1_ & op2_) | (~val_ & (op1_ | op2_))) & 0x80000000) >> 2) |
-          ((((op1_ & op2_ & ~val) | (~op1_ & ~op2_ & val_)) & 0x80000000) >> 3))
+          ((((op1_ & op2_ & ~val_) | (~op1_ & ~op2_ & val_)) & 0x80000000) >> 3));
 }
 
 static
