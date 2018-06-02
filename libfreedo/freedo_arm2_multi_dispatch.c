@@ -26,9 +26,13 @@
   X(OP_E)                                       \
   X(OP_F)
 
-#define CPSR_NZ_MASK 0x3FFFFFFFUL
-#define CPSR_N_FLAG  0x8000000UL
-#define CPSR_Z_FLAG  0x4000000UL
+#define CPSR_NZ_MASK   0x3FFFFFFFUL
+#define CPSR_CV_MASK   0xCFFFFFFFUL
+#define CPSR_NZCV_MASK 0x0FFFFFFFUL
+#define CPSR_N_FLAG    0x80000000UL
+#define CPSR_Z_FLAG    0x40000000UL
+#define CPSR_C_FLAG    0x20000000UL
+#define CPSR_V_FLAG    0x10000000UL
 
 struct REGS_s
 {
@@ -224,6 +228,18 @@ calculate_CPSR_NZ(const uint32_t val_)
 static
 INLINE
 uint32_t
+calculate_CPSR_CV_SUB(const uint32_t val_,
+                      const uint32_t op1_,
+                      const uint32_t op2_)
+{
+  return ((CPU.REGS->CPSR & CPSR_CV_MASK) |
+          ((((op1_ & op2_) | (~val_ & (op1_ | op2_))) & 0x80000000) >> 2) |
+          ((((op1_ & op2_ & ~val) | (~op1_ & ~op2_ & val_)) & 0x80000000) >> 3))
+}
+
+static
+INLINE
+uint32_t
 handle_IMM_AND_DAC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
@@ -267,7 +283,10 @@ handle_IMM_EOR_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
+  const uint32_t val = (CPU.REGS->R[Rn_] ^ rot_imm_);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
   return 0;
 }
@@ -291,8 +310,12 @@ handle_IMM_SUB_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
+  const uint32_t val = (CPU.REGS->R[Rn_] - rot_imm_);
 
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
+  CPU.REGS->CPSR   = calculate_CPSR_CV_SUB(val,CPU.REGS->R[Rn_],rot_imm_);
+  
   return 0;
 }
 
