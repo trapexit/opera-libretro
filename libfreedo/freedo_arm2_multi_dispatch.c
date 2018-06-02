@@ -282,11 +282,11 @@ calculate_CPSR_NZCV_SUB(const uint32_t val_,
 static
 INLINE
 uint32_t
-handle_IMM_AND_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+AND_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
+  CPU.REGS->R[Rd_] = (op1_ & op2_);
 
   return 0;
 }
@@ -294,11 +294,11 @@ handle_IMM_AND_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_AND_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+AND_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (CPU.REGS->R[Rn_] & rot_imm_);
+  const uint32_t val = (op1_ & op2_);
 
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
@@ -309,11 +309,11 @@ handle_IMM_AND_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_EOR_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+EOR_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
+  CPU.REGS->R[Rd_] = (op1_ ^ op2_);
 
   return 0;
 }
@@ -321,11 +321,11 @@ handle_IMM_EOR_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_EOR_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+EOR_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (CPU.REGS->R[Rn_] ^ rot_imm_);
+  const uint32_t val = (op1_ ^ op2_);
 
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
@@ -336,11 +336,11 @@ handle_IMM_EOR_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_SUB_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+SUB_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
+  CPU.REGS->R[Rd_] = (op1_ - op2_);
 
   return 0;
 }
@@ -348,16 +348,14 @@ handle_IMM_SUB_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_SUB_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+SUB_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (CPU.REGS->R[Rn_] - rot_imm_);
+  const uint32_t val = (op1_ - op2_);
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
-                                             CPU.REGS->R[Rn_],
-                                             rot_imm_);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op1_,op2_);
 
   return 0;
 }
@@ -365,11 +363,11 @@ handle_IMM_SUB_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_RSB_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+RSB_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
+  CPU.REGS->R[Rd_] = (op2_ - op1_);
 
   return 0;
 }
@@ -377,16 +375,14 @@ handle_IMM_RSB_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_RSB_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+RSB_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (rot_imm_ - CPU.REGS->R[Rn_]);
+  const uint32_t val = (op2_ - op1_);
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
-                                             rot_imm_,
-                                             CPU.REGS->R[Rn_]);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op2_,op1_);
 
   return 0;
 }
@@ -394,11 +390,11 @@ handle_IMM_RSB_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_ADD_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+ADD_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
+  CPU.REGS->R[Rd_] = (op1_ + op2_);
 
   return 0;
 }
@@ -406,16 +402,14 @@ handle_IMM_ADD_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_ADD_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+ADD_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (CPU.REGS->R[Rn_] + rot_imm_);
+  const uint32_t val = (op1_ + op2_);
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,
-                                         CPU.REGS->R[Rn_],
-                                         rot_imm_);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,op1_,op2_);
 
   return 0;
 }
@@ -423,12 +417,12 @@ handle_IMM_ADD_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_ADC_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+ADC_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
-                      rot_imm_ +
+  CPU.REGS->R[Rd_] = (op1_ +
+                      op2_ +
                       ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1));
 
   return 0;
@@ -437,18 +431,16 @@ handle_IMM_ADC_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_ADC_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+ADC_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (CPU.REGS->R[Rn_] +
-                        rot_imm_ +
+  const uint32_t val = (op1_ +
+                        op2_ +
                         ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1));
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,
-                                         CPU.REGS->R[Rn_],
-                                         rot_imm_);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,op1_,op2_);
 
   return 0;
 }
@@ -456,12 +448,12 @@ handle_IMM_ADC_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_SBC_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+SBC_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
-                      rot_imm_ +
+  CPU.REGS->R[Rd_] = (op1_ -
+                      op2_ +
                       ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
                       1);
 
@@ -471,20 +463,17 @@ handle_IMM_SBC_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_SBC_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+SBC_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (CPU.REGS->R[Rn_] -
-                        rot_imm_ +
+  const uint32_t val = (op1_ -
+                        op2_ +
                         ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
                         1);
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
-                                             CPU.REGS->R[Rn_],
-                                             rot_imm_);
-
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op1_,op2_);
 
   return 0;
 }
@@ -492,13 +481,13 @@ handle_IMM_SBC_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_RSC_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+RSC_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  CPU.REGS->R[Rd_] = (rot_imm_ -
-                      CPU.REGS->R[Rn_] +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
+  CPU.REGS->R[Rd_] = (op2_ -
+                      op1_ +
+                      ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
                       1);
 
   return 0;
@@ -507,19 +496,17 @@ handle_IMM_RSC_DAC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_IMM_RSC_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+RSC_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
 {
-  const uint32_t val = (rot_imm_ -
-                        CPU.REGS->R[Rn_] +
-                        ((CPU.REGS->CPSR >> 29) & 1) -
+  const uint32_t val = (op2_ -
+                        op1_ +
+                        ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
                         1);
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
-                                             rot_imm_,
-                                             CPU.REGS->R[Rn_]);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op2_,op1_);
 
   return 0;
 }
@@ -527,275 +514,66 @@ handle_IMM_RSC_SCC(const uint32_t Rn_,
 static
 INLINE
 uint32_t
-handle_REG_AND_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t shift_Rm_)
+IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & shift_Rm_);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_AND_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t shifted_Rm_)
-{
-  const uint32_t val = (CPU.REGS->R[Rn_] & shifted_Rm_);
-
-  CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_EOR_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_EOR_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] ^ rot_imm_);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_SUB_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_SUB_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] - rot_imm_);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_RSB_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_RSB_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_ADD_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_ADD_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_ADC_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
-                      rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1));
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_ADC_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
-                      rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1));
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_SBC_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
-                      rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
-                      1);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_SBC_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
-                      rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
-                      1);
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_RSC_DAC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (rot_imm_ -
-                      CPU.REGS->R[Rn_] +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
-                      1);
-
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_REG_RSC_SCC(const uint32_t Rn_,
-                   const uint32_t Rd_,
-                   const uint32_t rot_imm_)
-{
-  CPU.REGS->R[Rd_] = (rot_imm_ -
-                      CPU.REGS->R[Rn_] +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
-                      1);
-  return 0;
-}
-
-static
-INLINE
-uint32_t
-handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
-{
-  uint32_t rot_imm;
   const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
   const uint32_t Rn     = ((opcode_ & 0x000F0000) >> 16);
   const uint32_t Rd     = ((opcode_ & 0x0000F000) >> 12);
   const uint32_t rotate = ((opcode_ & 0x00000F00) >>  7);
   const uint32_t imm    = ((opcode_ & 0x000000FF) >>  0);
+  const uint32_t op1    = CPU.REGS->R[Rn];
+  const uint32_t op2    = ROR(imm,rotate);
 
-  rot_imm = ROR(imm,rotate);
   switch(opcode)
     {
       /* AND, do not alter condition codes */
     case 0x0:
-      return handle_IMM_AND_DAC(Rn,Rd,rot_imm);
+      return AND_DAC(Rd,op1,op2);
       /* AND, set condition codes */
     case 0x1:
-      return handle_IMM_AND_SCC(Rn,Rd,rot_imm);
+      return AND_SCC(Rd,op1,op2);
       /* EOR, do not alter condition codes */
     case 0x2:
-      return handle_IMM_EOR_DAC(Rn,Rd,rot_imm);
+      return EOR_DAC(Rd,op1,op2);
       /* EOR, set condition codes */
     case 0x3:
-      return handle_IMM_EOR_SCC(Rn,Rd,rot_imm);
+      return EOR_SCC(Rd,op1,op2);
       /* SUB, do not alter condition codes */
     case 0x4:
-      return handle_IMM_SUB_DAC(Rn,Rd,rot_imm);
+      return SUB_DAC(Rd,op1,op2);
       /* SUB, set condition codes */
     case 0x5:
-      return handle_IMM_SUB_SCC(Rn,Rd,rot_imm);
+      return SUB_SCC(Rd,op1,op2);
       /* RSB, do not alter condition codes */
     case 0x6:
-      return handle_IMM_RSB_DAC(Rn,Rd,rot_imm);
+      return RSB_DAC(Rd,op1,op2);
       /* RSB, set condition codes */
     case 0x7:
-      return handle_IMM_RSB_SCC(Rn,Rd,rot_imm);
+      return RSB_SCC(Rd,op1,op2);
       /* ADD, do not alter condition codes */
     case 0x8:
-      return handle_IMM_ADD_DAC(Rn,Rd,rot_imm);
+      return ADD_DAC(Rd,op1,op2);
       /* ADD, set condition codes */
     case 0x9:
-      return handle_IMM_ADD_SCC(Rn,Rd,rot_imm);
+      return ADD_SCC(Rd,op1,op2);
       /* ADC, do not alter condition codes */
     case 0xA:
-      return handle_IMM_ADC_DAC(Rn,Rd,rot_imm);
+      return ADC_DAC(Rd,op1,op2);
       /* ADC, set condition codes */
     case 0xB:
-      return handle_IMM_ADC_SCC(Rn,Rd,rot_imm);
+      return ADC_SCC(Rd,op1,op2);
       /* SBC, do not alter condition codes */
     case 0xC:
-      return handle_IMM_SBC_DAC(Rn,Rd,rot_imm);
+      return SBC_DAC(Rd,op1,op2);
       /* SBC, set condition codes */
     case 0xD:
-      return handle_IMM_SBC_SCC(Rn,Rd,rot_imm);
+      return SBC_SCC(Rd,op1,op2);
       /* RSC, do not alter condition codes */
     case 0xE:
-      return handle_IMM_RSC_DAC(Rn,Rd,rot_imm);
+      return RSC_DAC(Rd,op1,op2);
       /* RSC, set condition codes */
     case 0xF:
-      return handle_IMM_RSC_SCC(Rn,Rd,rot_imm);
+      return RSC_SCC(Rd,op1,op2);
       break;
     }
 
@@ -912,52 +690,66 @@ SHIFT_SCC(const uint32_t s_,
 static
 INLINE
 uint32_t
-handle_REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
+REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
-  uint32_t shifted_Rm;
   const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
   const uint32_t Rn     = ((opcode_ & 0x000F0000) >> 16);
   const uint32_t Rd     = ((opcode_ & 0x0000F000) >> 12);
   const uint32_t shift  = ((opcode_ & 0x00000FF0) >>  4);
   const uint32_t Rm     = ((opcode_ & 0x0000000F) >>  0);
+  const uint32_t op1    = CPU.REGS->R[Rn];
+  const uint32_t op2    = SHIFT_DAC(shift,Rm);
 
-  shifted_Rm = SHIFT_DAC(shift,Rm);
   switch(opcode)
     {
       /* AND, do not alter condition codes */
     case 0x0:
-      return handle_REG_AND_DAC(Rn,Rd,shifted_Rm);
+      return AND_DAC(Rd,op1,op2);
       /* AND, set condition codes */
     case 0x1:
-      return handle_REG_AND_SCC(Rn,Rd,shifted_Rm);
+      return AND_SCC(Rd,op1,op2);
       /* EOR, do not alter condition codes */
     case 0x2:
+      return EOR_DAC(Rd,op1,op2);
       /* EOR, set condition codes */
     case 0x3:
+      return EOR_SCC(Rd,op1,op2);
       /* SUB, do not alter condition codes */
     case 0x4:
+      return SUB_DAC(Rd,op1,op2);
       /* SUB, set condition codes */
     case 0x5:
+      return SUB_SCC(Rd,op1,op2);
       /* RSB, do not alter condition codes */
     case 0x6:
+      return RSB_DAC(Rd,op1,op2);
       /* RSB, set condition codes */
     case 0x7:
+      return RSB_SCC(Rd,op1,op2);
       /* ADD, do not alter condition codes */
     case 0x8:
+      return ADD_DAC(Rd,op1,op2);
       /* ADD, set condition codes */
     case 0x9:
+      return ADD_SCC(Rd,op1,op2);
       /* ADC, do not alter condition codes */
     case 0xA:
+      return ADC_DAC(Rd,op1,op2);
       /* ADC, set condition codes */
     case 0xB:
+      return ADC_SCC(Rd,op1,op2);
       /* SBC, do not alter condition codes */
     case 0xC:
+      return SBC_DAC(Rd,op1,op2);
       /* SBC, set condition codes */
     case 0xD:
+      return SBC_SCC(Rd,op1,op2);
       /* RSC, do not alter condition codes */
     case 0xE:
+      return RSC_DAC(Rd,op1,op2);
       /* RSC, set condition codes */
     case 0xF:
+      return RSC_SCC(Rd,op1,op2);
       break;
     }
 
@@ -1124,7 +916,7 @@ handle_OP_0(const uint32_t opcode_)
 {
   if((opcode_ & 0x00000090) == 0x00000090)
     return handle_multiply(opcode_);
-  return handle_REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
+  return REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
 }
 
 static
@@ -1142,7 +934,7 @@ INLINE
 uint32_t
 handle_OP_2(const uint32_t opcode_)
 {
-  return handle_IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
+  return IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(opcode_);
 }
 
 static
