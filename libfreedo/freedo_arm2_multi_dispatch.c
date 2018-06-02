@@ -511,10 +511,16 @@ handle_IMM_RSC_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (rot_imm_ -
-                      CPU.REGS->R[Rn_] +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
-                      1);
+  const uint32_t val = (rot_imm_ -
+                        CPU.REGS->R[Rn_] +
+                        ((CPU.REGS->CPSR >> 29) & 1) -
+                        1);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
+                                             rot_imm_,
+                                             CPU.REGS->R[Rn_]);
+
   return 0;
 }
 
@@ -523,9 +529,9 @@ INLINE
 uint32_t
 handle_REG_AND_DAC(const uint32_t Rn_,
                    const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+                   const uint32_t shift_Rm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
+  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & shift_Rm_);
 
   return 0;
 }
@@ -535,9 +541,12 @@ INLINE
 uint32_t
 handle_REG_AND_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
-                   const uint32_t rot_imm_)
+                   const uint32_t shifted_Rm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
+  const uint32_t val = (CPU.REGS->R[Rn_] & shifted_Rm_);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
   return 0;
 }
@@ -905,18 +914,22 @@ INLINE
 uint32_t
 handle_REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
+  uint32_t shifted_Rm;
   const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
   const uint32_t Rn     = ((opcode_ & 0x000F0000) >> 16);
   const uint32_t Rd     = ((opcode_ & 0x0000F000) >> 12);
   const uint32_t shift  = ((opcode_ & 0x00000FF0) >>  4);
   const uint32_t Rm     = ((opcode_ & 0x0000000F) >>  0);
 
+  shifted_Rm = SHIFT_DAC(shift,Rm);
   switch(opcode)
     {
       /* AND, do not alter condition codes */
     case 0x0:
+      return handle_REG_AND_DAC(Rn,Rd,shifted_Rm);
       /* AND, set condition codes */
     case 0x1:
+      return handle_REG_AND_SCC(Rn,Rd,shifted_Rm);
       /* EOR, do not alter condition codes */
     case 0x2:
       /* EOR, set condition codes */
