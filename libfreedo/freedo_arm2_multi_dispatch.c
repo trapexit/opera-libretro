@@ -33,6 +33,10 @@
 #define CPSR_Z_FLAG    0x40000000UL
 #define CPSR_C_FLAG    0x20000000UL
 #define CPSR_V_FLAG    0x10000000UL
+#define CPSR_N_SHIFT   31
+#define CPSR_Z_SHIFT   30
+#define CPSR_C_SHIFT   29
+#define CPSR_V_SHIFT   28
 
 struct REGS_s
 {
@@ -406,7 +410,12 @@ handle_IMM_ADD_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] + rot_imm_);
+  const uint32_t val = (CPU.REGS->R[Rn_] + rot_imm_);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,
+                                         CPU.REGS->R[Rn_],
+                                         rot_imm_);
 
   return 0;
 }
@@ -420,7 +429,7 @@ handle_IMM_ADC_DAC(const uint32_t Rn_,
 {
   CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
                       rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1));
+                      ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1));
 
   return 0;
 }
@@ -432,9 +441,14 @@ handle_IMM_ADC_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] +
-                      rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1));
+  const uint32_t val = (CPU.REGS->R[Rn_] +
+                        rot_imm_ +
+                        ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1));
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,
+                                         CPU.REGS->R[Rn_],
+                                         rot_imm_);
 
   return 0;
 }
@@ -448,7 +462,7 @@ handle_IMM_SBC_DAC(const uint32_t Rn_,
 {
   CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
                       rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
+                      ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
                       1);
 
   return 0;
@@ -461,10 +475,17 @@ handle_IMM_SBC_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] -
-                      rot_imm_ +
-                      ((CPU.REGS->CPSR >> 29) & 1) -
-                      1);
+  const uint32_t val = (CPU.REGS->R[Rn_] -
+                        rot_imm_ +
+                        ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
+                        1);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
+                                             CPU.REGS->R[Rn_],
+                                             rot_imm_);
+
+
   return 0;
 }
 

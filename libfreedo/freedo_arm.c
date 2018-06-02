@@ -1158,7 +1158,7 @@ ARM_ALU_Exec(uint32_t  inst_,
       *rd_ = op2_ - op1_ - (ARM_GET_C()^1);
       ARM_SET_ZN(*rd_);
       ARM_SET_CV_sub(*rd_,op2_,op1_);
-      break;//*/
+      break;
     case 17:
       op1_ &= op2_;
       ARM_SET_ZN(op1_);
