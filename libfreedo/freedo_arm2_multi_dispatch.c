@@ -351,8 +351,9 @@ handle_IMM_SUB_SCC(const uint32_t Rn_,
   const uint32_t val = (CPU.REGS->R[Rn_] - rot_imm_);
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
-  CPU.REGS->CPSR   = calculate_CPSR_CV_SUB(val,CPU.REGS->R[Rn_],rot_imm_);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
+                                             CPU.REGS->R[Rn_],
+                                             rot_imm_);
 
   return 0;
 }
@@ -376,7 +377,12 @@ handle_IMM_RSB_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (rot_imm_ - CPU.REGS->R[Rn_]);
+  const uint32_t val = (rot_imm_ - CPU.REGS->R[Rn_]);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,
+                                             rot_imm_,
+                                             CPU.REGS->R[Rn_]);
 
   return 0;
 }
