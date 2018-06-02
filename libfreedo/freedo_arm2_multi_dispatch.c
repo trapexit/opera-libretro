@@ -26,6 +26,10 @@
   X(OP_E)                                       \
   X(OP_F)
 
+#define CPSR_NZ_MASK 0x3FFFFFFFUL
+#define CPSR_N_FLAG  0x8000000UL
+#define CPSR_Z_FLAG  0x4000000UL
+
 struct REGS_s
 {
   uint32_t R[16];
@@ -209,6 +213,17 @@ ROR(const uint32_t n_,
 static
 INLINE
 uint32_t
+calculate_CPSR_NZ(const uint32_t val_)
+{
+  return ((CPU.REGS->CPSR & CPSR_NZ_MASK) |
+          ((val_ == 0) ?
+           (CPSR_Z_FLAG) :
+           (val_ & CPSR_N_FLAG)));
+}
+
+static
+INLINE
+uint32_t
 handle_IMM_AND_DAC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
@@ -225,7 +240,10 @@ handle_IMM_AND_SCC(const uint32_t Rn_,
                    const uint32_t Rd_,
                    const uint32_t rot_imm_)
 {
-  CPU.REGS->R[Rd_] = (CPU.REGS->R[Rn_] & rot_imm_);
+  const uint32_t val = (CPU.REGS->R[Rn_] & rot_imm_);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
   return 0;
 }
