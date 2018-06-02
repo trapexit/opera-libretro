@@ -228,13 +228,51 @@ calculate_CPSR_NZ(const uint32_t val_)
 static
 INLINE
 uint32_t
+calculate_CPSR_CV(const uint32_t val_,
+                  const uint32_t op1_,
+                  const uint32_t op2_)
+{
+  return ((CPU.REGS->CPSR & CPSR_CV_MASK) |
+          ((((op1_ & op2_) | (~val_ & (op1_ | op2_))) & 0x80000000) >> 2) |
+          ((((op1_ & op2_ & ~val_) | (~op1_ & ~op2_ & val_)) & 0x80000000) >> 3));
+}
+
+static
+INLINE
+uint32_t
 calculate_CPSR_CV_SUB(const uint32_t val_,
                       const uint32_t op1_,
                       const uint32_t op2_)
 {
   return ((CPU.REGS->CPSR & CPSR_CV_MASK) |
+          ((((op1_ & ~op2_) | (~val_ & (op1_ | ~op2_))) & 0x80000000) >> 2) |
+          ((((op1_ & ~op2_ & ~val_) | (~op1_ & op2_ & val_)) & 0x80000000) >> 3));
+}
+
+static
+INLINE
+uint32_t
+calculate_CPSR_NZCV(const uint32_t val_,
+                    const uint32_t op1_,
+                    const uint32_t op2_)
+{
+  return ((CPU.REGS->CPSR & CPSR_NZCV_MASK) |
+          ((val_ == 0) ? (CPSR_Z_FLAG) : (val_ & CPSR_N_FLAG)) |
           ((((op1_ & op2_) | (~val_ & (op1_ | op2_))) & 0x80000000) >> 2) |
           ((((op1_ & op2_ & ~val_) | (~op1_ & ~op2_ & val_)) & 0x80000000) >> 3));
+}
+
+static
+INLINE
+uint32_t
+calculate_CPSR_NZCV_SUB(const uint32_t val_,
+                        const uint32_t op1_,
+                        const uint32_t op2_)
+{
+  return ((CPU.REGS->CPSR & CPSR_NZCV_MASK) |
+          ((val_ == 0) ? (CPSR_Z_FLAG) : (val_ & CPSR_N_FLAG)) |
+          ((((op1_ & ~op2_) | (~val_ & (op1_ | ~op2_))) & 0x80000000) >> 2) |
+          ((((op1_ & ~op2_ & ~val_) | (~op1_ & op2_ & val_)) & 0x80000000) >> 3));
 }
 
 static
@@ -315,7 +353,7 @@ handle_IMM_SUB_SCC(const uint32_t Rn_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
   CPU.REGS->CPSR   = calculate_CPSR_CV_SUB(val,CPU.REGS->R[Rn_],rot_imm_);
-  
+
   return 0;
 }
 
