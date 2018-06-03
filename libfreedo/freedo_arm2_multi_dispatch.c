@@ -224,9 +224,7 @@ uint32_t
 calculate_CPSR_NZ(const uint32_t val_)
 {
   return ((CPU.REGS->CPSR & CPSR_NZ_MASK) |
-          ((val_ == 0) ?
-           (CPSR_Z_FLAG) :
-           (val_ & CPSR_N_FLAG)));
+          ((val_ == 0) ? (CPSR_Z_FLAG) : (val_ & CPSR_N_FLAG)));
 }
 
 static
@@ -296,14 +294,14 @@ calculate_CPSR_CV_SUB(const uint32_t val_,
 static
 INLINE
 uint32_t
-calculate_CPSR_NZCV(const uint32_t val_,
-                    const uint32_t op1_,
-                    const uint32_t op2_)
+calculate_CPSR_NZCV_ADD(const uint32_t val_,
+                        const uint32_t op1_,
+                        const uint32_t op2_)
 {
   return ((CPU.REGS->CPSR & CPSR_NZCV_MASK) |
           ((val_ == 0) ? (CPSR_Z_FLAG) : (val_ & CPSR_N_FLAG)) |
-          ((((op1_ & op2_) | (~val_ & (op1_ | op2_))) & 0x80000000) >> 2) |
-          ((((op1_ & op2_ & ~val_) | (~op1_ & ~op2_ & val_)) & 0x80000000) >> 3));
+          calculate_CPSR_C_ADD(val_,op1_,op2_) |
+          calculate_CPSR_V_ADD(val_,op1_,op2_));
 }
 
 static
@@ -315,8 +313,8 @@ calculate_CPSR_NZCV_SUB(const uint32_t val_,
 {
   return ((CPU.REGS->CPSR & CPSR_NZCV_MASK) |
           ((val_ == 0) ? (CPSR_Z_FLAG) : (val_ & CPSR_N_FLAG)) |
-          ((((op1_ & ~op2_) | (~val_ & (op1_ | ~op2_))) & 0x80000000) >> 2) |
-          ((((op1_ & ~op2_ & ~val_) | (~op1_ & op2_ & val_)) & 0x80000000) >> 3));
+          calculate_CPSR_C_SUB(val_,op1_,op2_) |
+          calculate_CPSR_V_SUB(val_,op1_,op2_));
 }
 
 static
@@ -449,7 +447,7 @@ ADD_SCC(const uint32_t Rd_,
   const uint32_t val = (op1_ + op2_);
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,op1_,op2_);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_ADD(val,op1_,op2_);
 
   return 0;
 }
@@ -480,7 +478,7 @@ ADC_SCC(const uint32_t Rd_,
                         ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1));
 
   CPU.REGS->R[Rd_] = val;
-  CPU.REGS->CPSR   = calculate_CPSR_NZCV(val,op1_,op2_);
+  CPU.REGS->CPSR   = calculate_CPSR_NZCV_ADD(val,op1_,op2_);
 
   return 0;
 }
@@ -594,7 +592,7 @@ CMN(const uint32_t op1_,
 {
   const uint32_t val = (op1_ + op2_);
 
-  CPU.REGS->CPSR = calculate_CPSR_NZCV(val,op1_,op2_);
+  CPU.REGS->CPSR = calculate_CPSR_NZCV_ADD(val,op1_,op2_);
 
   return 0;
 }
