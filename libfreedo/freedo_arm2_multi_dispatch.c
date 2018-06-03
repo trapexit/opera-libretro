@@ -232,13 +232,53 @@ calculate_CPSR_NZ(const uint32_t val_)
 static
 INLINE
 uint32_t
+calculate_CPSR_C_ADD(const uint32_t res_,
+                     const uint32_t op1_,
+                     const uint32_t op2_)
+{
+  return ((((op1_ & op2_) | (~res_ & (op1_ | op2_))) & 0x80000000) >> 2);
+}
+
+static
+INLINE
+uint32_t
+calculate_CPSR_V_ADD(const uint32_t res_,
+                     const uint32_t op1_,
+                     const uint32_t op2_)
+{
+  return ((((op1_ ^ res_) & (op2_ ^ res_)) & 0x80000000) >> 3);
+}
+
+static
+INLINE
+uint32_t
+calculate_CPSR_C_SUB(const uint32_t res_,
+                     const uint32_t op1_,
+                     const uint32_t op2_)
+{
+  return ((((op1_ & ~op2_) | (~res_ & (op1_ | ~op2_))) & 0x80000000) >> 2);
+}
+
+static
+INLINE
+uint32_t
+calculate_CPSR_V_SUB(const uint32_t res_,
+                     const uint32_t op1_,
+                     const uint32_t op2_)
+{
+  return ((((op1_ & ~op2_ & ~res_) | (~op1_ & op2_ & res_)) & 0x80000000) >> 3);
+}
+
+static
+INLINE
+uint32_t
 calculate_CPSR_CV(const uint32_t val_,
                   const uint32_t op1_,
                   const uint32_t op2_)
 {
   return ((CPU.REGS->CPSR & CPSR_CV_MASK) |
-          ((((op1_ & op2_) | (~val_ & (op1_ | op2_))) & 0x80000000) >> 2) |
-          ((((op1_ & op2_ & ~val_) | (~op1_ & ~op2_ & val_)) & 0x80000000) >> 3));
+          calculate_CPSR_C_ADD(val_,op1_,op2_) |
+          calculate_CPSR_V_ADD(val_,op1_,op2_));
 }
 
 static
@@ -249,8 +289,8 @@ calculate_CPSR_CV_SUB(const uint32_t val_,
                       const uint32_t op2_)
 {
   return ((CPU.REGS->CPSR & CPSR_CV_MASK) |
-          ((((op1_ & ~op2_) | (~val_ & (op1_ | ~op2_))) & 0x80000000) >> 2) |
-          ((((op1_ & ~op2_ & ~val_) | (~op1_ & op2_ & val_)) & 0x80000000) >> 3));
+          calculate_CPSR_C_SUB(val_,op1_,op2_) |
+          calculate_CPSR_V_SUB(val_,op1_,op2_));
 }
 
 static
