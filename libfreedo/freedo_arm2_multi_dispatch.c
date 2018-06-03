@@ -748,8 +748,54 @@ IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 static
 INLINE
 uint32_t
-SHIFT(const uint32_t s_,
-      const uint32_t val_)
+SHIFT_DAC(const uint32_t s_,
+          const uint32_t val_)
+{
+  switch(s_ & 0x7)
+    {
+      /* IMM, logical left */
+    case 0x0:
+      return (val_ << (s_ >> 3));
+      /* REG, logical left */
+    case 0x1:
+      return (val_ << (CPU.REGS->R[s_ >> 4] & 0xFF));
+      /* IMM, logical right */
+    case 0x2:
+      return (val_ >> (s_ >> 3));
+      /* REG, logical right */
+    case 0x3:
+      return (val_ >> (CPU.REGS->R[s_ >> 4] & 0xFF));
+      /* IMM, arithmetic right */
+      /* WARNING: signed right shifts are often but not always
+         arithmetic. It might be required to use a more thorough
+         computation. */
+    case 0x4:
+      {
+        const uint32_t s = (s_ >> 3);
+
+        return ((int32_t)val_ >> ((s == 0) ? 32 : s));
+      }
+      /* REG, arithmetic right */
+    case 0x5:
+      {
+        const uint32_t s = (CPU.REGS->R[s_ >> 4] & 0xFF);
+
+        return ((int32_t)val_ >> ((s == 0) ? 32 : s));
+      }
+      /* IMM, rotate right */
+    case 0x6:
+      return ROR(val_,(s_ >> 3));
+      /* REG, rotate right */
+    case 0x7:
+      return ROR(val_,(CPU.REGS->R[s_ >> 4] & 0xFF));
+    }
+}
+
+static
+INLINE
+uint32_t
+SHIFT_SCC(const uint32_t s_,
+          const uint32_t val_)
 {
   switch(s_ & 0x7)
     {
@@ -796,63 +842,79 @@ INLINE
 uint32_t
 REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
+  uint32_t op2;
   const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
   const uint32_t Rn     = ((opcode_ & 0x000F0000) >> 16);
   const uint32_t Rd     = ((opcode_ & 0x0000F000) >> 12);
   const uint32_t shift  = ((opcode_ & 0x00000FF0) >>  4);
   const uint32_t Rm     = ((opcode_ & 0x0000000F) >>  0);
   const uint32_t op1    = CPU.REGS->R[Rn];
-  const uint32_t op2    = SHIFT(shift,Rm);
 
   switch(opcode)
     {
       /* AND, do not alter condition codes */
     case 0x0:
+      op2 = SHIFT_DAC(shift,Rm);
       return AND_DAC(Rd,op1,op2);
       /* AND, set condition codes */
     case 0x1:
+      op2 = SHIFT_DAC(shift,Rm);
       return AND_SCC(Rd,op1,op2);
       /* EOR, do not alter condition codes */
     case 0x2:
+      op2 = SHIFT_DAC(shift,Rm);
       return EOR_DAC(Rd,op1,op2);
       /* EOR, set condition codes */
     case 0x3:
+      op2 = SHIFT_DAC(shift,Rm);
       return EOR_SCC(Rd,op1,op2);
       /* SUB, do not alter condition codes */
     case 0x4:
+      op2 = SHIFT_DAC(shift,Rm);
       return SUB_DAC(Rd,op1,op2);
       /* SUB, set condition codes */
     case 0x5:
+      op2 = SHIFT_DAC(shift,Rm);
       return SUB_SCC(Rd,op1,op2);
       /* RSB, do not alter condition codes */
     case 0x6:
+      op2 = SHIFT_DAC(shift,Rm);
       return RSB_DAC(Rd,op1,op2);
       /* RSB, set condition codes */
     case 0x7:
+      op2 = SHIFT_DAC(shift,Rm);
       return RSB_SCC(Rd,op1,op2);
       /* ADD, do not alter condition codes */
     case 0x8:
+      op2 = SHIFT_DAC(shift,Rm);
       return ADD_DAC(Rd,op1,op2);
       /* ADD, set condition codes */
     case 0x9:
+      op2 = SHIFT_DAC(shift,Rm);
       return ADD_SCC(Rd,op1,op2);
       /* ADC, do not alter condition codes */
     case 0xA:
+      op2 = SHIFT_DAC(shift,Rm);
       return ADC_DAC(Rd,op1,op2);
       /* ADC, set condition codes */
     case 0xB:
+      op2 = SHIFT_DAC(shift,Rm);
       return ADC_SCC(Rd,op1,op2);
       /* SBC, do not alter condition codes */
     case 0xC:
+      op2 = SHIFT_DAC(shift,Rm);
       return SBC_DAC(Rd,op1,op2);
       /* SBC, set condition codes */
     case 0xD:
+      op2 = SHIFT_DAC(shift,Rm);
       return SBC_SCC(Rd,op1,op2);
       /* RSC, do not alter condition codes */
     case 0xE:
+      op2 = SHIFT_DAC(shift,Rm);
       return RSC_DAC(Rd,op1,op2);
       /* RSC, set condition codes */
     case 0xF:
+      op2 = SHIFT_DAC(shift,Rm);
       return RSC_SCC(Rd,op1,op2);
       break;
     }
