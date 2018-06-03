@@ -514,6 +514,156 @@ RSC_SCC(const uint32_t Rd_,
 static
 INLINE
 uint32_t
+TST(const uint32_t op1_,
+    const uint32_t op2_)
+{
+  CPU.REGS->CPSR = calculate_CPSR_NZ(op1_ & op2_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+TEQ(const uint32_t op1_,
+    const uint32_t op2_)
+{
+  CPU.REGS->CPSR = calculate_CPSR_NZ(op1_ ^ op2_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+CMP(const uint32_t op1_,
+    const uint32_t op2_)
+{
+  const uint32_t val = (op1_ - op2_);
+
+  CPU.REGS->CPSR = calculate_CPSR_NZCV_SUB(val,op1_,op2_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+CMN(const uint32_t op1_,
+    const uint32_t op2_)
+{
+  const uint32_t val = (op1_ + op2_);
+
+  CPU.REGS->CPSR = calculate_CPSR_NZCV(val,op1_,op2_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+ORR_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  CPU.REGS->R[Rd_] = (op1_ | op2_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+ORR_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  const uint32_t val = (op1_ | op2_);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+MOV_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  CPU.REGS->R[Rd_] = op2_;
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+MOV_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  CPU.REGS->R[Rd_] = op2_;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(op2_);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+BIC_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  CPU.REGS->R[Rd_] = (op1_ & ~op2_);
+}
+
+static
+INLINE
+uint32_t
+BIC_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  const uint32_t val = (op1_ & ~op2_);
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
+MVN_DAC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  CPU.REGS->R[Rd_] = ~op2_;
+}
+
+static
+INLINE
+uint32_t
+MVN_SCC(const uint32_t Rd_,
+        const uint32_t op1_,
+        const uint32_t op2_)
+{
+  const uint32_t val = ~op2_;
+
+  CPU.REGS->R[Rd_] = val;
+  CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
+
+  return 0;
+}
+
+static
+INLINE
+uint32_t
 IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
 {
   const uint32_t opcode = ((opcode_ & 0x00F00000) >> 20);
