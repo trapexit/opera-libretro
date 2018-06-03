@@ -858,7 +858,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return AND_DAC(Rd,op1,op2);
       /* AND, set condition codes */
     case 0x1:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return AND_SCC(Rd,op1,op2);
       /* EOR, do not alter condition codes */
     case 0x2:
@@ -866,7 +866,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return EOR_DAC(Rd,op1,op2);
       /* EOR, set condition codes */
     case 0x3:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return EOR_SCC(Rd,op1,op2);
       /* SUB, do not alter condition codes */
     case 0x4:
@@ -874,7 +874,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return SUB_DAC(Rd,op1,op2);
       /* SUB, set condition codes */
     case 0x5:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return SUB_SCC(Rd,op1,op2);
       /* RSB, do not alter condition codes */
     case 0x6:
@@ -882,7 +882,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return RSB_DAC(Rd,op1,op2);
       /* RSB, set condition codes */
     case 0x7:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return RSB_SCC(Rd,op1,op2);
       /* ADD, do not alter condition codes */
     case 0x8:
@@ -890,7 +890,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return ADD_DAC(Rd,op1,op2);
       /* ADD, set condition codes */
     case 0x9:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return ADD_SCC(Rd,op1,op2);
       /* ADC, do not alter condition codes */
     case 0xA:
@@ -898,7 +898,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return ADC_DAC(Rd,op1,op2);
       /* ADC, set condition codes */
     case 0xB:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return ADC_SCC(Rd,op1,op2);
       /* SBC, do not alter condition codes */
     case 0xC:
@@ -906,7 +906,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return SBC_DAC(Rd,op1,op2);
       /* SBC, set condition codes */
     case 0xD:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return SBC_SCC(Rd,op1,op2);
       /* RSC, do not alter condition codes */
     case 0xE:
@@ -914,7 +914,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       return RSC_DAC(Rd,op1,op2);
       /* RSC, set condition codes */
     case 0xF:
-      op2 = SHIFT_DAC(shift,Rm);
+      op2 = SHIFT_SCC(shift,Rm);
       return RSC_SCC(Rd,op1,op2);
       break;
     }
