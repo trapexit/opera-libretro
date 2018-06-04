@@ -831,6 +831,14 @@ SHIFT_DAC(const uint32_t s_,
 
 static
 INLINE
+void
+SET_CPSR_C(const uint32_t val_)
+{
+  CPU.REGS->CPSR = ((CPU.REGS->CPSR & 0xDFFFFFFF) |
+                    ((val_ & 1) << CPSR_C_SHIFT));
+}
+
+
 uint32_t
 SHIFT_SCC(const uint32_t s_,
           const uint32_t val_)
@@ -839,7 +847,13 @@ SHIFT_SCC(const uint32_t s_,
     {
       /* IMM, logical left */
     case 0x0:
+      if(s_ == 0)
+        return val_;
+
+      CPU.REGS->CPSR = ((CPU.REGS->CPSR & 0xDFFFFFFF) |
+                        (((val_ << ((s_ >> 3) - 1)) & 0x80000000) >> 2));
       return (val_ << (s_ >> 3));
+
       /* REG, logical left */
     case 0x1:
       return (val_ << (CPU.REGS->R[s_ >> 4] & 0xFF));
