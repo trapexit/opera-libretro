@@ -856,7 +856,18 @@ SHIFT_SCC(const uint32_t s_,
 
       /* REG, logical left */
     case 0x1:
-      return (val_ << (CPU.REGS->R[s_ >> 4] & 0xFF));
+      {
+        const uint32_t shift = (CPU.REGS->R[s_ >> 4] & 0xFF);
+
+        if(shift == 0)
+          return val_;
+
+        CPU.REGS->CPSR = ((CPU.REGS->CPSR & 0xDFFFFFFF) |
+                          (((val_ << (shift - 1)) & 0x80000000) >> 2));
+
+        return (val_ << shift);
+      }
+
       /* IMM, logical right */
     case 0x2:
       return (val_ >> (s_ >> 3));
