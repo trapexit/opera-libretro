@@ -29,6 +29,8 @@
 
 #define CDIMAGE_SECTOR_SIZE 2048
 #define SAMPLE_BUFFER_SIZE 512
+#define MAX_WIDTH 768
+#define MAX_HEIGHT 576
 
 static vdlp_frame_t *FRAME = NULL;
 
@@ -41,6 +43,7 @@ static uint32_t   SAMPLE_IDX;
 static int32_t    SAMPLE_BUFFER[SAMPLE_BUFFER_SIZE];
 static uint32_t   ACTIVE_DEVICES;
 
+static unsigned REGION;
 static const freedo_bios_t *BIOS;
 
 static
@@ -113,6 +116,7 @@ retro_environment_set_variables(void)
     {
       { "4do_bios", NULL },
       { "4do_rom2",                 "Kanji ROM; disabled|enabled" },
+      { "4do_region",               "Region; NTSC|PAL" },
       { "4do_cpu_overclock",        "CPU overclock; "
                                     "1.0x (12.50Mhz)|"
                                     "1.1x (13.75Mhz)|"
@@ -220,13 +224,13 @@ void
 video_init(void)
 {
   if(VIDEO_BUFFER == NULL)
-    VIDEO_BUFFER = (uint32_t*)malloc(640 * 480 * sizeof(uint32_t));
+    VIDEO_BUFFER = (uint32_t*)malloc(MAX_WIDTH * MAX_HEIGHT * sizeof(uint32_t));
 
   if(FRAME == NULL)
     FRAME = (vdlp_frame_t*)malloc(sizeof(vdlp_frame_t));
 
   memset(FRAME,0,sizeof(vdlp_frame_t));
-  memset(VIDEO_BUFFER,0,(640 * 480 * sizeof(uint32_t)));
+  memset(VIDEO_BUFFER,0,(MAX_WIDTH * MAX_HEIGHT * sizeof(uint32_t)));
 }
 
 static
@@ -327,8 +331,8 @@ retro_get_system_av_info(struct retro_system_av_info *info_)
   info_->timing.sample_rate    = 44100;
   info_->geometry.base_width   = VIDEO_WIDTH;
   info_->geometry.base_height  = VIDEO_HEIGHT;
-  info_->geometry.max_width    = 640;
-  info_->geometry.max_height   = 480;
+  info_->geometry.max_width    = MAX_WIDTH;
+  info_->geometry.max_height   = MAX_HEIGHT;
   info_->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
@@ -433,19 +437,62 @@ rom2_enabled(void)
 
 static
 void
+check_option_4do_region(void)
+{
+  int rv;
+  struct retro_variable var;
+
+  REGION = RETRO_REGION_NTSC;
+
+  var.key = "4do_region";
+  var.value = NULL;
+  rv = retro_environment_cb(RETRO_ENVIRONMENT_GET_VARIABLE,&var);
+  if(rv && var.value)
+    {
+      if(!strcmp("NTSC",var.value))
+        REGION = RETRO_REGION_NTSC;
+      else if(!strcmp("PAL",var.value))
+        REGION = RETRO_REGION_PAL;
+      else
+        REGION = RETRO_REGION_NTSC;
+    }
+}
+
+static
+void
 check_option_4do_high_resolution(void)
 {
   if(option_enabled("4do_high_resolution"))
     {
-      HIRESMODE    = 1;
-      VIDEO_WIDTH  = 640;
-      VIDEO_HEIGHT = 480;
+      HIRESMODE = 1;
+      switch(REGION)
+        {
+        default:
+        case RETRO_REGION_NTSC:
+          VIDEO_WIDTH  = 640;
+          VIDEO_HEIGHT = 480;
+          break;
+        case RETRO_REGION_PAL:
+          VIDEO_WIDTH  = 768;
+          VIDEO_HEIGHT = 576;
+          break;
+        }
     }
   else
     {
-      HIRESMODE    = 0;
-      VIDEO_WIDTH  = 320;
-      VIDEO_HEIGHT = 240;
+      HIRESMODE = 0;
+      switch(REGION)
+        {
+        default:
+        case RETRO_REGION_NTSC:
+          VIDEO_WIDTH  = 320;
+          VIDEO_HEIGHT = 240;
+          break;
+        case RETRO_REGION_PAL:
+          VIDEO_WIDTH  = 384;
+          VIDEO_HEIGHT = 288;
+          break;
+        }
     }
 }
 
@@ -533,6 +580,7 @@ void
 check_options(void)
 {
   check_option_4do_bios();
+  check_option_4do_region();
   check_option_4do_high_resolution();
   check_option_4do_cpu_overclock();
   check_option_4do_active_devices();
@@ -706,6 +754,7 @@ retro_unload_game(void)
 unsigned
 retro_get_region(void)
 {
+  printf("REGION\n");
   return RETRO_REGION_NTSC;
 }
 
