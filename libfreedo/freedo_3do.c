@@ -189,7 +189,7 @@ freedo_3do_process_frame(vdlp_frame_t *frame_)
           i += cnt;
           cnt = 0;
         }
-    } while(i < (freq / 60));
+    } while(i < (freq / 50));
 }
 
 uint32_t

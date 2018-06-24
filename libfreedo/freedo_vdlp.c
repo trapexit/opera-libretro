@@ -290,7 +290,7 @@ vdlp_process_line_320(int           line_,
       dst = line->line;
       src = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF));
 
-      for(i = 0; i < 320; i++)
+      for(i = 0; i < 384; i++)
         *dst++ = *(uint16_t*)(src++);
 
       memcpy(line->xCLUTR,CLUTR,32);
@@ -331,7 +331,7 @@ vdlp_process_line_640(int           line_,
       src3 = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF) + (2*1024*1024));
       src4 = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF) + (3*1024*1024));
 
-      for(i = 0; i < 320; i++)
+      for(i = 0; i < 384; i++)
         {
           *dst1++ = *(uint16_t*)(src1++);
           *dst1++ = *(uint16_t*)(src2++);
@@ -379,12 +379,12 @@ freedo_vdlp_process_line(int           line_,
       vdlp_execute();
     }
 
-  y = (line_ - 16);
+  y = (line_ - 17);
 
   if(LINE_DELAY == 0 /*&& LOAD_CLUT*/)
     vdlp_execute();
 
-  if((y >= 0) && (y < 240))
+  if((y >= 0) && (y < 288))
     vdlp_process_line(y,frame_);
 
   if(CURRENTBMP & 2)

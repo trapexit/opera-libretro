@@ -106,8 +106,8 @@ freedo_quarz_init(void)
   QUARZ.qrz_AccVDL  = 0;
   QUARZ.qrz_AccDSP  = 0;
   QUARZ.qrz_AccARM  = 0;
-  QUARZ.VDL_FS      = 526;
-  QUARZ.VDL_CLOCK   = QUARZ.VDL_FS * 30;
+  QUARZ.VDL_FS      = 610;
+  QUARZ.VDL_CLOCK   = QUARZ.VDL_FS * 25;
   QUARZ.VDL_HS      = QUARZ.VDL_FS / 2;
   QUARZ.qrz_TCount  = 0;
   QUARZ.qrz_vdlline = 0;

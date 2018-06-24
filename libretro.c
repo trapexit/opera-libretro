@@ -754,8 +754,7 @@ retro_unload_game(void)
 unsigned
 retro_get_region(void)
 {
-  printf("REGION\n");
-  return RETRO_REGION_NTSC;
+  return REGION;
 }
 
 unsigned
