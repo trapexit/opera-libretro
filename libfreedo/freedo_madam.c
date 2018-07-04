@@ -45,6 +45,27 @@
 
 struct BitReaderBig bitoper;
 
+struct SCB
+{
+  uint32_t    flags;
+  struct SCB *next;
+  uint32_t   *data;
+  void       *PIPptr;
+  int32_t     X;
+  int32_t     Y;
+  int32_t     HDX;
+  int32_t     HDY;
+  int32_t     VDX;
+  int32_t     VDY;
+  int32_t     DDX;
+  int32_t     DDY;
+  uint32_t    PPMPC;
+  uint32_t    PRE0;
+  uint32_t    PRE1;
+};
+
+typedef struct SCB SCB;
+
 /* === CCB control word flags === */
 #define CCB_SKIP        0x80000000
 #define CCB_LAST        0x40000000
@@ -875,6 +896,39 @@ freedo_madam_cel_handle(void)
           return CELCYCLES;
         }
 
+      /* uint8_t *_scb = freedo_arm_ram_get(); */
+      /* SCB *scb = (SCB*)&_scb[CURRENTCCB]; */
+      /* printf("flags: %x\n" */
+      /*        "next: %p\n" */
+      /*        "data: %p\n" */
+      /*        "X: %d\n" */
+      /*        "Y: %d\n" */
+      /*        "HDX: %d\n" */
+      /*        "HDY: %d\n" */
+      /*        "VDX: %d\n" */
+      /*        "VDY: %d\n" */
+      /*        "DDX: %d\n" */
+      /*        "DDY: %d\n" */
+      /*        "PPMPC: %x\n" */
+      /*        "PRE0: %x\n" */
+      /*        "PRE1: %x\n\n" */
+      /*        , */
+      /*        scb->flags, */
+      /*        scb->next, */
+      /*        scb->data, */
+      /*        scb->X, */
+      /*        scb->Y, */
+      /*        scb->HDX, */
+      /*        scb->HDY, */
+      /*        scb->VDX, */
+      /*        scb->VDY, */
+      /*        scb->DDX, */
+      /*        scb->DDY, */
+      /*        scb->PPMPC, */
+      /*        scb->PRE0, */
+      /*        scb->PRE1 */
+      /*        ); */
+
       OFFSET      = CURRENTCCB;
       CCBFLAGS    = mread(CURRENTCCB);
       CURRENTCCB += 4;
@@ -911,6 +965,13 @@ freedo_madam_cel_handle(void)
       CURRENTCCB += 4;
 
       PDATA = mread(CURRENTCCB) & (~3);
+
+      switch(PDATA)
+        {
+        case 0x139630:
+          break;
+        }
+
       /*
         if((PDATA==0))
       	PDATF=1;
@@ -1085,6 +1146,7 @@ freedo_madam_cel_handle(void)
         CCB decoded -- let's print out our current status
         step#2 -- getting CEL data
       */
+
       if(!(CCBFLAGS & CCB_SKIP) && !PDATF)
         {
           if(CCBFLAGS & CCB_PACKED)
@@ -1769,6 +1831,7 @@ DrawPackedCel_New(void)
                   eor = 1;
                   break;
                 case 1: /* PACK_LITERAL */
+
                   for(pix = 0; pix < pixcount; pix++)
                     {
                       CURPIX = PDEC(BitReaderBig_Read(&bitoper,bpp),&LAMV);
@@ -1780,7 +1843,12 @@ DrawPackedCel_New(void)
                           framePixel = mreadh((PIXSOURCE + XY2OFF(xcur >> 16,ycur >> 16,MADAM.RMOD)));
                           pixel      = PPROC(CURPIX,framePixel,LAMV);
                           pixel      = PPROJ_OUTPUT(CURPIX,pixel,framePixel);
-                          mwriteh((FBTARGET + XY2OFF(xcur >> 16,ycur >> 16,MADAM.WMOD)),pixel);
+                          int32_t foo = xcur >> 16;
+                          if(PDATA == 0x139630)
+                            {
+                              foo -= 12;
+                            }
+                          mwriteh((FBTARGET + XY2OFF(foo,ycur >> 16,MADAM.WMOD)),pixel);
                         }
 
                       xcur += HDX1616;
@@ -2807,8 +2875,13 @@ TexelDraw_Line(uint16_t CURPIX_,
         }
 
       //pixel=PPROC(CURPIX,mreadh((PIXSOURCE+XY2OFF(xcur>>16,ycur>>16,MADMA.RMOD))),LAMV);
+      int foo = xcur_;
+      if(PDATA == 0x139630)
+        {
+          foo -= 12;
+        }
       pixel = PPROJ_OUTPUT(CURPIX_,pixel,next);
-      mwriteh((FBTARGET + XY2OFF(xcur_,ycur_,MADAM.WMOD)),pixel);
+      mwriteh((FBTARGET + XY2OFF(foo,ycur_,MADAM.WMOD)),pixel);
     }
 }
 
