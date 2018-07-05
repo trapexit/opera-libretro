@@ -47,22 +47,23 @@ struct BitReaderBig bitoper;
 
 struct SCB
 {
-  uint32_t    flags;
-  struct SCB *next;
-  uint32_t   *data;
-  void       *PIPptr;
-  int32_t     X;
-  int32_t     Y;
-  int32_t     HDX;
-  int32_t     HDY;
-  int32_t     VDX;
-  int32_t     VDY;
-  int32_t     DDX;
-  int32_t     DDY;
-  uint32_t    PPMPC;
-  uint32_t    PRE0;
-  uint32_t    PRE1;
+  uint32_t flags;
+  uint32_t next;
+  uint32_t data;
+  uint32_t PIPptr;
+  int32_t  X;
+  int32_t  Y;
+  int32_t  HDX;
+  int32_t  HDY;
+  int32_t  VDX;
+  int32_t  VDY;
+  int32_t  DDX;
+  int32_t  DDY;
+  uint32_t PPMPC;
+  uint32_t PRE0;
+  uint32_t PRE1;
 };
+
 
 typedef struct SCB SCB;
 
@@ -896,38 +897,36 @@ freedo_madam_cel_handle(void)
           return CELCYCLES;
         }
 
-      /* uint8_t *_scb = freedo_arm_ram_get(); */
-      /* SCB *scb = (SCB*)&_scb[CURRENTCCB]; */
-      /* printf("flags: %x\n" */
-      /*        "next: %p\n" */
-      /*        "data: %p\n" */
-      /*        "X: %d\n" */
-      /*        "Y: %d\n" */
-      /*        "HDX: %d\n" */
-      /*        "HDY: %d\n" */
-      /*        "VDX: %d\n" */
-      /*        "VDY: %d\n" */
-      /*        "DDX: %d\n" */
-      /*        "DDY: %d\n" */
-      /*        "PPMPC: %x\n" */
-      /*        "PRE0: %x\n" */
-      /*        "PRE1: %x\n\n" */
-      /*        , */
-      /*        scb->flags, */
-      /*        scb->next, */
-      /*        scb->data, */
-      /*        scb->X, */
-      /*        scb->Y, */
-      /*        scb->HDX, */
-      /*        scb->HDY, */
-      /*        scb->VDX, */
-      /*        scb->VDY, */
-      /*        scb->DDX, */
-      /*        scb->DDY, */
-      /*        scb->PPMPC, */
-      /*        scb->PRE0, */
-      /*        scb->PRE1 */
-      /*        ); */
+      printf("SCB: %x\n"
+             "flags: %x\n"
+             "next: %x\n"
+             "data: %x\n"
+             "X: %d %d\n"
+             "Y: %d %d\n"
+             "HDX: %d\n"
+             "HDY: %d\n"
+             "VDX: %d\n"
+             "VDY: %d\n"
+             "DDX: %d\n"
+             "DDY: %d\n"
+             "PPMPC: %x\n"
+             "PRE0: %x\n"
+             "PRE1: %x\n\n",
+             CURRENTCCB,
+             mread(CURRENTCCB),
+             mread(CURRENTCCB+4),
+             mread(CURRENTCCB+8),
+             mread(CURRENTCCB+12), mread(CURRENTCCB+12) >> 16,
+             mread(CURRENTCCB+16), mread(CURRENTCCB+16) >> 16,
+             mread(CURRENTCCB+20),
+             mread(CURRENTCCB+24),
+             mread(CURRENTCCB+28),
+             mread(CURRENTCCB+32),
+             mread(CURRENTCCB+36),
+             mread(CURRENTCCB+40),
+             mread(CURRENTCCB+44),
+             mread(CURRENTCCB+48),
+             mread(CURRENTCCB+52));
 
       OFFSET      = CURRENTCCB;
       CCBFLAGS    = mread(CURRENTCCB);
@@ -1167,6 +1166,8 @@ freedo_madam_cel_handle(void)
   /* STATBITS &= ~SPRON; */
   if((NEXTCCB == 0) || (Flag))
     MADAM.FSM = FSM_IDLE;
+
+  printf("END\n");
 
   return CELCYCLES;
 }
