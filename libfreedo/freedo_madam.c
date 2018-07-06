@@ -68,34 +68,34 @@ struct SCB
 typedef struct SCB SCB;
 
 /* === SCB control word flags === */
-#define SCB_SKIP        0x80000000
-#define SCB_LAST        0x40000000
-#define SCB_NPABS       0x20000000
-#define SCB_SPABS       0x10000000
-#define SCB_PPABS       0x08000000
-#define SCB_LDSIZE      0x04000000
-#define SCB_LDPRS       0x02000000
-#define SCB_LDPPMP      0x01000000
-#define SCB_LDPLUT      0x00800000
-#define SCB_SCBPRE      0x00400000
-#define SCB_YOXY        0x00200000
-#define SCB_ACSC        0x00100000
-#define SCB_ALSC        0x00080000
-#define SCB_ACW         0x00040000
-#define SCB_ACCW        0x00020000
-#define SCB_TWD         0x00010000
-#define SCB_LCE         0x00008000
-#define SCB_ACE         0x00004000
-#define SCB_reserved13  0x00002000
-#define SCB_MARIA       0x00001000
-#define SCB_PXOR        0x00000800
-#define SCB_USEAV       0x00000400
-#define SCB_PACKED      0x00000200
-#define SCB_POVER_MASK  0x00000180
-#define SCB_PLUTPOS     0x00000040
-#define SCB_BGND        0x00000020
-#define SCB_NOBLK       0x00000010
-#define SCB_PLUTA_MASK  0x0000000F
+#define SCB_SKIP       0x80000000
+#define SCB_LAST       0x40000000
+#define SCB_NPABS      0x20000000
+#define SCB_SPABS      0x10000000
+#define SCB_PPABS      0x08000000
+#define SCB_LDSIZE     0x04000000
+#define SCB_LDPRS      0x02000000
+#define SCB_LDPPMP     0x01000000
+#define SCB_LDPIP      0x00800000
+#define SCB_SCoBPRE    0x00400000
+#define SCB_YOXY       0x00200000
+#define SCB_ACSC       0x00100000
+#define SCB_ALSC       0x00080000
+#define SCB_ACW        0x00040000
+#define SCB_ACCW       0x00020000
+#define SCB_TWD        0x00010000
+#define SCB_LCE        0x00008000
+#define SCB_ACE        0x00004000
+#define SCB_ASC        0x00002000
+#define SCB_MARIA      0x00001000
+#define SCB_PXOR       0x00000800
+#define SCB_USEAV      0x00000400
+#define SCB_PACKED     0x00000200
+#define SCB_DOVER_MASK 0x00000180
+#define SCB_PIPPOS     0x00000040
+#define SCB_BGND       0x00000020
+#define SCB_NOBLK      0x00000010
+#define SCB_PLUTA_MASK 0x0000000F
 
 #define SCB_POVER_SHIFT  7
 #define SCB_PLUTA_SHIFT  0
@@ -985,7 +985,7 @@ freedo_madam_cel_handle(void)
         PDATF = 1;
       CURRENTSCB += 4;
 
-      if(SCBFLAGS & SCB_LDPLUT)
+      if(SCBFLAGS & SCB_LDPIP)
         {
           PLUTDATA = mread(CURRENTSCB) & (~3);
           /*
@@ -1071,7 +1071,7 @@ freedo_madam_cel_handle(void)
           CURRENTSCB += 4;
         }
 
-      if(SCBFLAGS & SCB_SCBPRE)
+      if(SCBFLAGS & SCB_SCoBPRE)
         {
           PRE0        = mread(CURRENTSCB);
           CURRENTSCB += 4;
@@ -1117,13 +1117,13 @@ freedo_madam_cel_handle(void)
 
         pdec.tmask = !(SCBFLAGS & SCB_BGND);
 
-        pproj.pmode        = (SCBFLAGS & SCB_POVER_MASK);
+        pproj.pmode        = (SCBFLAGS & SCB_DOVER_MASK);
         pproj.pmodeORmask  = ((pproj.pmode == PMODE_ONE ) ? 0x8000 : 0x0000);
         pproj.pmodeANDmask = ((pproj.pmode != PMODE_ZERO) ? 0xFFFF : 0x7FFF);
       }
 
       /* load PLUT */
-      if((SCBFLAGS & SCB_LDPLUT) && !PLUTF)
+      if((SCBFLAGS & SCB_LDPIP) && !PLUTF)
         {
           switch(PRE0 & PRE0_BPP_MASK)
             {
@@ -1429,11 +1429,11 @@ PPROJ_OUTPUT(uint32_t pdec_output_,
   uint32_t VHOutput;
 
   /*
-    SCB_PLUTPOS flag
+    SCB_PIPPOS flag
     Determine projector's originating source of VH values.
   */
 
-  if(SCBFLAGS & SCB_PLUTPOS) /* Use pixel decoder output. */
+  if(SCBFLAGS & SCB_PIPPOS) /* Use pixel decoder output. */
     VHOutput = (pdec_output_ & 0x8001);
   else /* Use VH values determined from the CEL's origin. */
     VHOutput = CEL_ORIGIN_VH_VALUE;
