@@ -810,9 +810,13 @@ freedo_madam_poke(uint32_t addr_,
       /* modulo variables */
     case 0x130:
       MADAM.mregs[addr_] = val_;
-      MADAM.RMOD = ((val_ & 1) << 7) + ((val_ & 12) << 8) + ((val_ & 0x70) << 4);
+      MADAM.RMOD = (((val_ & 0x01) << 7) +
+                    ((val_ & 0x0C) << 8) +
+                    ((val_ & 0x70) << 4));
       val_ >>= 8;
-      MADAM.WMOD = ((val_ & 1) << 7) + ((val_ & 12) << 8) + ((val_ & 0x70) << 4);
+      MADAM.WMOD = (((val_ & 0x01) << 7) +
+                    ((val_ & 0x0C) << 8) +
+                    ((val_ & 0x70) << 4));
       break;
 
     default:
