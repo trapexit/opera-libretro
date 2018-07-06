@@ -97,12 +97,12 @@ typedef struct SCB SCB;
 #define SCB_NOBLK      0x00000010
 #define SCB_PLUTA_MASK 0x0000000F
 
-#define SCB_POVER_SHIFT  7
+#define SCB_DOVER_SHIFT  7
 #define SCB_PLUTA_SHIFT  0
 
-#define PMODE_PDC   ((0x00000000)<<SCB_POVER_SHIFT) /* Normal */
-#define PMODE_ZERO  ((0x00000002)<<SCB_POVER_SHIFT)
-#define PMODE_ONE   ((0x00000003)<<SCB_POVER_SHIFT)
+#define PMODE_PDC   ((0x00000000)<<SCB_DOVER_SHIFT) /* Normal */
+#define PMODE_ZERO  ((0x00000002)<<SCB_DOVER_SHIFT)
+#define PMODE_ONE   ((0x00000003)<<SCB_DOVER_SHIFT)
 
 /* === SCBCTL0 flags === */
 #define B15POS_MASK   0xC0000000
@@ -821,7 +821,6 @@ freedo_madam_poke(uint32_t addr_,
     }
 }
 
-static uint32_t OFFSET;
 static uint32_t temp1;
 static uint32_t Flag;
 
@@ -872,6 +871,65 @@ LoadPLUT(uint32_t pnt_,
     }
 }
 
+
+static
+void
+print_scb_flags(const uint32_t flags_)
+{
+  printf("SKIP: %d "
+         "LAST: %d "
+         "NPABS: %d "
+         "SPABS: %d "
+         "PPABS: %d "
+         "LDSIZE: %d "
+         "LDPRS: %d "
+         "LDPPMP: %d "
+         "LDPIP: %d "
+         "SCoBPRE: %d "
+         "YOXY: %d "
+         "ACW: %d "
+         "ACCW: %d "
+         "TWD: %d "
+         "LCE: %d "
+         "ACE: %d "
+         "ASC: %d "
+         "MARIA: %d "
+         "PXOR: %d "
+         "USEAV: %d "
+         "PACKED: %d "
+         "DOVER: %d "
+         "PIPPOS: %d "
+         "BGND: %d "
+         "NOBLK: %d "
+         "PIPA: %d"
+         "\n",
+         !!(flags_ & SCB_SKIP),
+         !!(flags_ & SCB_LAST),
+         !!(flags_ & SCB_NPABS),
+         !!(flags_ & SCB_SPABS),
+         !!(flags_ & SCB_PPABS),
+         !!(flags_ & SCB_LDSIZE),
+         !!(flags_ & SCB_LDPRS),
+         !!(flags_ & SCB_LDPPMP),
+         !!(flags_ & SCB_LDPIP),
+         !!(flags_ & SCB_SCoBPRE),
+         !!(flags_ & SCB_YOXY),
+         !!(flags_ & SCB_ACW),
+         !!(flags_ & SCB_ACCW),
+         !!(flags_ & SCB_TWD),
+         !!(flags_ & SCB_LCE),
+         !!(flags_ & SCB_ACE),
+         !!(flags_ & SCB_ASC),
+         !!(flags_ & SCB_MARIA),
+         !!(flags_ & SCB_PXOR),
+         !!(flags_ & SCB_USEAV),
+         !!(flags_ & SCB_PACKED),
+         (flags_ & SCB_DOVER_MASK) >> SCB_DOVER_SHIFT,
+         !!(flags_ & SCB_PIPPOS),
+         !!(flags_ & SCB_BGND),
+         !!(flags_ & SCB_NOBLK),
+         (flags_ & 0xF));
+}
 
 uint32_t
 freedo_madam_cel_handle(void)
@@ -928,9 +986,10 @@ freedo_madam_cel_handle(void)
              mread(CURRENTSCB+48),
              mread(CURRENTSCB+52));
 
-      OFFSET      = CURRENTSCB;
       SCBFLAGS    = mread(CURRENTSCB);
       CURRENTSCB += 4;
+
+      print_scb_flags(SCBFLAGS);
 
       if(SCBFLAGS & SCB_PXOR)
         {
