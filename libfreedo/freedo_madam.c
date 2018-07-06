@@ -67,49 +67,49 @@ struct SCB
 
 typedef struct SCB SCB;
 
-/* === CCB control word flags === */
-#define CCB_SKIP        0x80000000
-#define CCB_LAST        0x40000000
-#define CCB_NPABS       0x20000000
-#define CCB_SPABS       0x10000000
-#define CCB_PPABS       0x08000000
-#define CCB_LDSIZE      0x04000000
-#define CCB_LDPRS       0x02000000
-#define CCB_LDPPMP      0x01000000
-#define CCB_LDPLUT      0x00800000
-#define CCB_CCBPRE      0x00400000
-#define CCB_YOXY        0x00200000
-#define CCB_ACSC        0x00100000
-#define CCB_ALSC        0x00080000
-#define CCB_ACW         0x00040000
-#define CCB_ACCW        0x00020000
-#define CCB_TWD         0x00010000
-#define CCB_LCE         0x00008000
-#define CCB_ACE         0x00004000
-#define CCB_reserved13  0x00002000
-#define CCB_MARIA       0x00001000
-#define CCB_PXOR        0x00000800
-#define CCB_USEAV       0x00000400
-#define CCB_PACKED      0x00000200
-#define CCB_POVER_MASK  0x00000180
-#define CCB_PLUTPOS     0x00000040
-#define CCB_BGND        0x00000020
-#define CCB_NOBLK       0x00000010
-#define CCB_PLUTA_MASK  0x0000000F
+/* === SCB control word flags === */
+#define SCB_SKIP        0x80000000
+#define SCB_LAST        0x40000000
+#define SCB_NPABS       0x20000000
+#define SCB_SPABS       0x10000000
+#define SCB_PPABS       0x08000000
+#define SCB_LDSIZE      0x04000000
+#define SCB_LDPRS       0x02000000
+#define SCB_LDPPMP      0x01000000
+#define SCB_LDPLUT      0x00800000
+#define SCB_SCBPRE      0x00400000
+#define SCB_YOXY        0x00200000
+#define SCB_ACSC        0x00100000
+#define SCB_ALSC        0x00080000
+#define SCB_ACW         0x00040000
+#define SCB_ACCW        0x00020000
+#define SCB_TWD         0x00010000
+#define SCB_LCE         0x00008000
+#define SCB_ACE         0x00004000
+#define SCB_reserved13  0x00002000
+#define SCB_MARIA       0x00001000
+#define SCB_PXOR        0x00000800
+#define SCB_USEAV       0x00000400
+#define SCB_PACKED      0x00000200
+#define SCB_POVER_MASK  0x00000180
+#define SCB_PLUTPOS     0x00000040
+#define SCB_BGND        0x00000020
+#define SCB_NOBLK       0x00000010
+#define SCB_PLUTA_MASK  0x0000000F
 
-#define CCB_POVER_SHIFT  7
-#define CCB_PLUTA_SHIFT  0
+#define SCB_POVER_SHIFT  7
+#define SCB_PLUTA_SHIFT  0
 
-#define PMODE_PDC   ((0x00000000)<<CCB_POVER_SHIFT) /* Normal */
-#define PMODE_ZERO  ((0x00000002)<<CCB_POVER_SHIFT)
-#define PMODE_ONE   ((0x00000003)<<CCB_POVER_SHIFT)
+#define PMODE_PDC   ((0x00000000)<<SCB_POVER_SHIFT) /* Normal */
+#define PMODE_ZERO  ((0x00000002)<<SCB_POVER_SHIFT)
+#define PMODE_ONE   ((0x00000003)<<SCB_POVER_SHIFT)
 
-/* === CCBCTL0 flags === */
+/* === SCBCTL0 flags === */
 #define B15POS_MASK   0xC0000000
 #define B0POS_MASK    0x30000000
 #define SWAPHV        0x08000000
 #define ASCALL        0x04000000
-#define _CCBCTL0_u25  0x02000000
+#define _SCBCTL0_u25  0x02000000
 #define CFBDSUB       0x01000000
 #define CFBDLSB_MASK  0x00C00000
 #define PDCLSB_MASK   0x00300000
@@ -214,7 +214,7 @@ typedef struct SCB SCB;
 #define PPMPC_1S_CFBD  0x00008000
 
 /* PPMPC_MS_MASK definitions */
-#define PPMPC_MS_CCB         0x00000000
+#define PPMPC_MS_SCB         0x00000000
 #define PPMPC_MS_PIN         0x00002000
 #define PPMPC_MS_PDC_MFONLY  0x00004000
 #define PPMPC_MS_PDC         0x00004000
@@ -237,7 +237,7 @@ typedef struct SCB SCB;
 
 /* PPMPC_2S_MASK definitions */
 #define PPMPC_2S_0     0x00000000
-#define PPMPC_2S_CCB   0x00000040
+#define PPMPC_2S_SCB   0x00000040
 #define PPMPC_2S_CFBD  0x00000080
 #define PPMPC_2S_PDC   0x000000C0
 
@@ -488,7 +488,7 @@ static void     DMAPBus(void);
 
 static struct
 {
-  uint32_t plutaCCBbits;
+  uint32_t plutaSCBbits;
   uint32_t pixelBitsMask;
   bool     tmask;
 } pdec;
@@ -506,7 +506,7 @@ static uint32_t  retuval;
 static uint32_t  BITADDR;
 static uint32_t  BITBUFLEN;
 static uint32_t  BITBUF;
-static uint32_t  CCBFLAGS;
+static uint32_t  SCBFLAGS;
 static uint32_t  PIXC;
 static uint32_t  PRE0;
 static uint32_t  PRE1;
@@ -516,7 +516,7 @@ static int32_t   SPRWI;
 static int32_t   SPRHI;
 static uint32_t  PLUTF;
 static uint32_t  PDATF;
-static uint32_t  NCCBF;
+static uint32_t  NSCBF;
 static int32_t   CELCYCLES;
 static bool      ADD;
 static int32_t   BITCALC;
@@ -564,7 +564,7 @@ static uint32_t pSource;
 #define SPRCNTU		0x108
 #define SPRPAUS		0x10c
 
-#define CCBCTL0		MADAM.mregs[0x110]
+#define SCBCTL0		MADAM.mregs[0x110]
 #define REGCTL0		MADAM.mregs[0x130]
 #define REGCTL1		MADAM.mregs[0x134]
 #define REGCTL2		MADAM.mregs[0x138]
@@ -576,9 +576,9 @@ static uint32_t pSource;
 #define PIXSOURCE	(MADAM.mregs[0x138])
 #define FBTARGET	(MADAM.mregs[0x13c])
 
-#define CURRENTCCB	MADAM.mregs[0x5a0]
+#define CURRENTSCB	MADAM.mregs[0x5a0]
 //next ccb == 0 stop the engine
-#define NEXTCCB		MADAM.mregs[0x5a4]
+#define NEXTSCB		MADAM.mregs[0x5a4]
 #define PLUTDATA	MADAM.mregs[0x5a8]
 #define PDATA		MADAM.mregs[0x5ac]
 #define ENGAFETCH	MADAM.mregs[0x5b0]
@@ -713,7 +713,7 @@ freedo_madam_poke(uint32_t addr_,
       return;
     case SPRSTOP:
       MADAM.FSM = FSM_IDLE;
-      NEXTCCB = 0;
+      NEXTSCB = 0;
       return;
     case SPRCNTU:
       if(MADAM.FSM == FSM_SUSPENDED)
@@ -880,18 +880,18 @@ freedo_madam_cel_handle(void)
   STATBITS |= SPRON;
   Flag = 0;
 
-  while((NEXTCCB != 0) && (!Flag))
+  while((NEXTSCB != 0) && (!Flag))
     //if(MADAM.FSM==FSM_INPROCESS)
     {
-      if((NEXTCCB == 0) || (Flag))
+      if((NEXTSCB == 0) || (Flag))
         {
           MADAM.FSM = FSM_IDLE;
           return CELCYCLES;
         }
 
-      //1st step -- parce CCB and load it into registers
-      CURRENTCCB = (NEXTCCB & 0x00FFFFFC);
-      if((CURRENTCCB >> 20) > 2)
+      //1st step -- parce SCB and load it into registers
+      CURRENTSCB = (NEXTSCB & 0x00FFFFFC);
+      if((CURRENTSCB >> 20) > 2)
         {
           MADAM.FSM = FSM_IDLE;
           return CELCYCLES;
@@ -912,27 +912,27 @@ freedo_madam_cel_handle(void)
              "PPMPC: %x\n"
              "PRE0: %x\n"
              "PRE1: %x\n\n",
-             CURRENTCCB,
-             mread(CURRENTCCB),
-             mread(CURRENTCCB+4),
-             mread(CURRENTCCB+8),
-             mread(CURRENTCCB+12), mread(CURRENTCCB+12) >> 16,
-             mread(CURRENTCCB+16), mread(CURRENTCCB+16) >> 16,
-             mread(CURRENTCCB+20),
-             mread(CURRENTCCB+24),
-             mread(CURRENTCCB+28),
-             mread(CURRENTCCB+32),
-             mread(CURRENTCCB+36),
-             mread(CURRENTCCB+40),
-             mread(CURRENTCCB+44),
-             mread(CURRENTCCB+48),
-             mread(CURRENTCCB+52));
+             CURRENTSCB,
+             mread(CURRENTSCB),
+             mread(CURRENTSCB+4),
+             mread(CURRENTSCB+8),
+             mread(CURRENTSCB+12), mread(CURRENTSCB+12) >> 16,
+             mread(CURRENTSCB+16), mread(CURRENTSCB+16) >> 16,
+             mread(CURRENTSCB+20),
+             mread(CURRENTSCB+24),
+             mread(CURRENTSCB+28),
+             mread(CURRENTSCB+32),
+             mread(CURRENTSCB+36),
+             mread(CURRENTSCB+40),
+             mread(CURRENTSCB+44),
+             mread(CURRENTSCB+48),
+             mread(CURRENTSCB+52));
 
-      OFFSET      = CURRENTCCB;
-      CCBFLAGS    = mread(CURRENTCCB);
-      CURRENTCCB += 4;
+      OFFSET      = CURRENTSCB;
+      SCBFLAGS    = mread(CURRENTSCB);
+      CURRENTSCB += 4;
 
-      if(CCBFLAGS & CCB_PXOR)
+      if(SCBFLAGS & SCB_PXOR)
         {
           PXOR1 = 0;
           PXOR2 = 0x1F1F1F1F;
@@ -946,24 +946,24 @@ freedo_madam_cel_handle(void)
       Flag  = 0;
       PLUTF = 0;
       PDATF = 0;
-      NCCBF = 0;
+      NSCBF = 0;
 
-      NEXTCCB = mread(CURRENTCCB) & (~3);
+      NEXTSCB = mread(CURRENTSCB) & (~3);
 
-      if(!(CCBFLAGS & CCB_NPABS))
+      if(!(SCBFLAGS & SCB_NPABS))
         {
-          NEXTCCB += CURRENTCCB + 4;
-          NEXTCCB &= 0x00FFFFFF;
+          NEXTSCB += CURRENTSCB + 4;
+          NEXTSCB &= 0x00FFFFFF;
         }
 
-      if(NEXTCCB == 0)
-        NCCBF = 1;
-      if((NEXTCCB >> 20) > 2)
-        NCCBF = 1;
+      if(NEXTSCB == 0)
+        NSCBF = 1;
+      if((NEXTSCB >> 20) > 2)
+        NSCBF = 1;
 
-      CURRENTCCB += 4;
+      CURRENTSCB += 4;
 
-      PDATA = mread(CURRENTCCB) & (~3);
+      PDATA = mread(CURRENTSCB) & (~3);
 
       switch(PDATA)
         {
@@ -975,26 +975,26 @@ freedo_madam_cel_handle(void)
         if((PDATA==0))
       	PDATF=1;
       */
-      if(!(CCBFLAGS & CCB_SPABS))
+      if(!(SCBFLAGS & SCB_SPABS))
         {
-          PDATA += CURRENTCCB + 4;
+          PDATA += CURRENTSCB + 4;
           PDATA &= 0x00FFFFFF;
         }
 
       if((PDATA >> 20) > 2)
         PDATF = 1;
-      CURRENTCCB += 4;
+      CURRENTSCB += 4;
 
-      if(CCBFLAGS & CCB_LDPLUT)
+      if(SCBFLAGS & SCB_LDPLUT)
         {
-          PLUTDATA = mread(CURRENTCCB) & (~3);
+          PLUTDATA = mread(CURRENTSCB) & (~3);
           /*
             if((PLUTDATA == 0))
               PLUTF=1;
           */
-          if(!(CCBFLAGS & CCB_PPABS))
+          if(!(SCBFLAGS & SCB_PPABS))
             {
-              PLUTDATA += CURRENTCCB + 4;
+              PLUTDATA += CURRENTSCB + 4;
               PLUTDATA &= 0x00FFFFFF;
             }
 
@@ -1002,26 +1002,26 @@ freedo_madam_cel_handle(void)
             PLUTF = 1;
         }
 
-      CURRENTCCB += 4;
+      CURRENTSCB += 4;
 
-      if(NCCBF)
-        CCBFLAGS |= CCB_LAST;
+      if(NSCBF)
+        SCBFLAGS |= SCB_LAST;
 
-      if(CCBFLAGS & CCB_LAST)
+      if(SCBFLAGS & SCB_LAST)
         Flag = 1;
 
-      if(CCBFLAGS & CCB_YOXY)
+      if(SCBFLAGS & SCB_YOXY)
         {
-          XPOS1616    = mread(CURRENTCCB);
+          XPOS1616    = mread(CURRENTSCB);
           XPOS        = XPOS1616 / 65536.0;
-          CURRENTCCB += 4;
-          YPOS1616    = mread(CURRENTCCB);
+          CURRENTSCB += 4;
+          YPOS1616    = mread(CURRENTSCB);
           YPOS        = YPOS1616 / 65536.0;
-          CURRENTCCB += 4;
+          CURRENTSCB += 4;
         }
       else
         {
-          CURRENTCCB += 8;
+          CURRENTSCB += 8;
         }
 
       /*
@@ -1032,60 +1032,60 @@ freedo_madam_cel_handle(void)
       CEL_ORIGIN_VH_VALUE = ((XPOS1616 & 0x1) | ((YPOS1616 & 0x1) << 15));
 
       /*
-        if((CCBFLAGS&CCB_SKIP)&& debug)
-        printf("###Cel skipped!!! PDATF=%d PLUTF=%d NCCBF=%d\n",PDATF,PLUTF,NCCBF);
+        if((SCBFLAGS&SCB_SKIP)&& debug)
+        printf("###Cel skipped!!! PDATF=%d PLUTF=%d NSCBF=%d\n",PDATF,PLUTF,NSCBF);
       */
 
-      if(CCBFLAGS & CCB_LAST)
-        NEXTCCB = 0;
+      if(SCBFLAGS & SCB_LAST)
+        NEXTSCB = 0;
 
-      if(CCBFLAGS & CCB_LDSIZE)
+      if(SCBFLAGS & SCB_LDSIZE)
         {
-          HDX1616     = ((int32_t)mread(CURRENTCCB)) >> 4;
+          HDX1616     = ((int32_t)mread(CURRENTSCB)) >> 4;
           HDX         = HDX1616 / 65536.0;
-          CURRENTCCB += 4;
-          HDY1616     = ((int32_t)mread(CURRENTCCB)) >> 4;
+          CURRENTSCB += 4;
+          HDY1616     = ((int32_t)mread(CURRENTSCB)) >> 4;
           HDY         = HDY1616 / 65536.0;
-          CURRENTCCB += 4;
-          VDX1616     = mread(CURRENTCCB);
+          CURRENTSCB += 4;
+          VDX1616     = mread(CURRENTSCB);
           VDX         = VDX1616 / 65536.0;
-          CURRENTCCB += 4;
-          VDY1616     = mread(CURRENTCCB);
+          CURRENTSCB += 4;
+          VDY1616     = mread(CURRENTSCB);
           VDY         = VDY1616 / 65536.0;
-          CURRENTCCB += 4;
+          CURRENTSCB += 4;
         }
 
-      if(CCBFLAGS & CCB_LDPRS)
+      if(SCBFLAGS & SCB_LDPRS)
         {
-          HDDX1616    = ((int32_t)mread(CURRENTCCB)) >> 4;
+          HDDX1616    = ((int32_t)mread(CURRENTSCB)) >> 4;
           HDDX        = HDDX1616 / 65536.0;
-          CURRENTCCB += 4;
-          HDDY1616    = ((int32_t)mread(CURRENTCCB)) >> 4;
+          CURRENTSCB += 4;
+          HDDY1616    = ((int32_t)mread(CURRENTSCB)) >> 4;
           HDDY        = HDDY1616 / 65536.0;
-          CURRENTCCB += 4;
+          CURRENTSCB += 4;
         }
 
-      if(CCBFLAGS & CCB_LDPPMP)
+      if(SCBFLAGS & SCB_LDPPMP)
         {
-          PIXC        = mread(CURRENTCCB);
-          CURRENTCCB += 4;
+          PIXC        = mread(CURRENTSCB);
+          CURRENTSCB += 4;
         }
 
-      if(CCBFLAGS & CCB_CCBPRE)
+      if(SCBFLAGS & SCB_SCBPRE)
         {
-          PRE0        = mread(CURRENTCCB);
-          CURRENTCCB += 4;
-          if(!(CCBFLAGS & CCB_PACKED))
+          PRE0        = mread(CURRENTSCB);
+          CURRENTSCB += 4;
+          if(!(SCBFLAGS & SCB_PACKED))
             {
-              PRE1        = mread(CURRENTCCB);
-              CURRENTCCB += 4;
+              PRE1        = mread(CURRENTSCB);
+              CURRENTSCB += 4;
             }
         }
       else if(!PDATF)
         {
           PRE0   = mread(PDATA);
           PDATA += 4;
-          if(!(CCBFLAGS & CCB_PACKED))
+          if(!(SCBFLAGS & SCB_PACKED))
             {
               PRE1   = mread(PDATA);
               PDATA += 4;
@@ -1101,29 +1101,29 @@ freedo_madam_cel_handle(void)
           case 7:
             continue;
           case 1:
-            pdec.plutaCCBbits  = ((CCBFLAGS & 0x0F) * 4);
+            pdec.plutaSCBbits  = ((SCBFLAGS & 0x0F) * 4);
             pdec.pixelBitsMask = 1; /* 1 bit */
             break;
           case 2:
-            pdec.plutaCCBbits  = ((CCBFLAGS & 0x0E) * 4);
+            pdec.plutaSCBbits  = ((SCBFLAGS & 0x0E) * 4);
             pdec.pixelBitsMask = 3; /* 2 bit */
             break;
           case 3:
           default:
-            pdec.plutaCCBbits  = ((CCBFLAGS & 0x08) * 4);
+            pdec.plutaSCBbits  = ((SCBFLAGS & 0x08) * 4);
             pdec.pixelBitsMask = 15; /* 4 bit */
             break;
           }
 
-        pdec.tmask = !(CCBFLAGS & CCB_BGND);
+        pdec.tmask = !(SCBFLAGS & SCB_BGND);
 
-        pproj.pmode        = (CCBFLAGS & CCB_POVER_MASK);
+        pproj.pmode        = (SCBFLAGS & SCB_POVER_MASK);
         pproj.pmodeORmask  = ((pproj.pmode == PMODE_ONE ) ? 0x8000 : 0x0000);
         pproj.pmodeANDmask = ((pproj.pmode != PMODE_ZERO) ? 0xFFFF : 0x7FFF);
       }
 
       /* load PLUT */
-      if((CCBFLAGS & CCB_LDPLUT) && !PLUTF)
+      if((SCBFLAGS & SCB_LDPLUT) && !PLUTF)
         {
           switch(PRE0 & PRE0_BPP_MASK)
             {
@@ -1142,13 +1142,13 @@ freedo_madam_cel_handle(void)
         }
 
       /*
-        CCB decoded -- let's print out our current status
+        SCB decoded -- let's print out our current status
         step#2 -- getting CEL data
       */
 
-      if(!(CCBFLAGS & CCB_SKIP) && !PDATF)
+      if(!(SCBFLAGS & SCB_SKIP) && !PDATF)
         {
-          if(CCBFLAGS & CCB_PACKED)
+          if(SCBFLAGS & SCB_PACKED)
             {
               DrawPackedCel_New();
             }
@@ -1164,7 +1164,7 @@ freedo_madam_cel_handle(void)
     }
 
   /* STATBITS &= ~SPRON; */
-  if((NEXTCCB == 0) || (Flag))
+  if((NEXTSCB == 0) || (Flag))
     MADAM.FSM = FSM_IDLE;
 
   printf("END\n");
@@ -1355,7 +1355,7 @@ PDEC(const uint32_t  pixel_,
     case 1: /* 1 bit  */
     case 2: /* 2 bits */
     case 3: /* 4 bits */
-      pres   = MADAM.PLUT[(pdec.plutaCCBbits + ((pix1.raw & pdec.pixelBitsMask) * 2)) >> 1];
+      pres   = MADAM.PLUT[(pdec.plutaSCBbits + ((pix1.raw & pdec.pixelBitsMask) * 2)) >> 1];
       resamv = 0x49;
       break;
 
@@ -1404,11 +1404,11 @@ PDEC(const uint32_t  pixel_,
     TODO: Do PROJECTOR functions now?
     They'll be done before using the PROCESSOR.
 
-    if(!(PRE1&PRE1_NOSWAP) && (CCBCTL0&(1<<27)))
+    if(!(PRE1&PRE1_NOSWAP) && (SCBCTL0&(1<<27)))
       pres = (pres&0x7ffe)|((pres&0x8000)>>15)|((pres&1)<<15);
 
-    if(!(CCBCTL0 & 0x80000000))
-      pres = (pres&0x7fff)|((CCBCTL0>>15)&0x8000);
+    if(!(SCBCTL0 & 0x80000000))
+      pres = (pres&0x7fff)|((SCBCTL0>>15)&0x8000);
 
     pres=(pres|pdec.pmodeORmask)&pdec.pmodeANDmask;
   */
@@ -1429,11 +1429,11 @@ PPROJ_OUTPUT(uint32_t pdec_output_,
   uint32_t VHOutput;
 
   /*
-    CCB_PLUTPOS flag
+    SCB_PLUTPOS flag
     Determine projector's originating source of VH values.
   */
 
-  if(CCBFLAGS & CCB_PLUTPOS) /* Use pixel decoder output. */
+  if(SCBFLAGS & SCB_PLUTPOS) /* Use pixel decoder output. */
     VHOutput = (pdec_output_ & 0x8001);
   else /* Use VH values determined from the CEL's origin. */
     VHOutput = CEL_ORIGIN_VH_VALUE;
@@ -1442,7 +1442,7 @@ PPROJ_OUTPUT(uint32_t pdec_output_,
     SWAPHV flag
     Swap the H and V values now if requested.
   */
-  if(CCBCTL0 & SWAPHV)
+  if(SCBCTL0 & SWAPHV)
     {
       /* TODO: I have read that PRE1 is only set for unpacked CELs.
          So... should this be ignored if using packed CELs? I don't
@@ -1456,7 +1456,7 @@ PPROJ_OUTPUT(uint32_t pdec_output_,
     CFBDSUB flag
     Substitute the VH values from the frame buffer if requested.
   */
-  if(CCBCTL0 & CFBDSUB)
+  if(SCBCTL0 & CFBDSUB)
     {
       /* TODO: This should be re-enabled sometime. However, it currently
          causes the wing commander 3 movies to screw up again! There
@@ -1469,7 +1469,7 @@ PPROJ_OUTPUT(uint32_t pdec_output_,
     B15POS_MASK settings
     Substitute the V value explicitly if requested.
   */
-  b15mode = (CCBCTL0 & B15POS_MASK);
+  b15mode = (SCBCTL0 & B15POS_MASK);
   switch(b15mode)
     {
     case B15POS_PDC:
@@ -1488,7 +1488,7 @@ PPROJ_OUTPUT(uint32_t pdec_output_,
     B15POS_MASK settings
     Substitute the H value explicitly if requested.
   */
-  b0mode = (CCBCTL0 & B0POS_MASK);
+  b0mode = (SCBCTL0 & B0POS_MASK);
   switch(b0mode)
     {
     case B0POS_PDC:
@@ -1549,7 +1549,7 @@ PPROC(uint32_t pixel_,
 #pragma pack(pop)
 
   /*
-    Set PMODE according to the values set up in the CCBFLAGS word.
+    Set PMODE according to the values set up in the SCBFLAGS word.
     (This merely uses masks here because it's faster).
     This is a duty of the PROJECTOR, but we'll do it here because its
     easier.
@@ -1568,7 +1568,7 @@ PPROC(uint32_t pixel_,
     pixc.raw = 0;
   */
 
-  if(CCBFLAGS & CCB_USEAV)
+  if(SCBFLAGS & SCB_USEAV)
     {
       AV.raw = pixc.meaning.av;
     }
@@ -1683,19 +1683,19 @@ PPROC(uint32_t pixel_,
   out.r16b.b = color2.B;
 
   /* TODO: Is this something the PROJECTOR should do? */
-  if(!(CCBFLAGS & CCB_NOBLK) && (out.raw == 0))
+  if(!(SCBFLAGS & SCB_NOBLK) && (out.raw == 0))
     out.raw = (1 << 10);
 
   /*
-    if(!(PRE1 & PRE1_NOSWAP) && (CCBCTL0 & (1 << 27)))
+    if(!(PRE1 & PRE1_NOSWAP) && (SCBCTL0 & (1 << 27)))
     out.raw = ((out.raw & 0x7FFE) |
     ((out.raw & 0x8000) >> 15) |
     ((out.raw & 1) << 15));
   */
 
   /*
-    if(!(CCBCTL0 & 0x80000000))
-    out.raw = ((out.raw & 0x7FFF) | ((CCBCTL0 >> 15) & 0x8000));
+    if(!(SCBCTL0 & 0x80000000))
+    out.raw = ((out.raw & 0x7FFF) | ((SCBCTL0 >> 15) & 0x8000));
   */
 
   return out.raw;
@@ -1888,7 +1888,7 @@ DrawPackedCel_New(void)
       int drawHeight;
 
       drawHeight = VDY1616;
-      if((CCBFLAGS & CCB_MARIA) && (drawHeight > (1 << 16)))
+      if((SCBFLAGS & SCB_MARIA) && (drawHeight > (1 << 16)))
         drawHeight = (1 << 16);
 
       for(currentrow = 0; currentrow < SPRHI; currentrow++)
@@ -2184,7 +2184,7 @@ DrawLiteralCel_New(void)
         SPRWI -= ((PRE0 >> 24) & 0xF);
 
         drawHeight = VDY1616;
-        if((CCBFLAGS & CCB_MARIA) && (drawHeight > (1 << 16)))
+        if((SCBFLAGS & SCB_MARIA) && (drawHeight > (1 << 16)))
           drawHeight = (1 << 16);
 
         for(i = 0; i < SPRHI; i++)
@@ -2363,7 +2363,7 @@ DrawLRCel_New(void)
         int32_t drawHeight;
 
         drawHeight = VDY1616;
-        if((CCBFLAGS & CCB_MARIA) && (drawHeight > (1 << 16)))
+        if((SCBFLAGS & SCB_MARIA) && (drawHeight > (1 << 16)))
           drawHeight = (1 << 16);
 
         for(i = 0; i < SPRHI; i++)
@@ -2482,8 +2482,8 @@ TexelCCWTest(const double hdx_,
              const double vdy_)
 {
   if(((hdx_ + vdx_) * (hdy_ - vdy_) + (vdx_ * vdy_) - (hdx_ * hdy_)) < 0.0)
-    return CCB_ACCW;
-  return CCB_ACW;
+    return SCB_ACCW;
+  return SCB_ACW;
 }
 
 static
@@ -2493,7 +2493,7 @@ QuardCCWTest(int32_t wdt_)
   float wdt;
   uint32_t tmp;
 
-  if((CCBFLAGS & CCB_ACCW) && (CCBFLAGS & CCB_ACW))
+  if((SCBFLAGS & SCB_ACCW) && (SCBFLAGS & SCB_ACW))
     return false;
 
   wdt = (float)wdt_;
@@ -2504,7 +2504,7 @@ QuardCCWTest(int32_t wdt_)
     return false;
   if(tmp != TexelCCWTest(HDX+HDDX*SPRHI,HDY+HDDY*SPRHI,VDX+HDDX*(float)SPRHI*wdt,VDY+HDDY*(float)SPRHI*wdt))
     return false;
-  if(tmp == (CCBFLAGS & (CCB_ACCW | CCB_ACW)))
+  if(tmp == (SCBFLAGS & (SCB_ACCW | SCB_ACW)))
     return true;
   return false;
 }
@@ -2524,7 +2524,7 @@ TestInitVisual(int32_t packed_)
   int32_t xpoints[4];
   int32_t ypoints[4];
 
-  if(!(CCBFLAGS & CCB_ACCW) && !(CCBFLAGS & CCB_ACW))
+  if(!(SCBFLAGS & SCB_ACCW) && !(SCBFLAGS & SCB_ACW))
     return -1;
 
   if(!packed_)
@@ -2597,7 +2597,7 @@ TestInitVisual(int32_t packed_)
           if(((HDY1616 < 0) && (VDX1616 > 0)) ||
              ((HDY1616 > 0) && (VDX1616 < 0)))
             {
-              if(CCBFLAGS & CCB_ACW)
+              if(SCBFLAGS & SCB_ACW)
                 {
                   if((ABS(HDY1616) == 0x10000) &&
                      (ABS(VDX1616) == 0x10000) &&
@@ -2614,7 +2614,7 @@ TestInitVisual(int32_t packed_)
             }
           else
             {
-              if(CCBFLAGS & CCB_ACCW)
+              if(SCBFLAGS & SCB_ACCW)
                 {
                   if((ABS(HDY1616) == 0x10000) &&
                      (ABS(VDX1616) == 0x10000) &&
@@ -2637,7 +2637,7 @@ TestInitVisual(int32_t packed_)
           if(((HDX1616 < 0) && (VDY1616 > 0)) ||
              ((HDX1616 > 0) && (VDY1616 < 0)))
             {
-              if(CCBFLAGS & CCB_ACCW)
+              if(SCBFLAGS & SCB_ACCW)
                 {
                   if((ABS(HDX1616) == 0x10000) &&
                      (ABS(VDY1616) == 0x10000) &&
@@ -2654,7 +2654,7 @@ TestInitVisual(int32_t packed_)
             }
           else
             {
-              if(CCBFLAGS & CCB_ACW)
+              if(SCBFLAGS & SCB_ACW)
                 {
                   if((ABS(HDX1616) == 0x10000) &&
                      (ABS(VDY1616) == 0x10000) &&
@@ -3124,8 +3124,8 @@ TexelDraw_Arbitrary(uint16_t CURPIX_,
 
           if(cnt_cross > 2)
             {
-              if(((CCBFLAGS & CCB_ACW)  && (updowns[2] == 0)) ||
-                 ((CCBFLAGS & CCB_ACCW) && (updowns[2] == 1)))
+              if(((SCBFLAGS & SCB_ACW)  && (updowns[2] == 0)) ||
+                 ((SCBFLAGS & SCB_ACCW) && (updowns[2] == 1)))
                 {
                   j = xpoints[2];
                   if(j < 0)
@@ -3149,8 +3149,8 @@ TexelDraw_Arbitrary(uint16_t CURPIX_,
                 }
             }
 
-          if(((CCBFLAGS & CCB_ACW)  && (updowns[0] == 0)) ||
-             ((CCBFLAGS & CCB_ACCW) && (updowns[0] == 1)))
+          if(((SCBFLAGS & SCB_ACW)  && (updowns[0] == 0)) ||
+             ((SCBFLAGS & SCB_ACCW) && (updowns[0] == 1)))
             {
               j = xpoints[0];
               if(j < 0)
