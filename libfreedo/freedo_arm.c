@@ -44,6 +44,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h>
+
 #define ARM_INITIAL_PC  0x03000000
 
 #define ARM_MUL_MASK    0x0fc000f0

@@ -40,8 +40,8 @@
 
 #include <math.h>
 #include <stdint.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 struct BitReaderBig bitoper;
 
@@ -678,6 +678,7 @@ freedo_madam_poke(uint32_t addr_,
   if((addr_ >= 0x400) && (addr_ <= 0x53F))
     return freedo_clio_fifo_write(addr_,val_);
 
+  MADAM.mregs[addr_] = val_;
   switch(addr_)
     {
     case 0x00:
@@ -685,24 +686,13 @@ freedo_madam_poke(uint32_t addr_,
         fputc(val_,stderr);
       return;
     case 0x04:
-      val_               = 0x29;
-      MADAM.mregs[addr_] = val_;
-      break;
+      MADAM.mregs[addr_] = 0x29;
+      return;
     case 0x08:
-      MADAM.mregs[addr_] = val_;
       HandleDMA8();
       break;
     case 0x580:
       freedo_vdlp_process(val_);
-      return;
-    case 0x584:
-    case 0x588:
-    case 0x58C:
-    case 0x590:
-    case 0x594:
-    case 0x598:
-    case 0x59C:
-      MADAM.mregs[addr_] = val_;
       return;
     case SPRSTRT:
       if(MADAM.FSM == FSM_IDLE)
@@ -719,6 +709,15 @@ freedo_madam_poke(uint32_t addr_,
     case SPRPAUS:
       if(MADAM.FSM == FSM_INPROCESS)
         MADAM.FSM = FSM_SUSPENDED;
+      return;
+    case 0x130:
+      MADAM.RMOD = (((val_ & 0x01) << 7) +
+                    ((val_ & 0x0C) << 8) +
+                    ((val_ & 0x70) << 4));
+      val_ >>= 8;
+      MADAM.WMOD = (((val_ & 0x01) << 7) +
+                    ((val_ & 0x0C) << 8) +
+                    ((val_ & 0x70) << 4));
       return;
 
       /* Matix engine */
@@ -803,23 +802,6 @@ freedo_madam_poke(uint32_t addr_,
           }
       }
       break;
-
-      /* modulo variables */
-    case 0x130:
-      printf("\n\nMOD: %x\n\n",val_);
-      MADAM.mregs[addr_] = val_;
-      MADAM.RMOD = (((val_ & 0x01) << 7) +
-                    ((val_ & 0x0C) << 8) +
-                    ((val_ & 0x70) << 4));
-      val_ >>= 8;
-      MADAM.WMOD = (((val_ & 0x01) << 7) +
-                    ((val_ & 0x0C) << 8) +
-                    ((val_ & 0x70) << 4));
-      break;
-
-    default:
-      MADAM.mregs[addr_] = val_;
-      break;
     }
 }
 
@@ -832,8 +814,6 @@ static double HDX;
 static double HDY;
 static double VDX;
 static double VDY;
-static double XPOS;
-static double YPOS;
 static double HDX_2;
 static double HDY_2;
 
@@ -878,6 +858,7 @@ static
 void
 print_scb_flags(const uint32_t flags_)
 {
+  printf("CLIPX: %d CLIPY: %d\n",CLIPXVAL,CLIPYVAL);
   printf("SKIP: %d "
          "LAST: %d "
          "NPABS: %d "
@@ -957,41 +938,42 @@ freedo_madam_cel_handle(void)
           return CELCYCLES;
         }
 
-      printf("SCB: %x\n"
-             "flags: %x\n"
-             "next: %x\n"
-             "data: %x\n"
-             "X: %d %d\n"
-             "Y: %d %d\n"
-             "HDX: %d\n"
-             "HDY: %d\n"
-             "VDX: %d\n"
-             "VDY: %d\n"
-             "DDX: %d\n"
-             "DDY: %d\n"
-             "PPMPC: %x\n"
-             "PRE0: %x\n"
-             "PRE1: %x\n\n",
-             CURRENTSCB,
-             mread(CURRENTSCB),
-             mread(CURRENTSCB+4),
-             mread(CURRENTSCB+8),
-             mread(CURRENTSCB+12), mread(CURRENTSCB+12) >> 16,
-             mread(CURRENTSCB+16), mread(CURRENTSCB+16) >> 16,
-             mread(CURRENTSCB+20),
-             mread(CURRENTSCB+24),
-             mread(CURRENTSCB+28),
-             mread(CURRENTSCB+32),
-             mread(CURRENTSCB+36),
-             mread(CURRENTSCB+40),
-             mread(CURRENTSCB+44),
-             mread(CURRENTSCB+48),
-             mread(CURRENTSCB+52));
-
-      SCBFLAGS    = mread(CURRENTSCB);
+      SCBFLAGS = mread(CURRENTSCB);
+      if(CURRENTSCB == 0xd6b84)
+        {
+          printf("SCB: %x\n"
+                 "flags: %x\n"
+                 "next: %x\n"
+                 "data: %x\n"
+                 "X: %d %d\n"
+                 "Y: %d %d\n"
+                 "HDX: %d\n"
+                 "HDY: %d\n"
+                 "VDX: %d\n"
+                 "VDY: %d\n"
+                 "DDX: %d\n"
+                 "DDY: %d\n"
+                 "PPMPC: %x\n"
+                 "PRE0: %x\n"
+                 "PRE1: %x\n\n",
+                 CURRENTSCB,
+                 mread(CURRENTSCB),
+                 mread(CURRENTSCB+4),
+                 mread(CURRENTSCB+8),
+                 mread(CURRENTSCB+12), mread(CURRENTSCB+12) >> 16,
+                 mread(CURRENTSCB+16), mread(CURRENTSCB+16) >> 16,
+                 mread(CURRENTSCB+20),
+                 mread(CURRENTSCB+24),
+                 mread(CURRENTSCB+28),
+                 mread(CURRENTSCB+32),
+                 mread(CURRENTSCB+36),
+                 mread(CURRENTSCB+40),
+                 mread(CURRENTSCB+44),
+                 mread(CURRENTSCB+48),
+                 mread(CURRENTSCB+52));
+          print_scb_flags(SCBFLAGS);
+        }
       CURRENTSCB += 4;
-
-      print_scb_flags(SCBFLAGS);
 
       if(SCBFLAGS & SCB_PXOR)
         {
@@ -1025,12 +1007,6 @@ freedo_madam_cel_handle(void)
       CURRENTSCB += 4;
 
       PDATA = mread(CURRENTSCB) & (~3);
-
-      switch(PDATA)
-        {
-        case 0x139630:
-          break;
-        }
 
       /*
         if((PDATA==0))
@@ -1074,10 +1050,8 @@ freedo_madam_cel_handle(void)
       if(SCBFLAGS & SCB_YOXY)
         {
           XPOS1616    = mread(CURRENTSCB);
-          XPOS        = XPOS1616 / 65536.0;
           CURRENTSCB += 4;
           YPOS1616    = mread(CURRENTSCB);
-          YPOS        = YPOS1616 / 65536.0;
           CURRENTSCB += 4;
         }
       else
@@ -1091,11 +1065,6 @@ freedo_madam_cel_handle(void)
         its VH values in the projector.
       */
       CEL_ORIGIN_VH_VALUE = ((XPOS1616 & 0x1) | ((YPOS1616 & 0x1) << 15));
-
-      /*
-        if((SCBFLAGS&SCB_SKIP)&& debug)
-        printf("###Cel skipped!!! PDATF=%d PLUTF=%d NSCBF=%d\n",PDATF,PLUTF,NSCBF);
-      */
 
       if(SCBFLAGS & SCB_LAST)
         NEXTSCB = 0;
@@ -1227,8 +1196,6 @@ freedo_madam_cel_handle(void)
   /* STATBITS &= ~SPRON; */
   if((NEXTSCB == 0) || (Flag))
     MADAM.FSM = FSM_IDLE;
-
-  printf("END\n");
 
   return CELCYCLES;
 }
@@ -2142,15 +2109,9 @@ DrawPackedCel_New(void)
   SPRWI++;
 
   if(FIXMODE & FIX_BIT_GRAPHICS_STEP_Y)
-    {
-      YPOS1616 = ycur;
-      YPOS     = (YPOS1616 / 65536.0);
-    }
+    YPOS1616 = ycur;
   else
-    {
-      XPOS1616 = xcur;
-      XPOS     = (XPOS1616 / 65536.0);
-    }
+    XPOS1616 = xcur;
 }
 
 static
@@ -2330,15 +2291,9 @@ DrawLiteralCel_New(void)
     }
 
   if(FIXMODE & FIX_BIT_GRAPHICS_STEP_Y)
-    {
-      YPOS1616 = ycur;
-      YPOS     = (YPOS1616 / 65536.0);
-    }
+    YPOS1616 = ycur;
   else
-    {
-      XPOS1616 = xcur;
-      XPOS     = (XPOS1616 / 65536.0);
-    }
+    XPOS1616 = xcur;
 }
 
 static
@@ -2498,15 +2453,9 @@ DrawLRCel_New(void)
     }
 
   if(FIXMODE & FIX_BIT_GRAPHICS_STEP_Y)
-    {
-      YPOS1616 = ycur;
-      YPOS     = YPOS1616 / 65536.0;
-    }
+    YPOS1616 = ycur;
   else
-    {
-      XPOS1616 = xcur;
-      XPOS     = XPOS1616 / 65536.0;
-    }
+    XPOS1616 = xcur;
 }
 
 /*
@@ -3007,6 +2956,7 @@ TexelDraw_Scale(uint16_t CURPIX_,
   if(xcur_ == deltax_)
     return 0;
 
+  /* clip start and end values instead? */
   for(y = ycur_; y != deltay_; y += TEXEL_INCY)
     {
       for(x = xcur_; x != deltax_; x += TEXEL_INCX)
