@@ -502,32 +502,21 @@ static struct
 } pproj;
 
 static uint8_t  *Mem;
-static uint32_t  retuval;
-static uint32_t  BITADDR;
-static uint32_t  BITBUFLEN;
-static uint32_t  BITBUF;
 static uint32_t  SCBFLAGS;
 static uint32_t  PIXC;
 static uint32_t  PRE0;
 static uint32_t  PRE1;
-static uint32_t  TARGETPROJ;
-static uint32_t  SRCDATA;
 static int32_t   SPRWI;
 static int32_t   SPRHI;
 static uint32_t  PLUTF;
 static uint32_t  PDATF;
-static uint32_t  NSCBF;
 static int32_t   CELCYCLES;
-static bool      ADD;
-static int32_t   BITCALC;
 
 static uint16_t bitbuf;
 static uint8_t  subbitbuf;
 static int32_t  bitcount;
 static int64_t  compsize;  /* size of commpressed in bytes. actually pixcount*bpp/8 */
 static uint32_t gFINISH;
-static uint16_t RRR;
-static int32_t  USECEL;
 
 static uint32_t const BPP[8] = {1,1,2,4,6,8,16,1};
 
@@ -806,7 +795,6 @@ freedo_madam_poke(uint32_t addr_,
 }
 
 static uint32_t temp1;
-static uint32_t Flag;
 
 static double HDDX;
 static double HDDY;
@@ -919,17 +907,9 @@ freedo_madam_cel_handle(void)
 {
   CELCYCLES = 0;
   STATBITS |= SPRON;
-  Flag = 0;
 
-  while((NEXTSCB != 0) && (!Flag))
-    //if(MADAM.FSM==FSM_INPROCESS)
+  while(NEXTSCB != 0)
     {
-      if((NEXTSCB == 0) || (Flag))
-        {
-          MADAM.FSM = FSM_IDLE;
-          return CELCYCLES;
-        }
-
       //1st step -- parce SCB and load it into registers
       CURRENTSCB = (NEXTSCB & 0x00FFFFFC);
       if((CURRENTSCB >> 20) > 2)
@@ -986,12 +966,10 @@ freedo_madam_cel_handle(void)
           PXOR2 = 0;
         }
 
-      Flag  = 0;
       PLUTF = 0;
       PDATF = 0;
-      NSCBF = 0;
 
-      NEXTSCB = mread(CURRENTSCB) & (~3);
+      NEXTSCB = (mread(CURRENTSCB) & 0xFFFFFFFC);
 
       if(!(SCBFLAGS & SCB_NPABS))
         {
@@ -999,19 +977,10 @@ freedo_madam_cel_handle(void)
           NEXTSCB &= 0x00FFFFFF;
         }
 
-      if(NEXTSCB == 0)
-        NSCBF = 1;
-      if((NEXTSCB >> 20) > 2)
-        NSCBF = 1;
-
       CURRENTSCB += 4;
 
-      PDATA = mread(CURRENTSCB) & (~3);
+      PDATA = (mread(CURRENTSCB) & 0xFFFFFFFC);
 
-      /*
-        if((PDATA==0))
-      	PDATF=1;
-      */
       if(!(SCBFLAGS & SCB_SPABS))
         {
           PDATA += CURRENTSCB + 4;
@@ -1024,11 +993,8 @@ freedo_madam_cel_handle(void)
 
       if(SCBFLAGS & SCB_LDPIP)
         {
-          PLUTDATA = mread(CURRENTSCB) & (~3);
-          /*
-            if((PLUTDATA == 0))
-              PLUTF=1;
-          */
+          PLUTDATA = (mread(CURRENTSCB) & 0xFFFFFFFC);
+
           if(!(SCBFLAGS & SCB_PPABS))
             {
               PLUTDATA += CURRENTSCB + 4;
@@ -1040,12 +1006,6 @@ freedo_madam_cel_handle(void)
         }
 
       CURRENTSCB += 4;
-
-      if(NSCBF)
-        SCBFLAGS |= SCB_LAST;
-
-      if(SCBFLAGS & SCB_LAST)
-        Flag = 1;
 
       if(SCBFLAGS & SCB_YOXY)
         {
@@ -1065,9 +1025,6 @@ freedo_madam_cel_handle(void)
         its VH values in the projector.
       */
       CEL_ORIGIN_VH_VALUE = ((XPOS1616 & 0x1) | ((YPOS1616 & 0x1) << 15));
-
-      if(SCBFLAGS & SCB_LAST)
-        NEXTSCB = 0;
 
       if(SCBFLAGS & SCB_LDSIZE)
         {
@@ -1132,16 +1089,16 @@ freedo_madam_cel_handle(void)
             continue;
           case 1:
             pdec.plutaSCBbits  = ((SCBFLAGS & 0x0F) * 4);
-            pdec.pixelBitsMask = 1; /* 1 bit */
+            pdec.pixelBitsMask = 0x01; /* 1 bit */
             break;
           case 2:
             pdec.plutaSCBbits  = ((SCBFLAGS & 0x0E) * 4);
-            pdec.pixelBitsMask = 3; /* 2 bit */
+            pdec.pixelBitsMask = 0x03; /* 2 bit */
             break;
           case 3:
           default:
             pdec.plutaSCBbits  = ((SCBFLAGS & 0x08) * 4);
-            pdec.pixelBitsMask = 15; /* 4 bit */
+            pdec.pixelBitsMask = 0x0F; /* 4 bit */
             break;
           }
 
@@ -1191,10 +1148,13 @@ freedo_madam_cel_handle(void)
             }
 
         }
+
+      if(SCBFLAGS & SCB_LAST)
+        break;
     }
 
   /* STATBITS &= ~SPRON; */
-  if((NEXTSCB == 0) || (Flag))
+  if(NEXTSCB == 0)
     MADAM.FSM = FSM_IDLE;
 
   return CELCYCLES;
@@ -1259,8 +1219,6 @@ freedo_madam_init(uint8_t *mem_)
   int32_t j;
   int32_t n;
 
-  ADD       = 0;
-  USECEL    = 1;
   CELCYCLES = 0;
   Mem       = mem_;
 
@@ -1783,7 +1741,6 @@ DrawPackedCel_New(void)
           BitReaderBig_AttachBuffer(&bitoper,start);
           offset = BitReaderBig_Read(&bitoper,(offsetl << 3));
 
-          /* BITCALC=((offset+2)<<2)<<5; */
           lastaddr  = (start + ((offset + 2) << 2));
           eor       = 0;
           xcur      = xvert;
@@ -1924,7 +1881,6 @@ DrawPackedCel_New(void)
           BitReaderBig_AttachBuffer(&bitoper,start);
           offset = BitReaderBig_Read(&bitoper,(offsetl << 3));
 
-          BITCALC = (((offset + 2) << 2) << 5);
           lastaddr = (start + ((offset + 2) << 2));
 
           eor = 0;
@@ -2011,7 +1967,6 @@ DrawPackedCel_New(void)
           BitReaderBig_AttachBuffer(&bitoper,start);
           offset = BitReaderBig_Read(&bitoper,(offsetl << 3));
 
-          BITCALC  = (((offset + 2) << 2) << 5);
           lastaddr = (start + ((offset + 2) << 2));
 
           eor = 0;
@@ -2164,7 +2119,6 @@ DrawLiteralCel_New(void)
             uint32_t j;
 
             BitReaderBig_AttachBuffer(&bitoper,PDATA);
-            BITCALC = (((offset + 2) << 2) << 5);
             xcur = (xvert + TEXTURE_WI_START * HDX1616);
             ycur = (yvert + TEXTURE_WI_START * HDY1616);
             BitReaderBig_Skip(&bitoper,(bpp * (((PRE0 >> 24) & 0xF))));
@@ -2212,7 +2166,6 @@ DrawLiteralCel_New(void)
         for(i = 0; i < SPRHI; i++)
           {
             BitReaderBig_AttachBuffer(&bitoper,PDATA);
-            BITCALC = (((offset + 2) << 2) << 5);
             xcur   = xvert;
             ycur   = yvert;
             xvert += VDX1616;
@@ -2251,7 +2204,6 @@ DrawLiteralCel_New(void)
         for(i = 0; i < SPRHI; i++)
           {
             BitReaderBig_AttachBuffer(&bitoper,PDATA);
-            BITCALC = (((offset + 2) << 2) << 5);
 
             xcur = xvert;
             ycur = yvert;
