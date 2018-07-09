@@ -678,9 +678,9 @@ madam_matrix_mul3x3(void)
   Rez2 = Rez2T;
   Rez3 = Rez3T;
 
-  Rez0T = (int)((M00 * V0 + M01 * V1 + M02 * V2) / 65536.0);
-  Rez1T = (int)((M10 * V0 + M11 * V1 + M12 * V2) / 65536.0);
-  Rez2T = (int)((M20 * V0 + M21 * V1 + M22 * V2) / 65536.0);
+  Rez0T = (int32_t)((M00 * V0 + M01 * V1 + M02 * V2) / 65536.0);
+  Rez1T = (int32_t)((M10 * V0 + M11 * V1 + M12 * V2) / 65536.0);
+  Rez2T = (int32_t)((M20 * V0 + M21 * V1 + M22 * V2) / 65536.0);
 }
 
 static
@@ -718,10 +718,10 @@ madam_matrix_mul4x4(void)
   Rez2 = Rez2T;
   Rez3 = Rez3T;
 
-  Rez0T = (int)((M00 * V0 + M01 * V1 + M02 * V2 + M03 * V3) / 65536.0);
-  Rez1T = (int)((M10 * V0 + M11 * V1 + M12 * V2 + M13 * V3) / 65536.0);
-  Rez2T = (int)((M20 * V0 + M21 * V1 + M22 * V2 + M23 * V3) / 65536.0);
-  Rez3T = (int)((M30 * V0 + M31 * V1 + M32 * V2 + M33 * V3) / 65536.0);
+  Rez0T = (int32_t)((M00 * V0 + M01 * V1 + M02 * V2 + M03 * V3) / 65536.0);
+  Rez1T = (int32_t)((M10 * V0 + M11 * V1 + M12 * V2 + M13 * V3) / 65536.0);
+  Rez2T = (int32_t)((M20 * V0 + M21 * V1 + M22 * V2 + M23 * V3) / 65536.0);
+  Rez3T = (int32_t)((M30 * V0 + M31 * V1 + M32 * V2 + M33 * V3) / 65536.0);
 }
 
 void
