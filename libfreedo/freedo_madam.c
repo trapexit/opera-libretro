@@ -705,7 +705,10 @@ freedo_madam_poke(uint32_t addr_,
       /* Matix engine */
     case 0x7FC:
       {
-        static double Rez0T,Rez1T,Rez2T,Rez3T;
+        static float Rez0T;
+        static float Rez1T;
+        static float Rez2T;
+        static float Rez3T;
 
         MADAM.mregs[0x7fc] = 0;       /* matrix engine already ready */
 
@@ -758,7 +761,7 @@ freedo_madam_poke(uint32_t addr_,
             */
           case 3:
             {
-              double M;
+              float M;
 
               Rez0 = Rez0T;
               Rez1 = Rez1T;
@@ -769,13 +772,13 @@ freedo_madam_poke(uint32_t addr_,
 
               Rez2T = (int32_t)((M20 * V0 + M21 * V1 + M22 * V2) / 65536.0); // z
               if(Rez2T != 0)
-                M /= (double)Rez2T;          // n/z
+                M /= (float)Rez2T;          // n/z
 
               Rez0T = (int32_t)((M00 * V0 + M01 * V1 + M02 * V2) / 65536.0);
               Rez1T = (int32_t)((M10 * V0 + M11 * V1 + M12 * V2) / 65536.0);
 
-              Rez0T = (double)((Rez0T * M) / 65536.0 / 65536.0); // x * n/z
-              Rez1T = (double)((Rez1T * M) / 65536.0 / 65536.0); // y * n/z
+              Rez0T = (float)((Rez0T * M) / 65536.0 / 65536.0); // x * n/z
+              Rez1T = (float)((Rez1T * M) / 65536.0 / 65536.0); // y * n/z
             }
             break;
 
@@ -803,16 +806,16 @@ static uint32_t OFFSET;
 static uint32_t temp1;
 static uint32_t Flag;
 
-static double HDDX;
-static double HDDY;
-static double HDX;
-static double HDY;
-static double VDX;
-static double VDY;
-static double XPOS;
-static double YPOS;
-static double HDX_2;
-static double HDY_2;
+static float HDDX;
+static float HDDY;
+static float HDX;
+static float HDY;
+static float VDX;
+static float VDY;
+static float XPOS;
+static float YPOS;
+static float HDX_2;
+static float HDY_2;
 
 static int32_t  HDDX1616;
 static int32_t  HDDY1616;
@@ -2407,10 +2410,10 @@ freedo_madam_reset(void)
 static
 INLINE
 uint32_t
-TexelCCWTest(const double hdx_,
-             const double hdy_,
-             const double vdx_,
-             const double vdy_)
+TexelCCWTest(const float hdx_,
+             const float hdy_,
+             const float vdx_,
+             const float vdy_)
 {
   if(((hdx_ + vdx_) * (hdy_ - vdy_) + (vdx_ * vdy_) - (hdx_ * hdy_)) < 0.0)
     return CCB_ACCW;
