@@ -401,6 +401,8 @@ struct madam_s
   uint16_t PLUT[MADAM_PLUT_COUNT];
   int32_t  RMOD;
   int32_t  WMOD;
+  int32_t  CLIPX;
+  int32_t  CLIPY;
   uint32_t FSM;
 };
 
@@ -559,9 +561,6 @@ static uint32_t pSource;
 #define REGCTL2		MADAM.mregs[0x138]
 #define REGCTL3		MADAM.mregs[0x13c]
 
-#define CLIPXVAL	((int)MADAM.mregs[0x134]&0x3ff)
-#define CLIPYVAL	((int)(MADAM.mregs[0x134]>>16)&0x3ff)
-
 #define CURRENTSCB	MADAM.mregs[0x5a0]
 //next ccb == 0 stop the engine
 #define NEXTSCB		MADAM.mregs[0x5a4]
@@ -601,9 +600,9 @@ TESTCLIP(const int32_t x_,
          const int32_t y_)
 {
   return ((x_ >= 0) &&
-          (x_ <= CLIPXVAL) &&
+          (x_ <= MADAM.CLIPX) &&
           (y_ >= 0) &&
-          (y_ <= CLIPYVAL));
+          (y_ <= MADAM.CLIPY));
 }
 
 uint32_t
@@ -699,7 +698,7 @@ freedo_madam_poke(uint32_t addr_,
       if(MADAM.FSM == FSM_INPROCESS)
         MADAM.FSM = FSM_SUSPENDED;
       return;
-    case 0x130:
+    case 0x130: /* REGCTL0 */
       MADAM.RMOD = (((val_ & 0x01) << 7) +
                     ((val_ & 0x0C) << 8) +
                     ((val_ & 0x70) << 4));
@@ -707,6 +706,10 @@ freedo_madam_poke(uint32_t addr_,
       MADAM.WMOD = (((val_ & 0x01) << 7) +
                     ((val_ & 0x0C) << 8) +
                     ((val_ & 0x70) << 4));
+      return;
+    case 0x134: /* REGCTL1 */
+      MADAM.CLIPX = ((val_ >>  0) & 0x03FF);
+      MADAM.CLIPY = ((val_ >> 16) & 0x03FF);
       return;
 
       /* Matix engine */
@@ -794,8 +797,6 @@ freedo_madam_poke(uint32_t addr_,
     }
 }
 
-static uint32_t temp1;
-
 static double HDDX;
 static double HDDY;
 static double HDX;
@@ -846,7 +847,7 @@ static
 void
 print_scb_flags(const uint32_t flags_)
 {
-  printf("CLIPX: %d CLIPY: %d\n",CLIPXVAL,CLIPYVAL);
+  printf("CLIPX: %d CLIPY: %d\n",MADAM.CLIPX,MADAM.CLIPY);
   printf("SKIP: %d "
          "LAST: %d "
          "NPABS: %d "
@@ -2147,7 +2148,7 @@ DrawLiteralCel_New(void)
                 ycur += HDY1616;
               }
 
-            PDATA += ((offset+2) << 2);
+            PDATA += ((offset + 2) << 2);
           }
       }
       break;
@@ -2501,10 +2502,10 @@ TestInitVisual(int32_t packed_)
          (xpoints[2] < 0) &&
          (xpoints[3] < 0))
         return -1;
-      if((xpoints[0] > CLIPXVAL) &&
-         (xpoints[1] > CLIPXVAL) &&
-         (xpoints[2] > CLIPXVAL) &&
-         (xpoints[3] > CLIPXVAL))
+      if((xpoints[0] > MADAM.CLIPX) &&
+         (xpoints[1] > MADAM.CLIPX) &&
+         (xpoints[2] > MADAM.CLIPX) &&
+         (xpoints[3] > MADAM.CLIPX))
         return -1;
 
       ypoints[0] = (YPOS1616 >> 16);
@@ -2517,10 +2518,10 @@ TestInitVisual(int32_t packed_)
          (ypoints[2] < 0) &&
          (ypoints[3] < 0))
         return -1;
-      if((ypoints[0] > CLIPYVAL) &&
-         (ypoints[1] > CLIPYVAL) &&
-         (ypoints[2] > CLIPYVAL) &&
-         (ypoints[3] > CLIPYVAL))
+      if((ypoints[0] > MADAM.CLIPY) &&
+         (ypoints[1] > MADAM.CLIPY) &&
+         (ypoints[2] > MADAM.CLIPY) &&
+         (ypoints[3] > MADAM.CLIPY))
         return -1;
     }
   else
@@ -2532,8 +2533,8 @@ TestInitVisual(int32_t packed_)
          (HDX1616   <= 0) &&
          (HDDX1616  <= 0))
         return -1;
-      if((xpoints[0] > CLIPXVAL) &&
-         (xpoints[1] > CLIPXVAL) &&
+      if((xpoints[0] > MADAM.CLIPX) &&
+         (xpoints[1] > MADAM.CLIPX) &&
          (HDX1616   >= 0)        &&
          (HDDX1616  >= 0))
         return -1;
@@ -2545,8 +2546,8 @@ TestInitVisual(int32_t packed_)
          (HDY1616   <= 0) &&
          (HDDY1616  <= 0))
         return -1;
-      if((ypoints[0] > CLIPYVAL) &&
-         (ypoints[1] > CLIPYVAL) &&
+      if((ypoints[0] > MADAM.CLIPY) &&
+         (ypoints[1] > MADAM.CLIPY) &&
          (HDY1616   >= 0) &&
          (HDDY1616  >= 0))
         return -1;
@@ -2672,8 +2673,8 @@ Init_Line_Map(void)
     }
   else if(VDX1616 > 0)
     {
-      if(((XPOS1616 + (SPRHI << 16)) >> 16) > CLIPXVAL)
-        TEXTURE_HI_LIM = (CLIPXVAL - (XPOS1616>>16) + 1);
+      if(((XPOS1616 + (SPRHI << 16)) >> 16) > MADAM.CLIPX)
+        TEXTURE_HI_LIM = (MADAM.CLIPX - (XPOS1616>>16) + 1);
     }
 
   if(VDY1616 < 0)
@@ -2685,19 +2686,19 @@ Init_Line_Map(void)
     }
   else if(VDY1616 > 0)
     {
-      if(((YPOS1616 + (SPRHI << 16)) >> 16) > CLIPYVAL)
-        TEXTURE_HI_LIM = (CLIPYVAL - (YPOS1616 >> 16) + 1);
+      if(((YPOS1616 + (SPRHI << 16)) >> 16) > MADAM.CLIPY)
+        TEXTURE_HI_LIM = (MADAM.CLIPY - (YPOS1616 >> 16) + 1);
     }
 
   if(HDX1616 < 0)
     TEXTURE_WI_LIM = ((XPOS1616 >> 16) + 1);
   else if(HDX1616 > 0)
-    TEXTURE_WI_LIM = (CLIPXVAL - (XPOS1616 >> 16) + 1);
+    TEXTURE_WI_LIM = (MADAM.CLIPX - (XPOS1616 >> 16) + 1);
 
   if(HDY1616 < 0)
     TEXTURE_WI_LIM = ((YPOS1616 >> 16) + 1);
   else if(HDY1616 > 0)
-    TEXTURE_WI_LIM = (CLIPYVAL - (YPOS1616 >> 16) + 1);
+    TEXTURE_WI_LIM = (MADAM.CLIPY - (YPOS1616 >> 16) + 1);
 
 
   if(XPOS1616 < 0)
@@ -2712,17 +2713,17 @@ Init_Line_Map(void)
       else if(VDX1616 > 0)
         TEXTURE_HI_START = -(XPOS1616 >> 16);
     }
-  else if((XPOS1616 >> 16) > CLIPXVAL)
+  else if((XPOS1616 >> 16) > MADAM.CLIPX)
     {
       if(HDX1616 > 0)
         return -1;
       else if(HDX1616 < 0)
-        TEXTURE_WI_START = ((XPOS1616 >> 16) - CLIPXVAL);
+        TEXTURE_WI_START = ((XPOS1616 >> 16) - MADAM.CLIPX);
 
       if(VDX1616 > 0)
         return -1;
       else if(VDX1616 < 0)
-        TEXTURE_HI_START = ((XPOS1616 >> 16) - CLIPXVAL);
+        TEXTURE_HI_START = ((XPOS1616 >> 16) - MADAM.CLIPX);
     }
 
   if(YPOS1616 < 0)
@@ -2737,17 +2738,17 @@ Init_Line_Map(void)
       else if(VDY1616 > 0)
         TEXTURE_HI_START = -(YPOS1616 >> 16);
     }
-  else if((YPOS1616 >> 16) > CLIPYVAL)
+  else if((YPOS1616 >> 16) > MADAM.CLIPY)
     {
       if(HDY1616 > 0)
         return -1;
       else if(HDY1616 < 0)
-        TEXTURE_WI_START = ((YPOS1616 >> 16) - CLIPYVAL);
+        TEXTURE_WI_START = ((YPOS1616 >> 16) - MADAM.CLIPY);
 
       if(VDY1616 > 0)
         return -1;
       else if(VDY1616 < 0)
-        TEXTURE_HI_START = ((YPOS1616 >> 16) - CLIPYVAL);
+        TEXTURE_HI_START = ((YPOS1616 >> 16) - MADAM.CLIPY);
     }
 
   /*
@@ -2900,9 +2901,9 @@ TexelDraw_Scale(uint16_t CURPIX_,
     return -1;
   else if((HDY1616 < 0) && (deltay_ < 0) && (ycur_ < 0))
     return -1;
-  else if((HDX1616 > 0) && (deltax_ > CLIPXVAL) && (xcur_ > CLIPXVAL))
+  else if((HDX1616 > 0) && (deltax_ > MADAM.CLIPX) && (xcur_ > MADAM.CLIPX))
     return -1;
-  else if((HDY1616 > 0) && (deltay_ > CLIPYVAL) && (ycur_ > CLIPYVAL))
+  else if((HDY1616 > 0) && (deltay_ > MADAM.CLIPY) && (ycur_ > MADAM.CLIPY))
     return -1;
 
   if(xcur_ == deltax_)
@@ -2974,8 +2975,8 @@ TexelDraw_Arbitrary(uint16_t CURPIX_,
   if((xA_ == xB_) && (xB_ == xC_) && (xC_ == xD_))
     return 0;
 
-  maxxt = ((CLIPXVAL + 1) << HIRESMODE);
-  maxyt = ((CLIPYVAL + 1) << HIRESMODE);
+  maxxt = ((MADAM.CLIPX + 1) << HIRESMODE);
+  maxyt = ((MADAM.CLIPY + 1) << HIRESMODE);
 
   if((HDX1616 < 0) && (HDDX1616 < 0))
     {
