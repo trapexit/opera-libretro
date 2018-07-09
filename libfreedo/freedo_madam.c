@@ -42,6 +42,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 struct BitReaderBig bitoper;
 
@@ -649,8 +650,79 @@ freedo_madam_peek(uint32_t addr_)
 #define Rez1 MADAM.mregs[0x664]
 #define Rez2 MADAM.mregs[0x668]
 #define Rez3 MADAM.mregs[0x66C]
+static float Rez0T;
+static float Rez1T;
+static float Rez2T;
+static float Rez3T;
 
 #define Nfrac16 (((int64_t)MADAM.mregs[0x680]<<32)|(uint32_t)MADAM.mregs[0x684])
+
+static
+INLINE
+void
+madam_matrix_nop(void)
+{
+  Rez0 = Rez0T;
+  Rez1 = Rez1T;
+  Rez2 = Rez2T;
+  Rez3 = Rez3T;
+}
+
+static
+INLINE
+void
+madam_matrix_mul3x3(void)
+{
+  Rez0 = Rez0T;
+  Rez1 = Rez1T;
+  Rez2 = Rez2T;
+  Rez3 = Rez3T;
+
+  Rez0T = (int)((M00 * V0 + M01 * V1 + M02 * V2) / 65536.0);
+  Rez1T = (int)((M10 * V0 + M11 * V1 + M12 * V2) / 65536.0);
+  Rez2T = (int)((M20 * V0 + M21 * V1 + M22 * V2) / 65536.0);
+}
+
+static
+INLINE
+void
+madam_matrix_mul3x3_nz(void)
+{
+  float M;
+
+  Rez0 = Rez0T;
+  Rez1 = Rez1T;
+  Rez2 = Rez2T;
+  Rez3 = Rez3T;
+
+  M = Nfrac16;
+
+  Rez2T = (int32_t)((M20 * V0 + M21 * V1 + M22 * V2) / 65536.0); // z
+  if(Rez2T != 0)
+    M /= (float)Rez2T;          // n/z
+
+  Rez0T = (int32_t)((M00 * V0 + M01 * V1 + M02 * V2) / 65536.0);
+  Rez1T = (int32_t)((M10 * V0 + M11 * V1 + M12 * V2) / 65536.0);
+
+  Rez0T = (float)((Rez0T * M) / 65536.0 / 65536.0); // x * n/z
+  Rez1T = (float)((Rez1T * M) / 65536.0 / 65536.0); // y * n/z
+}
+
+static
+INLINE
+void
+madam_matrix_mul4x4(void)
+{
+  Rez0 = Rez0T;
+  Rez1 = Rez1T;
+  Rez2 = Rez2T;
+  Rez3 = Rez3T;
+
+  Rez0T = (int)((M00 * V0 + M01 * V1 + M02 * V2 + M03 * V3) / 65536.0);
+  Rez1T = (int)((M10 * V0 + M11 * V1 + M12 * V2 + M13 * V3) / 65536.0);
+  Rez2T = (int)((M20 * V0 + M21 * V1 + M22 * V2 + M23 * V3) / 65536.0);
+  Rez3T = (int)((M30 * V0 + M31 * V1 + M32 * V2 + M33 * V3) / 65536.0);
+}
 
 void
 freedo_madam_poke(uint32_t addr_,
@@ -705,21 +777,13 @@ freedo_madam_poke(uint32_t addr_,
       /* Matix engine */
     case 0x7FC:
       {
-        static float Rez0T;
-        static float Rez1T;
-        static float Rez2T;
-        static float Rez3T;
-
         MADAM.mregs[0x7fc] = 0;       /* matrix engine already ready */
 
         switch(val_)
           {
             /* NOP */
           case 0:
-            Rez0 = Rez0T;
-            Rez1 = Rez1T;
-            Rez2 = Rez2T;
-            Rez3 = Rez3T;
+            madam_matrix_nop();
             return;
 
             /*
@@ -727,15 +791,7 @@ freedo_madam_poke(uint32_t addr_,
               16.16 values
             */
           case 1:
-            Rez0 = Rez0T;
-            Rez1 = Rez1T;
-            Rez2 = Rez2T;
-            Rez3 = Rez3T;
-
-            Rez0T = (int)((M00 * V0 + M01 * V1 + M02 * V2 + M03 * V3) / 65536.0);
-            Rez1T = (int)((M10 * V0 + M11 * V1 + M12 * V2 + M13 * V3) / 65536.0);
-            Rez2T = (int)((M20 * V0 + M21 * V1 + M22 * V2 + M23 * V3) / 65536.0);
-            Rez3T = (int)((M30 * V0 + M31 * V1 + M32 * V2 + M33 * V3) / 65536.0);
+            madam_matrix_mul4x4();
             return;
 
             /*
@@ -743,14 +799,7 @@ freedo_madam_poke(uint32_t addr_,
               16.16 values
             */
           case 2:
-            Rez0 = Rez0T;
-            Rez1 = Rez1T;
-            Rez2 = Rez2T;
-            Rez3 = Rez3T;
-
-            Rez0T = (int)((M00 * V0 + M01 * V1 + M02 * V2) / 65536.0);
-            Rez1T = (int)((M10 * V0 + M11 * V1 + M12 * V2) / 65536.0);
-            Rez2T = (int)((M20 * V0 + M21 * V1 + M22 * V2) / 65536.0);
+            madam_matrix_mul3x3();
             return;
 
             /*
@@ -760,29 +809,11 @@ freedo_madam_poke(uint32_t addr_,
               return the result vectors {x*n/z, y*n/z, z}
             */
           case 3:
-            {
-              float M;
-
-              Rez0 = Rez0T;
-              Rez1 = Rez1T;
-              Rez2 = Rez2T;
-              Rez3 = Rez3T;
-
-              M = Nfrac16;
-
-              Rez2T = (int32_t)((M20 * V0 + M21 * V1 + M22 * V2) / 65536.0); // z
-              if(Rez2T != 0)
-                M /= (float)Rez2T;          // n/z
-
-              Rez0T = (int32_t)((M00 * V0 + M01 * V1 + M02 * V2) / 65536.0);
-              Rez1T = (int32_t)((M10 * V0 + M11 * V1 + M12 * V2) / 65536.0);
-
-              Rez0T = (float)((Rez0T * M) / 65536.0 / 65536.0); // x * n/z
-              Rez1T = (float)((Rez1T * M) / 65536.0 / 65536.0); // y * n/z
-            }
-            break;
+            madam_matrix_mul3x3_nz();
+            return;
 
           default:
+            printf("MATRIX MODE UNKNOWN: %d\n",val_);
             break;
           }
       }
