@@ -6,7 +6,7 @@
 #define DISPATCH() \
   if(cycle_cnt > cycles_) goto EXIT;            \
   opcode = *((uint32_t*)&mem8[PC]);             \
-  switch((opcode & 0x0F00000) >> 24) { OPCODE(DISPATCH_CASE) }
+  switch((opcode & 0x0F000000) >> 24) { OPCODE(DISPATCH_CASE) }
 #define DISPATCH_CASE(OP) case OP: goto CONCAT(label_,OP);
 #define OPCODE(X)                               \
   X(OP_0)                                       \
@@ -326,7 +326,7 @@ AND_DAC(const uint32_t Rd_,
 {
   CPU.REGS->R[Rd_] = (op1_ & op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -341,7 +341,7 @@ AND_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -353,7 +353,7 @@ EOR_DAC(const uint32_t Rd_,
 {
   CPU.REGS->R[Rd_] = (op1_ ^ op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -368,7 +368,7 @@ EOR_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -380,7 +380,7 @@ SUB_DAC(const uint32_t Rd_,
 {
   CPU.REGS->R[Rd_] = (op1_ - op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -395,7 +395,7 @@ SUB_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op1_,op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -407,7 +407,7 @@ RSB_DAC(const uint32_t Rd_,
 {
   CPU.REGS->R[Rd_] = (op2_ - op1_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -422,7 +422,7 @@ RSB_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op2_,op1_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -434,7 +434,7 @@ ADD_DAC(const uint32_t Rd_,
 {
   CPU.REGS->R[Rd_] = (op1_ + op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -449,7 +449,7 @@ ADD_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZCV_ADD(val,op1_,op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -463,7 +463,7 @@ ADC_DAC(const uint32_t Rd_,
                       op2_ +
                       ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1));
 
-  return 0;
+  return 1;
 }
 
 static
@@ -480,7 +480,7 @@ ADC_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZCV_ADD(val,op1_,op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -495,7 +495,7 @@ SBC_DAC(const uint32_t Rd_,
                       ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
                       1);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -513,7 +513,7 @@ SBC_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op1_,op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -528,7 +528,7 @@ RSC_DAC(const uint32_t Rd_,
                       ((CPU.REGS->CPSR >> CPSR_C_SHIFT) & 1) -
                       1);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -546,7 +546,7 @@ RSC_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZCV_SUB(val,op2_,op1_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -557,7 +557,7 @@ TST(const uint32_t op1_,
 {
   CPU.REGS->CPSR = calculate_CPSR_NZ(op1_ & op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -568,7 +568,7 @@ TEQ(const uint32_t op1_,
 {
   CPU.REGS->CPSR = calculate_CPSR_NZ(op1_ ^ op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -581,7 +581,7 @@ CMP(const uint32_t op1_,
 
   CPU.REGS->CPSR = calculate_CPSR_NZCV_SUB(val,op1_,op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -594,7 +594,7 @@ CMN(const uint32_t op1_,
 
   CPU.REGS->CPSR = calculate_CPSR_NZCV_ADD(val,op1_,op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -606,7 +606,7 @@ ORR_DAC(const uint32_t Rd_,
 {
   CPU.REGS->R[Rd_] = (op1_ | op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -621,7 +621,7 @@ ORR_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -633,7 +633,7 @@ MOV_DAC(const uint32_t Rd_,
 {
   CPU.REGS->R[Rd_] = op2_;
 
-  return 0;
+  return 1;
 }
 
 static
@@ -646,7 +646,7 @@ MOV_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = op2_;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(op2_);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -671,7 +671,7 @@ BIC_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -696,7 +696,7 @@ MVN_SCC(const uint32_t Rd_,
   CPU.REGS->R[Rd_] = val;
   CPU.REGS->CPSR   = calculate_CPSR_NZ(val);
 
-  return 0;
+  return 1;
 }
 
 static
@@ -765,7 +765,7 @@ IMM_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       break;
     }
 
-  return 0;
+  return 1;
 }
 
 /*
@@ -982,7 +982,7 @@ REG_AND_EOR_SUB_RSB_ADD_ADC_SDC_RSC(const uint32_t opcode_)
       break;
     }
 
-  return 0;
+  return 1;
 }
 
 static
@@ -990,7 +990,7 @@ INLINE
 uint32_t
 handle_IMM_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -998,7 +998,7 @@ INLINE
 uint32_t
 handle_REG_TST_TEQ_CMP_CMN_ORR_MOV_BIC_MVN(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1006,7 +1006,7 @@ INLINE
 uint32_t
 handle_IMM_POST_LDR_STR(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1014,7 +1014,7 @@ INLINE
 uint32_t
 handle_IMM_PRE_LDR_STR(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1022,7 +1022,7 @@ INLINE
 uint32_t
 handle_REG_POST_LDR_STR(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1030,7 +1030,7 @@ INLINE
 uint32_t
 handle_REG_PRE_LDR_STR(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1038,7 +1038,7 @@ INLINE
 uint32_t
 handle_POST_LDM_STM(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1046,7 +1046,7 @@ INLINE
 uint32_t
 handle_PRE_LDM_STM(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1079,7 +1079,7 @@ INLINE
 uint32_t
 handle_POST_LDC_STC(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1087,7 +1087,7 @@ INLINE
 uint32_t
 handle_PRE_LDC_STC(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1095,7 +1095,7 @@ INLINE
 uint32_t
 handle_coproc_data_operation(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1103,7 +1103,7 @@ INLINE
 uint32_t
 handle_coproc_register_transfer(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1111,7 +1111,7 @@ INLINE
 uint32_t
 handle_software_interrupt(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1119,7 +1119,7 @@ INLINE
 uint32_t
 handle_single_data_swap(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1127,7 +1127,7 @@ INLINE
 uint32_t
 handle_multiply(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1135,7 +1135,7 @@ INLINE
 uint32_t
 handle_undefined(const uint32_t opcode_)
 {
-  return 0;
+  return 1;
 }
 
 static
@@ -1180,7 +1180,7 @@ uint32_t
 handle_OP_4(const uint32_t opcode_)
 {
   return handle_IMM_POST_LDR_STR(opcode_);
-  return 0;
+  return 1;
 }
 
 static
@@ -1189,7 +1189,7 @@ uint32_t
 handle_OP_5(const uint32_t opcode_)
 {
   return handle_IMM_PRE_LDR_STR(opcode_);
-  return 0;
+  return 1;
 }
 
 static
@@ -1279,7 +1279,8 @@ handle_OP_F(const uint32_t opcode_)
 }
 
 uint32_t
-freedo_arm2_loop(const uint32_t cycles_)
+freedo_arm2_loop(const uint32_t  cycles_,
+                 uint8_t        *mem8_)
 {
   uint32_t opcode;
   uint32_t PC;
@@ -1287,6 +1288,9 @@ freedo_arm2_loop(const uint32_t cycles_)
   uint8_t *mem8;
 
   cycle_cnt = 0;
+  PC = CPU.REGS->R[R15];
+  mem8 = mem8_;
+
   DISPATCH();
 
  label_OP_0:
@@ -1342,3 +1346,27 @@ freedo_arm2_loop(const uint32_t cycles_)
 
   return cycle_cnt;
 }
+
+
+#ifdef MAIN
+#include <stdio.h>
+
+int
+main(void)
+{
+  uint32_t mem32[] =
+    {
+      0xe3a00008, // mov r0, #8
+      0xe3a01010, // mov r1, #16
+      0xe0802001  // add r2, r0, r1
+    };
+  REGS_t regs;
+
+  regs.R[R15] = 0;
+  CPU.REGS = &regs;
+  freedo_arm2_loop(1,(uint8_t*)mem32);
+  printf("R[0] = %d\n", CPU.REGS->R[0]);
+
+  return 0;
+}
+#endif
