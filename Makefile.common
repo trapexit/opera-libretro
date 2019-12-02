@@ -32,6 +32,7 @@ SOURCES_C += \
 	$(4DO_DIR)/freedo_bitop.c \
 	$(4DO_DIR)/freedo_cdrom.c \
 	$(4DO_DIR)/freedo_clio.c \
+        $(4DO_DIR)/freedo_debug.c \
 	$(4DO_DIR)/freedo_diag_port.c \
 	$(4DO_DIR)/freedo_dsp.c \
 	$(4DO_DIR)/freedo_frame.c \
