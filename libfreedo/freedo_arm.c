@@ -31,6 +31,7 @@
 #include "freedo_arm.h"
 #include "freedo_clio.h"
 #include "freedo_core.h"
+#include "freedo_debug.h"
 #include "freedo_diag_port.h"
 #include "freedo_madam.h"
 #include "freedo_sport.h"
@@ -43,6 +44,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #define ARM_INITIAL_PC  0x03000000
 
@@ -969,11 +971,14 @@ void
 decode_swi(uint32_t cmd_)
 {
   int rv;
-  char str[256];
+  char str[512];
 
-  rv = freedo_debug_swi_func_raw(str,sizeof(str),cmd_);
-  printf("%x : %s\n",cmd_ & 0x00FFFFFF,(rv == 0) ? str : "unknown");
-  
+  if((cmd_ & 0xFFFFFF) != 0x1000E)
+    {
+      rv = freedo_debug_swi_func_raw(str,511,cmd_);
+      printf("0x%x : %s\n",cmd_ & 0x00FFFFFF,(rv == 0) ? str : "unknown");
+    }
+
   CPU.SPSR[arm_mode_table[0x13]] = CPU.CPSR;
 
   SETI(1);
