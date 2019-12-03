@@ -236,3 +236,42 @@ freedo_debug_swi_func(uint32_t swi_)
       return NULL;
     }
 }
+
+
+static
+uint8_t
+arm_dis_condition(const uint32_t op_)
+{
+  return (op_ >> 28);
+}
+
+static
+const
+char*
+arm_dis_condition_mnemonic(const uint8_t cond_)
+{
+  const char *mnemonics[] = {"EQ","NE","CS","CC",
+                             "MI","PL","VS","VC",
+                             "HI","LS","GE","LT",
+                             "GT","LE","AL","NV"};
+  return mnemonics[cond_ & 0xF];
+}
+
+int
+freedo_debug_arm_disassemble(uint32_t op_)
+{
+  uint8_t condition;
+  const char *condition_mnemonic;
+
+  condition = arm_dis_condition(op_);
+  condition_mnemonic = arm_dis_condition_mnemonic(condition);
+
+  if((op_ & 0x0F000000) == 0x0F000000)
+    printf("SWI%s 0x%x\n",condition_mnemonic,(op_ & 0x00FFFFFF));
+  else if((op_ & 0x0B000000) == 0x0B000000)
+    printf("BL%s 0x%x\n",condition_mnemonic,(op_ & 0x00FFFFFF));
+  else if((op_ & 0x0A000000) == 0x0A000000)
+    printf("B%s 0x%x\n",condition_mnemonic,(op_ & 0x00FFFFFF));
+
+  return 0;
+}

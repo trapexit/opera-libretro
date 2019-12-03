@@ -1489,6 +1489,7 @@ freedo_arm_execute(void)
     }
 
   cmd = mreadw(CPU.USER[15]);
+  freedo_debug_arm_disassemble(cmd);
   CPU.USER[15] += 4;
 
   CYCLES = -SCYCLE;
