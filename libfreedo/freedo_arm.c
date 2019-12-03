@@ -970,13 +970,12 @@ static
 void
 decode_swi(uint32_t cmd_)
 {
-  int rv;
-  char str[512];
+  const char *str;
 
   if((cmd_ & 0xFFFFFF) != 0x1000E)
     {
-      rv = freedo_debug_swi_func_raw(str,511,cmd_);
-      printf("0x%x : %s\n",cmd_ & 0x00FFFFFF,(rv == 0) ? str : "unknown");
+      str = freedo_debug_swi_func(cmd_);
+      printf("0x%x : %s\n",cmd_ & 0x00FFFFFF,(str != NULL) ? str : "unknown");
     }
 
   CPU.SPSR[arm_mode_table[0x13]] = CPU.CPSR;
@@ -985,8 +984,8 @@ decode_swi(uint32_t cmd_)
   SETM(0x13);
 
   CPU.USER[14] = CPU.USER[15];
-
   CPU.USER[15] = 0x00000008;
+
   CYCLES -= (SCYCLE + NCYCLE);  // +2S+1N
 }
 
