@@ -257,6 +257,33 @@ arm_dis_condition_mnemonic(const uint8_t cond_)
   return mnemonics[cond_ & 0xF];
 }
 
+enum arm_opidx_e
+  {
+    ARM_OP_ADC_IMM,
+    ARM_OP_ADC_REG_IMM,
+    ARM_OP_ADC_REG_REG,
+    ARM_OP_SWI,
+    ARM_OP_BL,
+    ARM_OP_B
+  };
+typedef enum arm_opidx_e arm_opidx_t;
+
+typedef struct arm_opcode_s arm_opcode_t;
+struct arm_opcode_s
+{
+  arm_opidx_t idx;
+  char name[4];
+  uint32_t mask;
+  uint32_t pattern;
+};
+
+arm_opcode_t OPCODES[] =
+  {
+    {ARM_OP_ADC_IMM,    "ADC",0x0FE00000,0x02A00000},
+    {ARM_OP_ADC_REG_IMM,"ADC",0x0FE00010,0x0A000000},
+    {ARM_OP_ADC_REG_REG,"ADC",0x0FE00090,0x0A000010}
+  };
+
 int
 freedo_debug_arm_disassemble(uint32_t op_)
 {
