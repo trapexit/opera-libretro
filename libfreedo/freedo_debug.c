@@ -305,12 +305,11 @@ freedo_debug_arm_disassemble(uint32_t op_)
   condition = arm_dis_condition(op_);
   condition_mnemonic = arm_dis_condition_mnemonic(condition);
 
-  if((op_ & 0x0F000000) == 0x0F000000)
-    printf("SWI%s 0x%x\n",condition_mnemonic,(op_ & 0x00FFFFFF));
-  else if((op_ & 0x0B000000) == 0x0B000000)
-    printf("BL%s 0x%x\n",condition_mnemonic,(op_ & 0x00FFFFFF));
-  else if((op_ & 0x0A000000) == 0x0A000000)
-    printf("B%s 0x%x\n",condition_mnemonic,(op_ & 0x00FFFFFF));
+  for(uint64_t i = 0; i < sizeof(OPCODES)/sizeof(OPCODES[0]); i++)
+    {
+      if((op_ & OPCODES[i].mask) == OPCODES[i].pattern)
+        printf("%s%s\n",OPCODES[i].name,condition_mnemonic);
+    }
 
   return 0;
 }
