@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <assert.h>
 
 const
@@ -334,6 +335,8 @@ enum arm_opidx_e
   };
 typedef enum arm_opidx_e arm_opidx_t;
 
+typedef void (*op_print_func_t)(const uint32_t);
+
 typedef struct arm_opcode_s arm_opcode_t;
 struct arm_opcode_s
 {
@@ -341,6 +344,7 @@ struct arm_opcode_s
   char name[4];
   uint32_t mask;
   uint32_t pattern;
+  op_print_func_t print;
 };
 
 static
@@ -389,9 +393,12 @@ arm_op_print_shift(const uint32_t op_)
           const char *shift_type;
 
           shift_amt  = ((op_ & 0x00000F80) >> 6);
+          if(shift_amt == 0)
+            return;
+          
           shift_type = arm_op_shift_type(op_);
 
-          printf("%s #%x",shift_type,shift_amt);
+          printf(", %s #%x",shift_type,shift_amt);
         }
     }
   else
@@ -402,7 +409,7 @@ arm_op_print_shift(const uint32_t op_)
       Rs         = ((op_ & 0x00000F00) >> 8);
       shift_type = arm_op_shift_type(op_);
 
-      printf("%s R%d",shift_type,Rs);
+      printf(", %s r%d",shift_type,Rs);
     }
 }
 
@@ -421,7 +428,7 @@ arm_op_print_data_processing_op2(const uint32_t op_)
       rotate = ((op_ & 0x00000F00) >> 8);
       imm    = ((op_ & 0x000000FF) >> 0);
 
-      printf("#%X",rotr32(imm,rotate*2));
+      printf(", #%X",rotr32(imm,rotate*2));
     }
   else
     {
@@ -430,7 +437,7 @@ arm_op_print_data_processing_op2(const uint32_t op_)
 
       Rm = (op_ & 0x0000000F);
 
-      printf("R%d, ",Rm);
+      printf(", r%d",Rm);
       arm_op_print_shift(op_);
     }
 }
@@ -439,21 +446,21 @@ static
 void
 arm_op_print_data_processing_3(const uint32_t op_)
 {
-  char  Rn;
-  char  Rd;
-  char *opcode;
-  char  set_condition_codes;
+  char Rn;
+  char Rd;
+  char set_condition_codes;
+  const char *opcode;
 
   opcode              = arm_op_data_processing_opcode(op_);
   set_condition_codes = !!(op_ & 0x00100000);
   Rn                  = ((op_ & 0x000F0000) >> 16);
   Rd                  = ((op_ & 0x0000F000) >> 12);
 
-  printf("%s%s%s R%d, R%d, ",
+  printf("%s%s%s\tr%d, r%d",
          opcode,
          arm_op_dis_condition_mnemonic(op_),
          (set_condition_codes ? "S" : ""),
-         Rd,Rn);  
+         Rd,Rn);
 
   arm_op_print_data_processing_op2(op_);
 }
@@ -553,6 +560,14 @@ freedo_debug_arm_disassemble(uint32_t op_)
     {
       if((op_ & OPCODES[i].mask) == OPCODES[i].pattern)
         {
+          if(!strcmp(OPCODES[i].name,"AND"))
+            {
+              printf("%08X ",op_);
+              arm_op_print_data_processing_3(op_);
+              printf("\n");
+            }
+
+
           //          printf("%08X %s%s\n",op_,OPCODES[i].name,condition_mnemonic);
           found = 1;
           break;
