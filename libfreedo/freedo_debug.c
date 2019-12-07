@@ -1,3 +1,5 @@
+#include "freedo_bitmath.h"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
@@ -238,24 +240,16 @@ freedo_debug_swi_func(uint32_t swi_)
     }
 }
 
-
-static
-uint8_t
-arm_dis_condition(const uint32_t op_)
-{
-  return (op_ >> 28);
-}
-
 static
 const
 char*
-arm_dis_condition_mnemonic(const uint8_t cond_)
+arm_op_dis_condition_mnemonic(const uint32_t op_)
 {
-  const char *mnemonics[] = {"EQ","NE","CS","CC",
-                             "MI","PL","VS","VC",
-                             "HI","LS","GE","LT",
-                             "GT","LE","","NV"};
-  return mnemonics[cond_ & 0xF];
+  static const char *mnemonics[] = {"EQ","NE","CS","CC",
+                                    "MI","PL","VS","VC",
+                                    "HI","LS","GE","LT",
+                                    "GT","LE","","NV"};
+  return mnemonics[(op_ >> 28) & 0xF];
 }
 
 enum arm_opidx_e
@@ -349,6 +343,121 @@ struct arm_opcode_s
   uint32_t pattern;
 };
 
+static
+const
+char*
+arm_op_data_processing_opcode(const uint32_t op_)
+{
+  static const char ARM_DATA_PROCESSING_OPCODES[][4] =
+    {
+    "AND","EOR","SUB","RSB",
+    "ADD","ADC","SBC","RSC",
+    "TST","TEQ","CMP","CMN",
+    "ORR","MOV","BIC","MVN"
+    };
+
+  return ARM_DATA_PROCESSING_OPCODES[(op_ & 0x01E00000) >> 20];
+}
+
+static
+const
+char*
+arm_op_shift_type(const uint32_t op_)
+{
+  static const char SHIFT_TYPES[][4] =
+    {
+      "LSL","LSR","ASR","ROR"
+    };
+
+  return SHIFT_TYPES[(op_ & 0x00000060) >> 5];
+}
+
+static
+void
+arm_op_print_shift(const uint32_t op_)
+{
+  /* Immediate  */
+  if((op_ & 0x00000010) == 0x00000000)
+    {
+      if((op_ & 0x00000FF0) == 0x00000060)
+        {
+          printf("RRX");
+        }
+      else
+        {
+          uint8_t shift_amt;
+          const char *shift_type;
+
+          shift_amt  = ((op_ & 0x00000F80) >> 6);
+          shift_type = arm_op_shift_type(op_);
+
+          printf("%s #%x",shift_type,shift_amt);
+        }
+    }
+  else
+    {
+      uint8_t Rs;
+      const char *shift_type;
+
+      Rs         = ((op_ & 0x00000F00) >> 8);
+      shift_type = arm_op_shift_type(op_);
+
+      printf("%s R%d",shift_type,Rs);
+    }
+}
+
+static
+void
+arm_op_print_data_processing_op2(const uint32_t op_)
+{
+  char immediate;
+
+  immediate = !!(op_ & 0x02000000);
+  if(immediate)
+    {
+      uint8_t rotate;
+      uint16_t imm;
+
+      rotate = ((op_ & 0x00000F00) >> 8);
+      imm    = ((op_ & 0x000000FF) >> 0);
+
+      printf("#%X",rotr32(imm,rotate*2));
+    }
+  else
+    {
+      uint8_t Rm;
+      uint8_t shift_type;
+
+      Rm = (op_ & 0x0000000F);
+
+      printf("R%d, ",Rm);
+      arm_op_print_shift(op_);
+    }
+}
+
+static
+void
+arm_op_print_data_processing_3(const uint32_t op_)
+{
+  char  Rn;
+  char  Rd;
+  char *opcode;
+  char  set_condition_codes;
+
+  opcode              = arm_op_data_processing_opcode(op_);
+  set_condition_codes = !!(op_ & 0x00100000);
+  Rn                  = ((op_ & 0x000F0000) >> 16);
+  Rd                  = ((op_ & 0x0000F000) >> 12);
+
+  printf("%s%s%s R%d, R%d, ",
+         opcode,
+         arm_op_dis_condition_mnemonic(op_),
+         (set_condition_codes ? "S" : ""),
+         Rd,Rn);  
+
+  arm_op_print_data_processing_op2(op_);
+}
+
 arm_opcode_t OPCODES[] =
   {
     {ARM_OP_ADC_IMM,     "ADC",0x0FE00000,0x02A00000},
@@ -439,15 +548,12 @@ freedo_debug_arm_disassemble(uint32_t op_)
   uint8_t condition;
   const char *condition_mnemonic;
 
-  condition = arm_dis_condition(op_);
-  condition_mnemonic = arm_dis_condition_mnemonic(condition);
-
   found = 0;
   for(uint64_t i = 0; i < sizeof(OPCODES)/sizeof(OPCODES[0]); i++)
     {
       if((op_ & OPCODES[i].mask) == OPCODES[i].pattern)
         {
-          printf("%08X %s%s\n",op_,OPCODES[i].name,condition_mnemonic);
+          //          printf("%08X %s%s\n",op_,OPCODES[i].name,condition_mnemonic);
           found = 1;
           break;
         }
@@ -458,7 +564,6 @@ freedo_debug_arm_disassemble(uint32_t op_)
       printf("%08X ::UNKNOWN::\n",op_);
       abort();
     }
-
 
   return 0;
 }
