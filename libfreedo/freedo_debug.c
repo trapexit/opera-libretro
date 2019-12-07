@@ -254,7 +254,7 @@ arm_dis_condition_mnemonic(const uint8_t cond_)
   const char *mnemonics[] = {"EQ","NE","CS","CC",
                              "MI","PL","VS","VC",
                              "HI","LS","GE","LT",
-                             "GT","LE","AL","NV"};
+                             "GT","LE","","NV"};
   return mnemonics[cond_ & 0xF];
 }
 
@@ -447,7 +447,7 @@ freedo_debug_arm_disassemble(uint32_t op_)
     {
       if((op_ & OPCODES[i].mask) == OPCODES[i].pattern)
         {
-          //          printf("%08X %s%s\n",op_,OPCODES[i].name,condition_mnemonic);
+          printf("%08X %s%s\n",op_,OPCODES[i].name,condition_mnemonic);
           found = 1;
           break;
         }
