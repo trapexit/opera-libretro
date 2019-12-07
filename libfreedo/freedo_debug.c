@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 
 const
 char*
@@ -361,7 +362,7 @@ arm_opcode_t OPCODES[] =
     {ARM_OP_AND_REG_REG, "AND",0x0FE00090,0x00000010},
     {ARM_OP_B,           "B  ",0x0F000000,0x0A000000},
     {ARM_OP_BIC_IMM,     "BIC",0x0FE00000,0x03C00000},
-    {ARM_OP_BIC_REG_IMM, "BIC",0x0FE00010,0x01C00010},
+    {ARM_OP_BIC_REG_IMM, "BIC",0x0FE00010,0x01C00000},
     {ARM_OP_BIC_REG_REG, "BIC",0x0FE00090,0x01C00010},
     {ARM_OP_BL,          "BL ",0x0F000000,0x0B000000},
     {ARM_OP_BX,          "BX ",0x0FF000F0,0x01200010},
@@ -414,12 +415,12 @@ arm_opcode_t OPCODES[] =
     {ARM_OP_SWI,         "SWI",0x0F000000,0x0F000000},
     {ARM_OP_SWP,         "SWP",0x0FF00FF0,0x01000090},
     {ARM_OP_SWP_B,       "SWP",0x0FF00FF0,0x01400090},
-    {ARM_OP_TEQ_IMM,     "TEQ",0x0FF00000,0x03300000},
-    {ARM_OP_TEQ_REG_IMM, "TEQ",0x0FF00010,0x01300000},
-    {ARM_OP_TEQ_REG_REG, "TEQ",0x0FF00090,0x01300010},
-    {ARM_OP_TST_IMM,     "TST",0x0FF00000,0x03100000},
-    {ARM_OP_TST_REG_IMM, "TST",0x0FF00010,0x01100000},
-    {ARM_OP_TST_REG_REG, "TST",0x0FF00090,0x01100010},
+    {ARM_OP_TEQ_IMM,     "TEQ",0x0FE00000,0x03200000},
+    {ARM_OP_TEQ_REG_IMM, "TEQ",0x0FE00010,0x01200000},
+    {ARM_OP_TEQ_REG_REG, "TEQ",0x0FE00090,0x01200010},
+    {ARM_OP_TST_IMM,     "TST",0x0FE00000,0x03000000},
+    {ARM_OP_TST_REG_IMM, "TST",0x0FE00010,0x01000000},
+    {ARM_OP_TST_REG_REG, "TST",0x0FE00090,0x01000010},
     {ARM_OP_CDP,         "CDP",0x0F000010,0x0E000000},
     {ARM_OP_LDC,         "LDC",0x0E100000,0x0C100000},
     {ARM_OP_STC,         "STC",0x0E100000,0x0C000000},
@@ -427,24 +428,37 @@ arm_opcode_t OPCODES[] =
     {ARM_OP_MCR,         "MCR",0x0E000010,0x0C000010},
     {ARM_OP_UNDEFINED,   "UND",0x0E000010,0x06000010},
 
-    {ARM_OP_END,"---",0,0}
+    {ARM_OP_END,"---",0,0xFFFFFFFF}
   };
 
 
 int
 freedo_debug_arm_disassemble(uint32_t op_)
 {
+  int found;
   uint8_t condition;
   const char *condition_mnemonic;
 
   condition = arm_dis_condition(op_);
   condition_mnemonic = arm_dis_condition_mnemonic(condition);
 
+  found = 0;
   for(uint64_t i = 0; i < sizeof(OPCODES)/sizeof(OPCODES[0]); i++)
     {
       if((op_ & OPCODES[i].mask) == OPCODES[i].pattern)
-        printf("%s%s\n",OPCODES[i].name,condition_mnemonic);
+        {
+          //          printf("%08X %s%s\n",op_,OPCODES[i].name,condition_mnemonic);
+          found = 1;
+          break;
+        }
     }
+
+  if(!found)
+    {
+      printf("%08X ::UNKNOWN::\n",op_);
+      abort();
+    }
+
 
   return 0;
 }
