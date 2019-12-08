@@ -5,6 +5,16 @@
 #include <stdlib.h>
 #include <assert.h>
 
+typedef void (*op_print_func_t)(const uint32_t);
+
+typedef struct arm_opcode_s arm_opcode_t;
+struct arm_opcode_s
+{
+  uint32_t mask;
+  uint32_t pattern;
+  op_print_func_t print;
+};
+
 enum
   {
     ARM_DP_AND = 0x0,
@@ -273,100 +283,6 @@ arm_op_dis_condition_mnemonic(const uint32_t op_)
   return mnemonics[(op_ >> 28) & 0xF];
 }
 
-enum arm_opidx_e
-  {
-    ARM_OP_ADC_IMM,
-    ARM_OP_ADC_REG_IMM,
-    ARM_OP_ADC_REG_REG,
-    ARM_OP_ADD_IMM,
-    ARM_OP_ADD_REG_IMM,
-    ARM_OP_ADD_REG_REG,
-    ARM_OP_AND_IMM,
-    ARM_OP_AND_REG_IMM,
-    ARM_OP_AND_REG_REG,
-    ARM_OP_B,
-    ARM_OP_BIC_IMM,
-    ARM_OP_BIC_REG_IMM,
-    ARM_OP_BIC_REG_REG,
-    ARM_OP_BL,
-    ARM_OP_BX,
-    ARM_OP_CDP,
-    ARM_OP_CMN_IMM,
-    ARM_OP_CMN_REG_IMM,
-    ARM_OP_CMN_REG_REG,
-    ARM_OP_CMP_IMM,
-    ARM_OP_CMP_REG_IMM,
-    ARM_OP_CMP_REG_REG,
-    ARM_OP_EOR_IMM,
-    ARM_OP_EOR_REG_IMM,
-    ARM_OP_EOR_REG_REG,
-    ARM_OP_LDC,
-    ARM_OP_LDM,
-    ARM_OP_LDR,
-    ARM_OP_MCR,
-    ARM_OP_MLA,
-    ARM_OP_MLA_S,
-    ARM_OP_MOV_IMM,
-    ARM_OP_MOV_REG_IMM,
-    ARM_OP_MOV_REG_REG,
-    ARM_OP_MRC,
-    ARM_OP_MRS_CPSR,
-    ARM_OP_MRS_SPSR,
-    ARM_OP_MSR_CPSR,
-    ARM_OP_MSR_CPSR_IMM,
-    ARM_OP_MSR_CPSR_REG,
-    ARM_OP_MSR_SPSR,
-    ARM_OP_MSR_SPSR_IMM,
-    ARM_OP_MSR_SPSR_REG,
-    ARM_OP_MUL,
-    ARM_OP_MUL_S,
-    ARM_OP_MVN_IMM,
-    ARM_OP_MVN_REG_IMM,
-    ARM_OP_MVN_REG_REG,
-    ARM_OP_ORR_IMM,
-    ARM_OP_ORR_REG_IMM,
-    ARM_OP_ORR_REG_REG,
-    ARM_OP_RSB_IMM,
-    ARM_OP_RSB_REG_IMM,
-    ARM_OP_RSB_REG_REG,
-    ARM_OP_RSC_IMM,
-    ARM_OP_RSC_REG_IMM,
-    ARM_OP_RSC_REG_REG,
-    ARM_OP_SBC_IMM,
-    ARM_OP_SBC_REG_IMM,
-    ARM_OP_SBC_REG_REG,
-    ARM_OP_SDR,
-    ARM_OP_STC,
-    ARM_OP_STM,
-    ARM_OP_SUB_IMM,
-    ARM_OP_SUB_REG_IMM,
-    ARM_OP_SUB_REG_REG,
-    ARM_OP_SWI,
-    ARM_OP_SWP,
-    ARM_OP_SWP_B,
-    ARM_OP_TEQ_IMM,
-    ARM_OP_TEQ_REG_IMM,
-    ARM_OP_TEQ_REG_REG,
-    ARM_OP_TST_IMM,
-    ARM_OP_TST_REG_IMM,
-    ARM_OP_TST_REG_REG,
-    ARM_OP_UNDEFINED,
-    ARM_OP_END
-  };
-typedef enum arm_opidx_e arm_opidx_t;
-
-typedef void (*op_print_func_t)(const uint32_t);
-
-typedef struct arm_opcode_s arm_opcode_t;
-struct arm_opcode_s
-{
-  arm_opidx_t idx;
-  char name[4];
-  uint32_t mask;
-  uint32_t pattern;
-  op_print_func_t print;
-};
-
 static
 inline
 uint8_t
@@ -560,97 +476,14 @@ arm_op_print_data_processing(const uint32_t op_)
 
 arm_opcode_t OPCODE_TYPES[] =
   {
-    {0,"Branch",              0x0E000000,0x0A000000},
-    {0,"Data Processing",     0x0C000000,0x00000000},
-    {0,"Multiply",            0x0FC000F0,0x00000090},
-    {0,"Single data transfer",0x0C000000,0x04000000},
-    {0,"Block data transfer", 0x0E000000,0x08000000},
-    {0,"Single data swap",    0x0FB00FF0,0x01000090},
-    {0,"Software interrupt",  0x0F000000,0x0F000000}
+    {0x0E000000,0x0A000000,NULL}, // Branch
+    {0x0C000000,0x00000000,arm_op_print_data_processing}, // Data processing
+    {0x0FC000F0,0x00000090,NULL}, // Multiply
+    {0x0C000000,0x04000000,NULL}, // Single data transfer
+    {0x0E000000,0x08000000,NULL}, // block data transfer
+    {0x0FB00FF0,0x01000090,NULL}, // single data swap
+    {0x0F000000,0x0F000000,NULL}  // software interupt
   };
-
-arm_opcode_t OPCODES[] =
-  {
-    {ARM_OP_ADC_IMM,     "ADC",0x0FE00000,0x02A00000},
-    {ARM_OP_ADC_REG_IMM, "ADC",0x0FE00010,0x00A00000},
-    {ARM_OP_ADC_REG_REG, "ADC",0x0FE00090,0x00A00010},
-    {ARM_OP_ADD_IMM,     "ADD",0x0FE00000,0x02800000},
-    {ARM_OP_ADD_REG_IMM, "ADD",0x0FE00010,0x00800000},
-    {ARM_OP_ADD_REG_REG, "ADD",0x0FE00090,0x00800010},
-    {ARM_OP_AND_IMM,     "AND",0x0FE00000,0x02000000},
-    {ARM_OP_AND_REG_IMM, "AND",0x0FE00010,0x00000000},
-    {ARM_OP_AND_REG_REG, "AND",0x0FE00090,0x00000010},
-    {ARM_OP_B,           "B  ",0x0F000000,0x0A000000},
-    {ARM_OP_BIC_IMM,     "BIC",0x0FE00000,0x03C00000},
-    {ARM_OP_BIC_REG_IMM, "BIC",0x0FE00010,0x01C00000},
-    {ARM_OP_BIC_REG_REG, "BIC",0x0FE00090,0x01C00010},
-    {ARM_OP_BL,          "BL ",0x0F000000,0x0B000000},
-    {ARM_OP_BX,          "BX ",0x0FF000F0,0x01200010},
-    {ARM_OP_CMN_IMM,     "CMN",0x0FF00000,0x03700000},
-    {ARM_OP_CMN_REG_IMM, "CMN",0x0FF00010,0x01700000},
-    {ARM_OP_CMN_REG_REG, "CMN",0x0FF00090,0x01700010},
-    {ARM_OP_CMP_IMM,     "CMP",0x0FF00000,0x03500000},
-    {ARM_OP_CMP_REG_IMM, "CMP",0x0FF00010,0x01500000},
-    {ARM_OP_CMP_REG_REG, "CMP",0x0FF00090,0x01500010},
-    {ARM_OP_EOR_IMM,     "EOR",0x0FE00000,0x02200000},
-    {ARM_OP_EOR_REG_IMM, "EOR",0x0FE00010,0x00200000},
-    {ARM_OP_EOR_REG_REG, "EOR",0x0FE00090,0x00200010},
-    {ARM_OP_LDM,         "LDM",0x0E100000,0x08100000},
-    {ARM_OP_LDR,         "LDR",0x0C100000,0x04100000},
-    {ARM_OP_MLA,         "MLA",0x0FF000F0,0x00200090},
-    {ARM_OP_MLA_S,       "MLA",0x0FF000F0,0x00300090},
-    {ARM_OP_MOV_IMM,     "MOV",0x0FE00000,0x03A00000},
-    {ARM_OP_MOV_REG_IMM, "MOV",0x0FE00010,0x01A00000},
-    {ARM_OP_MOV_REG_REG, "MOV",0x0FE00090,0x01A00010},
-    {ARM_OP_MRS_CPSR,    "MRS",0x0FFF0FFF,0x014F0000},
-    {ARM_OP_MRS_SPSR,    "MRS",0x0FFF0FFF,0x010F0000},
-    {ARM_OP_MSR_CPSR,    "MSR",0x0FFFFFF0,0x0129F000},
-    {ARM_OP_MSR_CPSR_IMM,"MSR",0x0FFFF000,0x0128F000},
-    {ARM_OP_MSR_CPSR_REG,"MSR",0x0FFFF000,0x0328F000},
-    {ARM_OP_MSR_SPSR,    "MSR",0x0FFFFFF0,0x0169F000},
-    {ARM_OP_MSR_SPSR_IMM,"MSR",0x0FFFF000,0x0168F000},
-    {ARM_OP_MSR_SPSR_REG,"MSR",0x0FFFF000,0x0368F000},
-    {ARM_OP_MUL,         "MUL",0x0FF000F0,0x00000090},
-    {ARM_OP_MUL_S,       "MUL",0x0FF000F0,0x00100090},
-    {ARM_OP_MVN_IMM,     "MVN",0x0FE00000,0x03E00000},
-    {ARM_OP_MVN_REG_IMM, "MVN",0x0FE00010,0x01E00000},
-    {ARM_OP_MVN_REG_REG, "MVN",0x0FE00090,0x01E00010},
-    {ARM_OP_ORR_IMM,     "ORR",0x0FE00000,0x03800000},
-    {ARM_OP_ORR_REG_IMM, "ORR",0x0FE00010,0x01800000},
-    {ARM_OP_ORR_REG_REG, "ORR",0x0FE00090,0x01800010},
-    {ARM_OP_RSB_IMM,     "RSB",0x0FE00000,0x02600000},
-    {ARM_OP_RSB_REG_IMM, "RSB",0x0FE00010,0x00600000},
-    {ARM_OP_RSB_REG_REG, "RSB",0x0FE00090,0x00600010},
-    {ARM_OP_RSC_IMM,     "RSC",0x0FE00000,0x02E00000},
-    {ARM_OP_RSC_REG_IMM, "RSC",0x0FE00010,0x00E00000},
-    {ARM_OP_RSC_REG_REG, "RSC",0x0FE00090,0x00E00010},
-    {ARM_OP_SBC_IMM,     "SBC",0x0FE00000,0x02C00000},
-    {ARM_OP_SBC_REG_IMM, "SBC",0x0FE00010,0x00C00000},
-    {ARM_OP_SBC_REG_REG, "SBC",0x0FE00090,0x00C00010},
-    {ARM_OP_SDR,         "SDR",0x0C100000,0x04000000},
-    {ARM_OP_STM,         "STM",0x0E100000,0x08000000},
-    {ARM_OP_SUB_IMM,     "SUB",0x0FE00000,0x02400000},
-    {ARM_OP_SUB_REG_IMM, "SUB",0x0FE00010,0x00400000},
-    {ARM_OP_SUB_REG_REG, "SUB",0x0FE00090,0x00400010},
-    {ARM_OP_SWI,         "SWI",0x0F000000,0x0F000000},
-    {ARM_OP_SWP,         "SWP",0x0FF00FF0,0x01000090},
-    {ARM_OP_SWP_B,       "SWP",0x0FF00FF0,0x01400090},
-    {ARM_OP_TEQ_IMM,     "TEQ",0x0FE00000,0x03200000},
-    {ARM_OP_TEQ_REG_IMM, "TEQ",0x0FE00010,0x01200000},
-    {ARM_OP_TEQ_REG_REG, "TEQ",0x0FE00090,0x01200010},
-    {ARM_OP_TST_IMM,     "TST",0x0FE00000,0x03000000},
-    {ARM_OP_TST_REG_IMM, "TST",0x0FE00010,0x01000000},
-    {ARM_OP_TST_REG_REG, "TST",0x0FE00090,0x01000010},
-    {ARM_OP_CDP,         "CDP",0x0F000010,0x0E000000},
-    {ARM_OP_LDC,         "LDC",0x0E100000,0x0C100000},
-    {ARM_OP_STC,         "STC",0x0E100000,0x0C000000},
-    {ARM_OP_MRC,         "MRC",0x0E100010,0x0C100010},
-    {ARM_OP_MCR,         "MCR",0x0E000010,0x0C000010},
-    {ARM_OP_UNDEFINED,   "UND",0x0E000010,0x06000010},
-
-    {ARM_OP_END,"---",0,0xFFFFFFFF}
-  };
-
 
 int
 freedo_debug_arm_disassemble(uint32_t op_)
@@ -664,10 +497,10 @@ freedo_debug_arm_disassemble(uint32_t op_)
     {
       if((op_ & OPCODE_TYPES[i].mask) == OPCODE_TYPES[i].pattern)
         {
-          if(i == 1)
+          if(OPCODE_TYPES[i].print)
             {
               printf("%08X ",op_);
-              arm_op_print_data_processing(op_);
+              (*OPCODE_TYPES[i].print)(op_);
               printf("\n");
             }
           found = 1;
