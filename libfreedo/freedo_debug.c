@@ -5,6 +5,26 @@
 #include <stdlib.h>
 #include <assert.h>
 
+enum
+  {
+    ARM_DP_AND = 0x0,
+    ARM_DP_EOR = 0x1,
+    ARM_DP_SUB = 0x2,
+    ARM_DP_RSB = 0x3,
+    ARM_DP_ADD = 0x4,
+    ARM_DP_ADC = 0x5,
+    ARM_DP_SBC = 0x6,
+    ARM_DP_RSC = 0x7,
+    ARM_DP_TST = 0x8,
+    ARM_DP_TEQ = 0x9,
+    ARM_DP_CMP = 0xA,
+    ARM_DP_CMN = 0xB,
+    ARM_DP_ORR = 0xC,
+    ARM_DP_MOV = 0xD,
+    ARM_DP_BIC = 0xE,
+    ARM_DP_MVN = 0xF
+  };
+
 const
 char*
 freedo_debug_swi_func(uint32_t swi_)
@@ -348,19 +368,27 @@ struct arm_opcode_s
 };
 
 static
+inline
+uint8_t
+arm_op_data_processing_opcode(const uint32_t op_)
+{
+  return ((op_ & 0x01E00000) >> 21);
+}
+
+static
 const
 char*
-arm_op_data_processing_opcode(const uint32_t op_)
+arm_op_data_processing_opcode_str(const uint32_t op_)
 {
   static const char ARM_DATA_PROCESSING_OPCODES[][4] =
     {
-    "AND","EOR","SUB","RSB",
-    "ADD","ADC","SBC","RSC",
-    "TST","TEQ","CMP","CMN",
-    "ORR","MOV","BIC","MVN"
+      "AND","EOR","SUB","RSB",
+      "ADD","ADC","SBC","RSC",
+      "TST","TEQ","CMP","CMN",
+      "ORR","MOV","BIC","MVN"
     };
 
-  return ARM_DATA_PROCESSING_OPCODES[(op_ & 0x01E00000) >> 20];
+  return ARM_DATA_PROCESSING_OPCODES[arm_op_data_processing_opcode(op_)];
 }
 
 static
@@ -395,7 +423,7 @@ arm_op_print_shift(const uint32_t op_)
           shift_amt  = ((op_ & 0x00000F80) >> 6);
           if(shift_amt == 0)
             return;
-          
+
           shift_type = arm_op_shift_type(op_);
 
           printf(", %s #%x",shift_type,shift_amt);
@@ -444,6 +472,45 @@ arm_op_print_data_processing_op2(const uint32_t op_)
 
 static
 void
+arm_op_print_data_processing_1(const uint32_t op_)
+{
+  uint8_t Rd;
+  uint8_t set_condition_codes;
+  const char *opcode;
+
+  opcode              = arm_op_data_processing_opcode_str(op_);
+  set_condition_codes = !!(op_ & 0x00100000);
+  Rd                  = ((op_ & 0x0000F000) >> 12);
+
+  printf("%s%s%s\tr%d",
+         opcode,
+         arm_op_dis_condition_mnemonic(op_),
+         (set_condition_codes ? "S" : ""),
+         Rd);
+
+  arm_op_print_data_processing_op2(op_);
+}
+
+static
+void
+arm_op_print_data_processing_2(const uint32_t op_)
+{
+  uint8_t Rn;
+  const char *opcode;
+
+  opcode = arm_op_data_processing_opcode_str(op_);
+  Rn     = ((op_ & 0x000F0000) >> 16);
+
+  printf("%s%s\tr%d",
+         opcode,
+         arm_op_dis_condition_mnemonic(op_),
+         Rn);
+
+  arm_op_print_data_processing_op2(op_);
+}
+
+static
+void
 arm_op_print_data_processing_3(const uint32_t op_)
 {
   char Rn;
@@ -451,7 +518,7 @@ arm_op_print_data_processing_3(const uint32_t op_)
   char set_condition_codes;
   const char *opcode;
 
-  opcode              = arm_op_data_processing_opcode(op_);
+  opcode              = arm_op_data_processing_opcode_str(op_);
   set_condition_codes = !!(op_ & 0x00100000);
   Rn                  = ((op_ & 0x000F0000) >> 16);
   Rd                  = ((op_ & 0x0000F000) >> 12);
@@ -460,10 +527,47 @@ arm_op_print_data_processing_3(const uint32_t op_)
          opcode,
          arm_op_dis_condition_mnemonic(op_),
          (set_condition_codes ? "S" : ""),
-         Rd,Rn);
+         Rd,
+         Rn);
 
   arm_op_print_data_processing_op2(op_);
 }
+
+static
+void
+arm_op_print_data_processing(const uint32_t op_)
+{
+  uint8_t opcode;
+
+  opcode = arm_op_data_processing_opcode(op_);
+  switch(opcode)
+    {
+    case ARM_DP_MOV:
+    case ARM_DP_MVN:
+      arm_op_print_data_processing_1(op_);
+      break;
+    case ARM_DP_CMP:
+    case ARM_DP_CMN:
+    case ARM_DP_TEQ:
+    case ARM_DP_TST:
+      arm_op_print_data_processing_2(op_);
+      break;
+    default:
+      arm_op_print_data_processing_3(op_);
+      break;
+    }
+}
+
+arm_opcode_t OPCODE_TYPES[] =
+  {
+    {0,"Branch",              0x0E000000,0x0A000000},
+    {0,"Data Processing",     0x0C000000,0x00000000},
+    {0,"Multiply",            0x0FC000F0,0x00000090},
+    {0,"Single data transfer",0x0C000000,0x04000000},
+    {0,"Block data transfer", 0x0E000000,0x08000000},
+    {0,"Single data swap",    0x0FB00FF0,0x01000090},
+    {0,"Software interrupt",  0x0F000000,0x0F000000}
+  };
 
 arm_opcode_t OPCODES[] =
   {
@@ -556,21 +660,17 @@ freedo_debug_arm_disassemble(uint32_t op_)
   const char *condition_mnemonic;
 
   found = 0;
-  for(uint64_t i = 0; i < sizeof(OPCODES)/sizeof(OPCODES[0]); i++)
+  for(uint64_t i = 0; i < sizeof(OPCODE_TYPES)/sizeof(OPCODE_TYPES[0]); i++)
     {
-      if((op_ & OPCODES[i].mask) == OPCODES[i].pattern)
+      if((op_ & OPCODE_TYPES[i].mask) == OPCODE_TYPES[i].pattern)
         {
-          if(!strcmp(OPCODES[i].name,"AND"))
+          if(i == 1)
             {
               printf("%08X ",op_);
-              arm_op_print_data_processing_3(op_);
+              arm_op_print_data_processing(op_);
               printf("\n");
             }
-
-
-          //          printf("%08X %s%s\n",op_,OPCODES[i].name,condition_mnemonic);
           found = 1;
-          break;
         }
     }
 
