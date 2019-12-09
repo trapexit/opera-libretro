@@ -342,7 +342,7 @@ arm_op_print_shift(const uint32_t op_)
 
           shift_type = arm_op_shift_type(op_);
 
-          printf(", %s #%x",shift_type,shift_amt);
+          printf(", %s %d",shift_type,shift_amt);
         }
     }
   else
