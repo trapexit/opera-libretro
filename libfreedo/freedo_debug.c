@@ -524,7 +524,22 @@ static
 void
 arm_op_print_single_data_swap(const uint32_t op_)
 {
+  uint8_t byte;
+  uint8_t Rn;
+  uint8_t Rd;
+  uint8_t Rm;
 
+  byte = !!(op_ & 0x00400000);
+  Rn   = ((op_ & 0x000F0000) >> 16);
+  Rd   = ((op_ & 0x0000F000) >> 12);
+  Rm   = ((op_ & 0x0000000F) >> 00);
+
+  printf("SWP%s%s\tr%d, %d, [r%d]",
+         arm_op_dis_condition_mnemonic(op_),
+         (byte ? "B" : ""),
+         Rd,
+         Rm,
+         Rn);
 }
 
 static arm_opcode_t OPCODE_TYPES[] =
