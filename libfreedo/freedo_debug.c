@@ -498,14 +498,42 @@ arm_op_print_software_interupt(const uint32_t op_)
          (op_ & 0x00FFFFFF));
 }
 
-arm_opcode_t OPCODE_TYPES[] =
+static
+void
+arm_op_print_single_data_transfer(const uint32_t op_)
+{
+
+}
+
+static
+void
+arm_op_print_block_data_transfer(const uint32_t op_)
+{
+
+}
+
+static
+void
+arm_op_print_multiply(const uint32_t op_)
+{
+
+}
+
+static
+void
+arm_op_print_single_data_swap(const uint32_t op_)
+{
+
+}
+
+static arm_opcode_t OPCODE_TYPES[] =
   {
     {0x0E000000,0x0A000000,arm_op_print_branches}, // Branch
     {0x0C000000,0x00000000,arm_op_print_data_processing}, // Data processing
-    {0x0FC000F0,0x00000090,NULL}, // Multiply
-    {0x0C000000,0x04000000,NULL}, // Single data transfer
-    {0x0E000000,0x08000000,NULL}, // block data transfer
-    {0x0FB00FF0,0x01000090,NULL}, // single data swap
+    {0x0FC000F0,0x00000090,arm_op_print_multiply}, // Multiply
+    {0x0C000000,0x04000000,arm_op_print_single_data_transfer}, // Single data transfer
+    {0x0E000000,0x08000000,arm_op_print_block_data_transfer}, // block data transfer
+    {0x0FB00FF0,0x01000090,arm_op_print_single_data_swap}, // single data swap
     {0x0F000000,0x0F000000,arm_op_print_software_interupt}  // software interupt
   };
 
