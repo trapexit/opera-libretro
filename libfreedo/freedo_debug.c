@@ -10,8 +10,8 @@ typedef void (*op_print_func_t)(const uint32_t);
 typedef struct arm_opcode_s arm_opcode_t;
 struct arm_opcode_s
 {
-  uint32_t mask;
-  uint32_t pattern;
+  uint32_t        mask;
+  uint32_t        pattern;
   op_print_func_t print;
 };
 
@@ -372,7 +372,7 @@ arm_op_print_data_processing_op2(const uint32_t op_)
       rotate = ((op_ & 0x00000F00) >> 8);
       imm    = ((op_ & 0x000000FF) >> 0);
 
-      printf(", #%X",rotr32(imm,rotate*2));
+      printf(", #&%X",rotr32(imm,rotate*2));
     }
   else
     {
@@ -483,7 +483,7 @@ arm_op_print_branches(const uint32_t op_)
 
   link = !!(op_ & 0x01000000);
   offset = sign_extend_24_32(op_ & 0x00FFFFFF);
-  printf("B%s%s\t0x%X",
+  printf("B%s%s\t#&%X",
          arm_op_dis_condition_mnemonic(op_),
          (link ? "L" : ""),
          offset);
@@ -493,9 +493,10 @@ static
 void
 arm_op_print_software_interupt(const uint32_t op_)
 {
-  printf("SWI%s\t0x%X",
+  printf("SWI%s\t#&%X\t; %s",
          arm_op_dis_condition_mnemonic(op_),
-         (op_ & 0x00FFFFFF));
+         (op_ & 0x00FFFFFF),
+         freedo_debug_swi_func(op_));
 }
 
 static

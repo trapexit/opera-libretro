@@ -968,16 +968,8 @@ typedef struct TagArg
 
 static
 void
-decode_swi(uint32_t cmd_)
+decode_swi()
 {
-  const char *str;
-
-  if((cmd_ & 0xFFFFFF) != 0x1000E)
-    {
-      str = freedo_debug_swi_func(cmd_);
-      printf("0x%x : %s\n",cmd_ & 0x00FFFFFF,(str != NULL) ? str : "unknown");
-    }
-
   CPU.SPSR[arm_mode_table[0x13]] = CPU.CPSR;
 
   SETI(1);
@@ -1779,7 +1771,7 @@ freedo_arm_execute(void)
           break;
 
         case 0xf:               //SWI
-          decode_swi(cmd);
+          decode_swi();
           break;
 
         default:                //coprocessor
