@@ -517,7 +517,30 @@ static
 void
 arm_op_print_multiply(const uint32_t op_)
 {
+  uint8_t Rd;
+  uint8_t Rn;
+  uint8_t Rs;
+  uint8_t Rm;
+  uint8_t accumulate;
+  uint8_t set_condition_code;
 
+  Rd = ((op_ & 0x000F0000) >> 16);
+  Rn = ((op_ & 0x0000F000) >> 12);
+  Rs = ((op_ & 0x00000F00) >>  8);
+  Rm = ((op_ & 0x0000000F) >>  0);
+  accumulate         = !!(op_ & 0x00200000);
+  set_condition_code = !!(op_ & 0x00100000);
+
+  if(accumulate)
+    printf("MLA%s%s\tr%d, r%d, r%d, r%d",
+           arm_op_dis_condition_mnemonic(op_),
+           (set_condition_code ? "S" : ""),
+           Rd,Rm,Rs,Rn);
+  else
+    printf("MUL%s%s\tr%d, r%d, r%d",
+           arm_op_dis_condition_mnemonic(op_),
+           (set_condition_code ? "S" : ""),
+           Rd,Rm,Rs);
 }
 
 static
