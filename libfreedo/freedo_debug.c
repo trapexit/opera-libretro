@@ -336,7 +336,7 @@ arm_op_print_shift(const uint32_t op_)
           uint8_t shift_amt;
           const char *shift_type;
 
-          shift_amt  = ((op_ & 0x00000F80) >> 6);
+          shift_amt  = ((op_ & 0x00000F80) >> 7);
           if(shift_amt == 0)
             return;
 
@@ -474,15 +474,39 @@ arm_op_print_data_processing(const uint32_t op_)
     }
 }
 
+static
+void
+arm_op_print_branches(const uint32_t op_)
+{
+  uint32_t link;
+  int32_t  offset;
+
+  link = !!(op_ & 0x01000000);
+  offset = sign_extend_24_32(op_ & 0x00FFFFFF);
+  printf("B%s%s\t0x%X",
+         arm_op_dis_condition_mnemonic(op_),
+         (link ? "L" : ""),
+         offset);
+}
+
+static
+void
+arm_op_print_software_interupt(const uint32_t op_)
+{
+  printf("SWI%s\t0x%X",
+         arm_op_dis_condition_mnemonic(op_),
+         (op_ & 0x00FFFFFF));
+}
+
 arm_opcode_t OPCODE_TYPES[] =
   {
-    {0x0E000000,0x0A000000,NULL}, // Branch
+    {0x0E000000,0x0A000000,arm_op_print_branches}, // Branch
     {0x0C000000,0x00000000,arm_op_print_data_processing}, // Data processing
     {0x0FC000F0,0x00000090,NULL}, // Multiply
     {0x0C000000,0x04000000,NULL}, // Single data transfer
     {0x0E000000,0x08000000,NULL}, // block data transfer
     {0x0FB00FF0,0x01000090,NULL}, // single data swap
-    {0x0F000000,0x0F000000,NULL}  // software interupt
+    {0x0F000000,0x0F000000,arm_op_print_software_interupt}  // software interupt
   };
 
 int
@@ -497,12 +521,11 @@ freedo_debug_arm_disassemble(uint32_t op_)
     {
       if((op_ & OPCODE_TYPES[i].mask) == OPCODE_TYPES[i].pattern)
         {
+          printf("%08X ",op_);
           if(OPCODE_TYPES[i].print)
-            {
-              printf("%08X ",op_);
-              (*OPCODE_TYPES[i].print)(op_);
-              printf("\n");
-            }
+            (*OPCODE_TYPES[i].print)(op_);
+          printf("\n");
+
           found = 1;
         }
     }
