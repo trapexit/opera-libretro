@@ -503,7 +503,17 @@ static
 void
 arm_op_print_single_data_transfer(const uint32_t op_)
 {
+  uint8_t store;
+  uint8_t immediate;
+  uint8_t pre_index;
+  uint8_t up;
+  uint8_t byte;
+  uint8_t write_back;
 
+  store      = !!(op_ & 0x00100000);
+  write_back = !!(op_ & 0x00200000);
+  byte       = !!(op_ & 0x00400000);
+  
 }
 
 static
