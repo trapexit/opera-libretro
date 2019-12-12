@@ -377,7 +377,6 @@ arm_op_print_data_processing_op2(const uint32_t op_)
   else
     {
       uint8_t Rm;
-      uint8_t shift_type;
 
       Rm = (op_ & 0x0000000F);
 
@@ -509,11 +508,65 @@ arm_op_print_single_data_transfer(const uint32_t op_)
   uint8_t up;
   uint8_t byte;
   uint8_t write_back;
+  uint8_t Rd;
+  uint8_t Rn;
 
   store      = !!(op_ & 0x00100000);
   write_back = !!(op_ & 0x00200000);
   byte       = !!(op_ & 0x00400000);
-  
+  up         = !!(op_ & 0x00800000);
+  pre_index  = !!(op_ & 0x01000000);
+  immediate  = !!(op_ & 0x02000000);
+  Rd = ((op_ & 0x0000F000) >> 12);
+  Rn = ((op_ & 0x000F0000) >> 16);
+
+  printf("%s%s%s%s\tr%d, [r%d",
+         (store ? "STR" : "LDR"),
+         arm_op_dis_condition_mnemonic(op_),
+         (byte ? "B" : ""),
+         (write_back ? "T" : ""),
+         Rd,
+         Rn);
+  if(pre_index)
+    {
+      if(immediate)
+        {
+          printf(", &%x]",(op_ & 0xFFF));
+        }
+      else
+        {
+          uint8_t Rm;
+
+          Rm = (op_ & 0x0000000F);
+
+          printf(", %cr%d",
+                 (up ? '+' : '-'),
+                 Rm);
+          arm_op_print_shift(op_);
+          printf("]");
+        }
+    }
+  else
+    {
+      if(immediate)
+        {
+          printf("], &%x",(op_ & 0xFFF));
+        }
+      else
+        {
+          uint8_t Rm;
+
+          Rm = (op_ & 0x0000000F);
+
+          printf("], %cr%d",
+                 (up ? '+' : '-'),
+                 Rm);
+          arm_op_print_shift(op_);
+        }
+    }
+
+  if(write_back)
+    printf("!");
 }
 
 static
