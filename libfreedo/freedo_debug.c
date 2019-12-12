@@ -502,7 +502,7 @@ static
 void
 arm_op_print_single_data_transfer(const uint32_t op_)
 {
-  uint8_t store;
+  uint8_t load;
   uint8_t immediate;
   uint8_t pre_index;
   uint8_t up;
@@ -511,17 +511,17 @@ arm_op_print_single_data_transfer(const uint32_t op_)
   uint8_t Rd;
   uint8_t Rn;
 
-  store      = !!(op_ & 0x00100000);
+  load       = !!(op_ & 0x00100000);
   write_back = !!(op_ & 0x00200000);
   byte       = !!(op_ & 0x00400000);
   up         = !!(op_ & 0x00800000);
   pre_index  = !!(op_ & 0x01000000);
-  immediate  = !!(op_ & 0x02000000);
+  immediate  =  !(op_ & 0x02000000);
   Rd = ((op_ & 0x0000F000) >> 12);
   Rn = ((op_ & 0x000F0000) >> 16);
 
   printf("%s%s%s%s\tr%d, [r%d",
-         (store ? "STR" : "LDR"),
+         (load ? "LDR" : "STR"),
          arm_op_dis_condition_mnemonic(op_),
          (byte ? "B" : ""),
          (write_back ? "T" : ""),
@@ -531,7 +531,9 @@ arm_op_print_single_data_transfer(const uint32_t op_)
     {
       if(immediate)
         {
-          printf(", &%x]",(op_ & 0xFFF));
+          printf(", %s&%x]",
+                 (up ? "" : "-"),
+                 (op_ & 0xFFF));
         }
       else
         {
@@ -550,7 +552,9 @@ arm_op_print_single_data_transfer(const uint32_t op_)
     {
       if(immediate)
         {
-          printf("], &%x",(op_ & 0xFFF));
+          printf("], %s&%x",
+                 (up ? "" : "-"),                 
+                 (op_ & 0xFFF));
         }
       else
         {
