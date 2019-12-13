@@ -57,12 +57,12 @@ freedo_debug_swi_func(uint32_t swi_)
       return "Item FindItem(int32 ctype, TagArg *tp);";
     case 0x10005:
       return "Item OpenItem(Item foundItem, void *args);";
-    /* case 0x10006:	 */
-    /*   return "Err UnlockSemaphore(Item s);"; */
+      /* case 0x10006:	 */
+      /*   return "Err UnlockSemaphore(Item s);"; */
     case 0x10006:
       return "Err UnlockItem(Item s);";
-    /* case 0x10007:	 */
-    /*   return "int32 LockSemaphore(Item s, uint32 flags);"; */
+      /* case 0x10007:	 */
+      /*   return "int32 LockSemaphore(Item s, uint32 flags);"; */
     case 0x10007:
       return "int32 LockItem(Item s, uint32 flags);";
     case 0x10008:
@@ -73,8 +73,8 @@ freedo_debug_swi_func(uint32_t swi_)
       return "Item GetThisMsg(Item msg);";
     case 0x10010:
       return "Err SendMsg(Item mp, Item msg, const void *dataptr, int32 datasize);";
-    /* case 0x10010:	 */
-    /*   return "Err SendSmallMsg(Item mp, Item msg, uint32 val1, uint32 val2);"; */
+      /* case 0x10010:	 */
+      /*   return "Err SendSmallMsg(Item mp, Item msg, uint32 val1, uint32 val2);"; */
     case 0x1000A:
       return "int32 SetItemPri(Item i, uint8 newpri);";
     case 0x1000D:
@@ -85,8 +85,8 @@ freedo_debug_swi_func(uint32_t swi_)
       return "uint32 ReadHardwareRandomNumber(void);";
     case 0x10012:
       return "Err ReplyMsg(Item msg, int32 result, const void *dataptr, int32 datasize);";
-    /* case 0x10012:	 */
-    /*   return "Err ReplySmallMsg(Item msg, int32 result, uint32 val1, int32 val2);"; */
+      /* case 0x10012:	 */
+      /*   return "Err ReplySmallMsg(Item msg, int32 result, uint32 val1, int32 val2);"; */
     case 0x10013:
       return "Item GetMsg(Item mp);";
     case 0x10014:
@@ -722,34 +722,23 @@ static arm_opcode_t OPCODE_TYPES[] =
     {0x0C000000,0x04000000,arm_op_print_single_data_transfer}, // Single data transfer
     {0x0E000000,0x08000000,arm_op_print_block_data_transfer}, // block data transfer
     {0x0FB00FF0,0x01000090,arm_op_print_single_data_swap}, // single data swap
-    {0x0F000000,0x0F000000,arm_op_print_software_interupt}  // software interupt
+    {0x0F000000,0x0F000000,arm_op_print_software_interupt} // software interupt
   };
 
 int
-freedo_debug_arm_disassemble(uint32_t op_)
+freedo_debug_arm_disassemble(const uint32_t pc_,
+                             const uint32_t op_)
 {
-  int found;
-  uint8_t condition;
-  const char *condition_mnemonic;
-
-  found = 0;
   for(uint64_t i = 0; i < sizeof(OPCODE_TYPES)/sizeof(OPCODE_TYPES[0]); i++)
     {
-      if((op_ & OPCODE_TYPES[i].mask) == OPCODE_TYPES[i].pattern)
-        {
-          printf("%08X ",op_);
-          if(OPCODE_TYPES[i].print)
-            (*OPCODE_TYPES[i].print)(op_);
-          printf("\n");
+      if((op_ & OPCODE_TYPES[i].mask) != OPCODE_TYPES[i].pattern)
+        continue;
 
-          found = 1;
-        }
-    }
+      printf("%08X %08X ",pc_,op_);
+      (*OPCODE_TYPES[i].print)(op_);
+      printf("\n");
 
-  if(!found)
-    {
-      printf("%08X ::UNKNOWN::\n",op_);
-      abort();
+      return 0;
     }
 
   return 0;

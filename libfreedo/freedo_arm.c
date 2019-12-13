@@ -1481,8 +1481,7 @@ freedo_arm_execute(void)
     }
 
   cmd = mreadw(CPU.USER[15]);
-  //  printf("%08X ",CPU.USER[15]);
-  freedo_debug_arm_disassemble(cmd);
+  freedo_debug_arm_disassemble(CPU.USER[15],cmd);
   CPU.USER[15] += 4;
 
   CYCLES = -SCYCLE;
