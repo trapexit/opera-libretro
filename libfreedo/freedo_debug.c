@@ -553,7 +553,7 @@ arm_op_print_single_data_transfer(const uint32_t op_)
       if(immediate)
         {
           printf("], %s&%x",
-                 (up ? "" : "-"),                 
+                 (up ? "" : "-"),
                  (op_ & 0xFFF));
         }
       else
@@ -574,10 +574,91 @@ arm_op_print_single_data_transfer(const uint32_t op_)
 }
 
 static
+const
+char*
+arm_op_dis_block_data_transfer_address_mode_name(const uint32_t op_)
+{
+  uint8_t LPU;
+  uint8_t Rn;
+
+  Rn  = ((op_ & 0x000F0000) >> 16);
+  LPU = (((op_ & 0x00100000) >> 18) |
+         ((op_ & 0x01000000) >> 23) |
+         ((op_ & 0x00800000) >> 23));
+  switch(LPU)
+    {
+    case 0x0:
+      return ((Rn == 13) ? "ED" : "DA");
+    case 0x1:
+      return ((Rn == 13) ? "EA" : "IA");
+    case 0x2:
+      return ((Rn == 13) ? "FD" : "DB");
+    case 0x3:
+      return ((Rn == 13) ? "FA" : "IB");
+    case 0x4:
+      return ((Rn == 13) ? "FA" : "DA");
+    case 0x5:
+      return ((Rn == 13) ? "FD" : "IA");
+    case 0x6:
+      return ((Rn == 13) ? "EA" : "DB");
+    case 0x7:
+      return ((Rn == 13) ? "ED" : "IB");
+    }
+
+  return "";
+}
+
+static
+const
+char*
+arm_op_dis_block_data_transfer_Rlist(const uint32_t op_,
+                                     char           rlist_[256])
+{
+  uint16_t Rlist;
+  uint32_t len;
+
+  len = 0;
+  rlist_[0] = '\0';
+  Rlist = (op_ & 0x0000FFFF);
+
+  for(uint32_t i = 0; i < 16; i++)
+    {
+      if(Rlist & 0x1)
+        {
+          len += sprintf(rlist_+len,"r%d,",i);
+        }
+
+      Rlist >>= 1;
+    }
+
+  if(rlist_[len-1] == ',')
+    rlist_[len-1] = '\0';
+
+  return rlist_;
+}
+
+static
 void
 arm_op_print_block_data_transfer(const uint32_t op_)
 {
+  uint8_t load;
+  uint8_t write_back;
+  uint8_t load_psr;
+  uint8_t Rn;
+  char Rlist[256];
 
+  load       = !!(op_ & 0x00100000);
+  write_back = !!(op_ & 0x00200000);
+  load_psr   = !!(op_ & 0x00400000);
+  Rn         = ((op_ & 0x000F0000) >> 16);
+  printf("%s%s%s\tr%d%s, {%s}%s",
+         (load ? "LDM" : "STM"),
+         arm_op_dis_condition_mnemonic(op_),
+         arm_op_dis_block_data_transfer_address_mode_name(op_),
+         Rn,
+         (write_back ? "!" : ""),
+         arm_op_dis_block_data_transfer_Rlist(op_,Rlist),
+         (load_psr ? "^" : ""));
 }
 
 static
