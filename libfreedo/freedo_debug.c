@@ -482,9 +482,10 @@ arm_op_print_branches(const uint32_t op_)
 
   link = !!(op_ & 0x01000000);
   offset = sign_extend_24_32(op_ & 0x00FFFFFF);
-  printf("B%s%s\t&%X",
+  printf("B%s%s\t&%X\t; %d",
          arm_op_dis_condition_mnemonic(op_),
          (link ? "L" : ""),
+         offset,
          offset);
 }
 
