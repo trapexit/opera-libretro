@@ -33,11 +33,6 @@
 #include "freedo_core.h"
 #include "freedo_vdlp.h"
 
-#include <string.h>
-
-//#define NTSC_CLOCK      12270000
-//#define PAL_CLOCK       14750000
-
 #define DEFAULT_CPU_FREQUENCY       12500000
 #define DEFAULT_CYCLES_PER_FIELD    CYCLES_PER_FIELD(DEFAULT_CPU_FREQUENCY,NTSC_FIELD_RATE)
 #define DEFAULT_CYCLES_PER_SND      (DEFAULT_CPU_FREQUENCY / SND_CLOCK)
