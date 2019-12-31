@@ -48,7 +48,7 @@
 #define NTSC_FIELD_RATE          5994
 #define PAL_FIELD_RATE           5000
 
-#define CYCLES_PER_FIELD(X,Y) ((((X) * 100) / Y) + 1)
+#define CYCLES_PER_FIELD(X,Y) (((((uint64_t)X) * 100) / Y) + 1)
 
 
 typedef struct freedo_clock_s freedo_clock_t;
@@ -86,7 +86,7 @@ freedo_clock_cpu_set_freq(const uint32_t freq_)
   freq = ((freq_ < MIN_CPU_FREQUENCY) ? MIN_CPU_FREQUENCY : freq_);
 
   g_CLOCK.cpu_frequency    = freq_;
-  g_CLOCK.cycles_per_field = ((((uint64_t)freq_ * (uint64_t)100) / g_CLOCK.field_rate) + 1);
+  g_CLOCK.cycles_per_field = CYCLES_PER_FIELD(freq_,g_CLOCK.field_rate);
 }
 
 void
