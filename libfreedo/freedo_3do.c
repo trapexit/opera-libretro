@@ -163,16 +163,16 @@ freedo_3do_internal_frame(vdlp_frame_t *frame_,
 void
 freedo_3do_process_frame(vdlp_frame_t *frame_)
 {
-  uint32_t i;
   uint32_t cnt;
-  uint64_t freq;
+  uint32_t cycles;
+  uint64_t cycles_per_field;
 
   if(flagtime)
     flagtime--;
 
-  i    = 0;
   cnt  = 0;
-  freq = freedo_clock_cpu_get_freq();
+  cycles = 0;
+  cycles_per_field = freedo_clock_cpu_cycles_per_field();
   do
     {
       if(freedo_madam_fsm_get() == FSM_INPROCESS)
@@ -186,10 +186,10 @@ freedo_3do_process_frame(vdlp_frame_t *frame_)
       if(cnt >= 32)
         {
           freedo_3do_internal_frame(frame_,cnt);
-          i += cnt;
+          cycles += cnt;
           cnt = 0;
         }
-    } while(i < (freq / 60));
+    } while(cycles < cycles_per_field);
 }
 
 uint32_t

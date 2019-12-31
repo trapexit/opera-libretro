@@ -55,6 +55,7 @@ void     freedo_clock_cpu_set_freq(const uint32_t freq_);
 void     freedo_clock_cpu_set_freq_mul(const float mul_);
 uint32_t freedo_clock_cpu_get_freq(void);
 uint32_t freedo_clock_cpu_get_default_freq(void);
+uint64_t freedo_clock_cpu_cycles_per_field(void);
 
 uint32_t freedo_clock_state_size(void);
 void     freedo_clock_state_save(void *buf_);
