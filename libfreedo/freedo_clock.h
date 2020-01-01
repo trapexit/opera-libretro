@@ -61,6 +61,9 @@ uint32_t freedo_clock_state_size(void);
 void     freedo_clock_state_save(void *buf_);
 void     freedo_clock_state_load(const void *buf_);
 
+void     freedo_clock_region_set_ntsc(void);
+void     freedo_clock_region_set_pal(void);
+
 EXTERN_C_END
 
 #endif /* LIBFREEDO_CLOCK_H_INCLUDED */

@@ -77,6 +77,15 @@ static freedo_clock_t g_CLOCK =
   };
 
 
+static
+void
+recalculate_cycles_per(void)
+{
+  g_CLOCK.cycles_per_field    = CYCLES_PER_FIELD(g_CLOCK.cpu_frequency,g_CLOCK.field_rate);
+  g_CLOCK.cycles_per_snd      = (g_CLOCK.cpu_frequency / SND_CLOCK);
+  g_CLOCK.cycles_per_scanline = CYCLES_PER_SCANLINE(g_CLOCK.cpu_frequency,g_CLOCK.field_size,g_CLOCK.field_rate);
+}
+
 void
 freedo_clock_cpu_set_freq(const uint32_t freq_)
 {
@@ -84,10 +93,9 @@ freedo_clock_cpu_set_freq(const uint32_t freq_)
 
   freq = ((freq_ < MIN_CPU_FREQUENCY) ? MIN_CPU_FREQUENCY : freq_);
 
-  g_CLOCK.cpu_frequency       = freq_;
-  g_CLOCK.cycles_per_field    = CYCLES_PER_FIELD(freq_,g_CLOCK.field_rate);
-  g_CLOCK.cycles_per_snd      = (freq_ / SND_CLOCK);
-  g_CLOCK.cycles_per_scanline = CYCLES_PER_SCANLINE(freq_,g_CLOCK.field_size,g_CLOCK.field_rate);
+  g_CLOCK.cpu_frequency = freq_;
+
+  recalculate_cycles_per();
 }
 
 void
@@ -229,4 +237,22 @@ freedo_clock_push_cycles(const uint32_t clks_)
   g_CLOCK.dsp_acc   += clks_;
   g_CLOCK.vdl_acc   += clks_;
   g_CLOCK.timer_acc += clks_;
+}
+
+void
+freedo_clock_region_set_ntsc(void)
+{
+  g_CLOCK.field_rate = NTSC_FIELD_RATE;
+  g_CLOCK.field_size = NTSC_FIELD_SIZE;
+
+  recalculate_cycles_per();
+}
+
+void
+freedo_clock_region_set_pal(void)
+{
+  g_CLOCK.field_rate = PAL_FIELD_RATE;
+  g_CLOCK.field_size = PAL_FIELD_SIZE;
+
+  recalculate_cycles_per();
 }
