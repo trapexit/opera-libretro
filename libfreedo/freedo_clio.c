@@ -322,8 +322,40 @@ freedo_clio_poke(uint32_t addr_,
     }
   else if(addr_ == 0x84)
     {
-      CLIO.regs[0x84] = (val_ & 0x0F);
-      freedo_arm_rom_select(val_ & 4);
+      if((val_ & 0x10) == 0x10)
+        {
+          if(val_ & 0x01)
+            CLIO.regs[0x84] |= 0x01;
+          else
+            CLIO.regs[0x84] &= 0xFE;
+        }
+
+      if((val_ & 0x20) == 0x20)
+        {
+          if(val_ & 0x02)
+            CLIO.regs[0x84] |= 0x02;
+          else
+            CLIO.regs[0x84] &= 0xFD;
+        }
+
+      if((val_ & 0x40) == 0x40)
+        {
+          if(val_ & 0x04)
+            CLIO.regs[0x84] |= 0x04;
+          else
+            CLIO.regs[0x84] &= 0xFB;
+        }
+
+      if((val_ & 0x80) == 0x80)
+        {
+          if(val_ & 0x08)
+            CLIO.regs[0x84] |= 0x08;
+          else
+            CLIO.regs[0x84] &= 0xF7;
+        }
+
+      freedo_arm_rom_select(!!(val_ & 0x4));
+
       return 0;
     }
   else if(addr_ == 0x0300)
