@@ -204,14 +204,10 @@ vdlp_execute_next_vdl(const uint32_t vdl_)
   for(i = 0; i < numcmd; i++)
     {
       uint32_t cmd;
-      union DMADPRW foo;
 
       cmd = vram_read32(CURRENTVDL);
       CURRENTVDL += 4;
 
-      foo.raw = cmd;
-
-      
       if(!(cmd & VDL_CONTROL))
         {
           const uint32_t idx = ((cmd & VDL_PEN_MASK) >> VDL_PEN_SHIFT);

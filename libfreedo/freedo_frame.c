@@ -35,7 +35,7 @@ freedo_frame_get_bitmap_xrgb_8888(const vdlp_frame_t *src_frame_,
     {
       const vdlp_line_t *line       = &src_frame_->lines[y];
       const uint16_t    *pixel      = line->line;
-      const int          fixed_clut = (line->xOUTCONTROLL & 0x2000000);
+      const int          fixed_clut = (line->xOUTCONTROLL & 0x02000000);
 
       for(x = 0; x < width_; x++)
         {
