@@ -30,6 +30,7 @@
 
 #include "freedo_arm.h"
 #include "freedo_core.h"
+#include "freedo_vdl.h"
 #include "freedo_vdlp.h"
 #include "hack_flags.h"
 #include "inline.h"
@@ -40,27 +41,6 @@
 #include <string.h>
 
 #define VRAM_OFFSET (1024 * 1024 * 2)
-
-/* === VDL Palette data === */
-#define VDL_CONTROL     0x80000000
-#define VDL_BACKGROUND	0xE0000000
-#define VDL_RGBCTL_MASK 0x60000000
-#define VDL_PEN_MASK    0x1F000000
-#define VDL_R_MASK      0x00FF0000
-#define VDL_G_MASK      0x0000FF00
-#define VDL_B_MASK      0x000000FF
-
-#define VDL_B_SHIFT      0
-#define VDL_G_SHIFT      8
-#define VDL_R_SHIFT      16
-#define VDL_PEN_SHIFT    24
-#define VDL_RGBSEL_SHIFT 29
-
-/* VDL_RGBCTL_MASK definitions */
-#define VDL_FULLRGB   0x00000000
-#define VDL_REDONLY   0x60000000
-#define VDL_GREENONLY 0x40000000
-#define VDL_BLUEONLY  0x20000000
 
 struct cdmaw
 {
@@ -78,10 +58,27 @@ struct cdmaw
   uint32_t pad2:6;              //26-31
 };
 
+/* DMA display-path reconfigure word */
+struct DMADPRW_s
+{
+  uint32_t VIoffline:1;
+  uint32_t ColrsOnly:1;
+  uint32_t HIon:1;
+  uint32_t VIon:1;
+  uint32_t blah:25;
+  uint32_t ctl_colr:3;
+};
+
 union CDMW
 {
   uint32_t     raw;
   struct cdmaw dmaw;
+};
+
+union DMADPRW
+{
+  uint32_t         raw;
+  struct DMADPRW_s dmadprw;
 };
 
 struct vdlp_datum_s
@@ -207,10 +204,14 @@ vdlp_execute_next_vdl(const uint32_t vdl_)
   for(i = 0; i < numcmd; i++)
     {
       uint32_t cmd;
+      union DMADPRW foo;
 
       cmd = vram_read32(CURRENTVDL);
       CURRENTVDL += 4;
 
+      foo.raw = cmd;
+
+      
       if(!(cmd & VDL_CONTROL))
         {
           const uint32_t idx = ((cmd & VDL_PEN_MASK) >> VDL_PEN_SHIFT);
