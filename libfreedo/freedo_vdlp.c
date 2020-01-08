@@ -114,7 +114,6 @@ typedef struct vdlp_datum_s vdlp_datum_t;
 
 static vdlp_datum_t vdl;
 static uint8_t *VRAM = NULL;
-static bool LOAD_CLUT = false;
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
 
@@ -168,7 +167,6 @@ void
 vdlp_execute_last_vdl(void)
 {
   LINE_DELAY = 511;
-  LOAD_CLUT  = false;
 }
 
 static
@@ -252,7 +250,7 @@ vdlp_execute_next_vdl(const uint32_t vdl_)
 
   CURRENTVDL = NEXTVDL;
   MODULO     = PIXELS_PER_LINE_MODULO[CLUTDMA.dmaw.modulo];
-  LOAD_CLUT  = ((LINE_DELAY = CLUTDMA.dmaw.lines) != 0);
+  LINE_DELAY = CLUTDMA.dmaw.lines;
 }
 
 static
@@ -370,7 +368,6 @@ freedo_vdlp_process_line(int           line_,
   line_ &= 0x07FF;
   if(line_ == 0)
     {
-      LOAD_CLUT  = true;
       LINE_DELAY = 0;
       CURRENTVDL = HEADVDL;
       vdlp_execute();
@@ -378,7 +375,7 @@ freedo_vdlp_process_line(int           line_,
 
   y = (line_ - 16);
 
-  if(LINE_DELAY == 0 /*&& LOAD_CLUT*/)
+  if(LINE_DELAY == 0)
     vdlp_execute();
 
   if((y >= 0) && (y < 240))
