@@ -42,6 +42,64 @@
 
 #define VRAM_OFFSET (1024 * 1024 * 2)
 
+/* Find details in docs: ppgfldr/ggsfldr/gpgfldr/4gpgd.html */
+typedef struct clut_dma_ctrl_word_s clut_dma_ctrl_word_s;
+struct clut_dma_ctrl_word_s
+{
+  uint32_t persist_len:9;        /* 0 - 8 */
+  uint32_t ctrl_word_cnt:6;      /* 9 - 14 */
+  uint32_t prev_bba_override:1;  /* 15 */
+  uint32_t curr_bba_override:1;  /* 16 */
+  uint32_t prev_bba_tick:1 ;     /* 17 */
+  uint32_t next_vdl_addr_type:1; /* 18 */
+  uint32_t vertical_mode:1;      /* 19 */
+  uint32_t padding0:1;           /* 20 */
+  uint32_t enable_dma:1;         /* 21 */
+  uint32_t padding1:1;           /* 22 */
+  uint32_t bba_incr_modulo:3;    /* 23 - 25 */
+  uint32_t padding2:6;           /* 26 - 31 */
+};
+
+union clut_dma_ctrl_word_u
+{
+  uint32_t raw;
+  clut_dma_ctrl_word_s cdcw;
+};
+
+/* ctrl_color == 0 if color value word */
+typedef struct clut_color_value_word_s clut_color_value_word_s;
+struct clut_color_value_word_s
+{
+  uint32_t blue:8;              /* 0 - 8 */
+  uint32_t green:8;             /* 8 - 15 */
+  uint32_t red:8;               /* 16 - 23 */
+  uint32_t addr:5;              /* 24 - 28 */
+  uint32_t rgb_enable:2;        /* 29 - 30 */
+  uint32_t ctrl_color:1;        /* 31 */
+};
+
+union clut_color_value_word_u
+{
+  uint32_t raw;
+  clut_color_value_word_s ccvw;
+};
+
+/* id == 0b11100000 if background value word */
+typedef struct clut_background_value_word_s clut_background_value_word_s;
+struct clut_background_value_word_s
+{
+  uint32_t blue:8;              /* 0 - 8 */
+  uint32_t green:8;             /* 8 - 15 */
+  uint32_t red:8;               /* 16 - 23 */
+  uint32_t id:8;                /* 24 - 31 */
+};
+
+union clut_background_value_word_u
+{
+  uint32_t raw;
+  clut_background_value_word_s cbvw;
+};
+
 struct cdmaw
 {
   uint32_t lines:9;             //0-8
@@ -58,27 +116,10 @@ struct cdmaw
   uint32_t pad2:6;              //26-31
 };
 
-/* DMA display-path reconfigure word */
-struct DMADPRW_s
-{
-  uint32_t VIoffline:1;
-  uint32_t ColrsOnly:1;
-  uint32_t HIon:1;
-  uint32_t VIon:1;
-  uint32_t blah:25;
-  uint32_t ctl_colr:3;
-};
-
 union CDMW
 {
   uint32_t     raw;
   struct cdmaw dmaw;
-};
-
-union DMADPRW
-{
-  uint32_t         raw;
-  struct DMADPRW_s dmadprw;
 };
 
 struct vdlp_datum_s
