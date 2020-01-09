@@ -164,14 +164,6 @@ vdlp_clut_reset(void)
 static
 INLINE
 void
-vdlp_execute_last_vdl(void)
-{
-  LINE_DELAY = 511;
-}
-
-static
-INLINE
-void
 vdlp_execute_next_vdl(const uint32_t vdl_)
 {
   int i;
@@ -261,9 +253,7 @@ vdlp_execute(void)
   uint32_t tmp;
 
   tmp = vram_read32(CURRENTVDL);
-  if(tmp == 0)  /* End of list */
-    vdlp_execute_last_vdl();
-  else
+  if(tmp)
     vdlp_execute_next_vdl(tmp);
 }
 
@@ -283,7 +273,7 @@ vdlp_process_line_320(int           line_,
       uint32_t *src;
 
       dst = line->line;
-      src = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF));
+      src = (uint32_t*)(VRAM + ((CURRENTBMP^2) & 0x0FFFFF));
 
       for(i = 0; i < 320; i++)
         *dst++ = *(uint16_t*)(src++);
@@ -359,6 +349,16 @@ vdlp_process_line(int           line_,
     vdlp_process_line_320(line_,frame_);
 }
 
+/* tick / increment bitmap-buffer address */
+static
+INLINE
+uint32_t
+tick_bba(const uint32_t bba_)
+{
+  return (bba_ + ((bba_ & 2) ? ((MODULO << 2) - 2) : 2));
+
+}
+
 void
 freedo_vdlp_process_line(int           line_,
                          vdlp_frame_t *frame_)
@@ -373,33 +373,27 @@ freedo_vdlp_process_line(int           line_,
       vdlp_execute();
     }
 
-  y = (line_ - 16);
-
   if(LINE_DELAY == 0)
     vdlp_execute();
 
+  y = (line_ - 16);
   if((y >= 0) && (y < 240))
     vdlp_process_line(y,frame_);
 
-  if(CURRENTBMP & 2)
-    CURRENTBMP += ((MODULO * 4) - 2);
-  else
-    CURRENTBMP += 2;
+  /*
+    See ppgfldr/ggsfldr/gpgfldr/2gpgb.html for details on the frame
+    buffer layout.
 
-  if(!CLUTDMA.dmaw.prevtick)
-    {
-      PREVIOUSBMP = CURRENTBMP;
-    }
-  else
-    {
-      if(PREVIOUSBMP & 2)
-        PREVIOUSBMP += ((MODULO * 4) - 2);
-      else
-        PREVIOUSBMP += 2;
-    }
+    320x240 by 16bit stored in "left/right" pairs. High order 16bits
+    represent X,Y and low order bits represent X,Y+1. Starting from
+    0,0 and going left to right and top to bottom to 319,239.
+  */
+
+  PREVIOUSBMP = ((CLUTDMA.dmaw.prevtick) ? tick_bba(PREVIOUSBMP) : CURRENTBMP);
+  CURRENTBMP  = tick_bba(CURRENTBMP);
 
   LINE_DELAY--;
-  OUTCONTROLL &= ~1; //Vioff1ln
+  OUTCONTROLL &= ~1; /* Vioff1ln: auto turn off vertical interpolation */
 }
 
 
@@ -407,9 +401,8 @@ void
 freedo_vdlp_init(uint8_t *vram_)
 {
   uint32_t i;
-
   static const uint32_t StartupVDL[]=
-    { // Startup VDL at address 0x2B0000
+    { /* Startup VDL at address 0x2B0000 */
       0x00004410, 0x002C0000, 0x002C0000, 0x002B0098,
       0x00000000, 0x01080808, 0x02101010, 0x03191919,
       0x04212121, 0x05292929, 0x06313131, 0x073A3A3A,
