@@ -105,6 +105,7 @@ typedef struct vdlp_datum_s vdlp_datum_t;
 #define CLUTDMA     vdl.CLUTDMA
 #define LINE_DELAY  vdl.line_delay
 
+static vdlp_t g_VDLP = {0};
 static vdlp_datum_t vdl;
 static uint8_t *VRAM = NULL;
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
