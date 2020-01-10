@@ -34,6 +34,7 @@
 #include "freedo_vdlp.h"
 #include "hack_flags.h"
 #include "inline.h"
+#include "static_assert.h"
 
 #include <boolean.h>
 
@@ -54,8 +55,8 @@
 typedef struct clut_dma_ctrl_word_s clut_dma_ctrl_word_s;
 struct clut_dma_ctrl_word_s
 {
-  uint32_t persist_len:9;        /* 0 - 8 */
-  uint32_t ctrl_word_cnt:6;      /* 9 - 14 */
+  uint32_t persist_len:9;        /*  8 - 0 */
+  uint32_t ctrl_word_cnt:6;      /* 14 - 9 */
   uint32_t prev_bba_override:1;  /* 15 */
   uint32_t curr_bba_override:1;  /* 16 */
   uint32_t prev_bba_tick:1 ;     /* 17 */
@@ -64,20 +65,20 @@ struct clut_dma_ctrl_word_s
   uint32_t padding0:1;           /* 20 */
   uint32_t enable_dma:1;         /* 21 */
   uint32_t padding1:1;           /* 22 */
-  uint32_t bba_incr_modulo:3;    /* 23 - 25 */
-  uint32_t padding2:6;           /* 26 - 31 */
+  uint32_t bba_incr_modulo:3;    /* 25 - 23 */
+  uint32_t padding2:6;           /* 31 - 26 */
 };
 
 /* ctrl_color == 0 if color value word */
 typedef struct color_value_word_s color_value_word_s;
 struct color_value_word_s
 {
-  uint32_t blue:8;              /* 0 - 8 */
-  uint32_t green:8;             /* 8 - 15 */
-  uint32_t red:8;               /* 16 - 23 */
-  uint32_t addr:5;              /* 24 - 28 */
-  uint32_t rgb_enable:2;        /* 29 - 30 */
-  uint32_t ctrl_color:1;        /* 31 */
+  uint32_t blue:8;              /*  7 - 0  */
+  uint32_t green:8;             /* 15 - 8  */
+  uint32_t red:8;               /* 23 - 16 */
+  uint32_t addr:5;              /* 28 - 24 */
+  uint32_t rgb_enable:2;        /* 30 - 29 */
+  uint32_t ctrl_color:1;        /* 31      */
 };
 
 
@@ -85,10 +86,10 @@ struct color_value_word_s
 typedef struct background_value_word_s background_value_word_s;
 struct background_value_word_s
 {
-  uint32_t blue:8;              /* 0 - 8 */
-  uint32_t green:8;             /* 8 - 15 */
-  uint32_t red:8;               /* 16 - 23 */
-  uint32_t id:8;                /* 24 - 31 */
+  uint32_t blue:8;              /*  7 - 0  */
+  uint32_t green:8;             /* 15 - 8  */
+  uint32_t red:8;               /* 23 - 16 */
+  uint32_t id:8;                /* 31 - 24 */
 };
 
 /* ctrl_color == 0x110 */
@@ -99,7 +100,7 @@ struct display_ctrl_word_s
   uint32_t colors_only:1;       /* 1 */
   uint32_t hi_on:1;             /* 2 */
   uint32_t vi_on:1;             /* 3 */
-  uint32_t line_blue_lsb:2;     /* 5- 4 */
+  uint32_t line_blue_lsb:2;     /* 5 - 4 */
   uint32_t line_hsrc:2;         /* 7 - 6 */
   uint32_t line_vsrc:2;         /* 9 - 8 */
   uint32_t swap_pen:1;          /* 10 */
@@ -145,6 +146,8 @@ union vdl_ctrl_word_u
   display_ctrl_word_s     dcw;
   av_output_ctrl_word_s   aocw;
 };
+
+STATIC_ASSERT(sizeof(clut_dma_ctrl_word_u) == sizeof(uint32_t),clut_dma_ctrl_word_not_4_bytes);
 
 struct cdmaw
 {
