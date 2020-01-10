@@ -80,6 +80,7 @@ struct color_value_word_s
   uint32_t ctrl_color:1;        /* 31 */
 };
 
+
 /* id == 0b11100000 if background value word */
 typedef struct background_value_word_s background_value_word_s;
 struct background_value_word_s
@@ -90,6 +91,7 @@ struct background_value_word_s
   uint32_t id:8;                /* 24 - 31 */
 };
 
+/* ctrl_color == 0x110 */
 typedef struct display_ctrl_word_s display_ctrl_word_s;
 struct display_ctrl_word_s
 {
@@ -97,17 +99,17 @@ struct display_ctrl_word_s
   uint32_t colors_only:1;       /* 1 */
   uint32_t hi_on:1;             /* 2 */
   uint32_t vi_on:1;             /* 3 */
-  uint32_t line_blue_lsb:2;     /* 4 - 5 */
-  uint32_t line_hsrc:2;         /* 6 - 7 */
-  uint32_t line_vsrc:2;         /* 8 - 9 */
+  uint32_t line_blue_lsb:2;     /* 5- 4 */
+  uint32_t line_hsrc:2;         /* 7 - 6 */
+  uint32_t line_vsrc:2;         /* 9 - 8 */
   uint32_t swap_pen:1;          /* 10 */
   uint32_t msb_replication:1;   /* 11 */
   uint32_t random:1;            /* 12 */
   uint32_t window_hi_on:1;      /* 13 */
   uint32_t window_vi_on:1;      /* 14 */
-  uint32_t window_blue_lsb:2;   /* 15 - 16 */
-  uint32_t window_hsrc:2;       /* 17 - 18 */
-  uint32_t window_vsrc:2;       /* 19 - 20 */
+  uint32_t window_blue_lsb:2;   /* 16 - 15 */
+  uint32_t window_hsrc:2;       /* 18 - 17 */
+  uint32_t window_vsrc:2;       /* 20 - 19 */
   uint32_t swap_hv:1;           /* 21 */
   uint32_t enable_bg_color_detector:1; /* 22 */
   uint32_t tran_true:1;         /* 23 */
@@ -116,7 +118,15 @@ struct display_ctrl_word_s
   uint32_t reserved:1;          /* 26 */
   uint32_t pal_ntsc:1;          /* 27 */
   uint32_t null:1;              /* 28 */
-  uint32_t ctrl_color:3;        /* 29 - 31 */
+  uint32_t ctrl_color:3;        /* 31 - 29 */
+};
+
+/* ctrl_color == 0x10 */
+typedef struct av_output_ctrl_word_s av_output_ctrl_word_s;
+struct av_output_ctrl_word_s
+{
+  uint32_t padding:30;          /* 29 - 0 */
+  uint32_t ctrl_color:2;        /* 31 - 30 */
 };
 
 typedef union clut_dma_ctrl_word_u clut_dma_ctrl_word_u;
@@ -133,6 +143,7 @@ union vdl_ctrl_word_u
   color_value_word_s      cvw;
   background_value_word_s bvw;
   display_ctrl_word_s     dcw;
+  av_output_ctrl_word_s   aocw;
 };
 
 struct cdmaw
