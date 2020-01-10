@@ -106,6 +106,7 @@ typedef struct vdlp_datum_s vdlp_datum_t;
 #define LINE_DELAY  vdl.line_delay
 
 static vdlp_t g_VDLP = {0};
+
 static vdlp_datum_t vdl;
 static uint8_t *VRAM = NULL;
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
@@ -140,9 +141,17 @@ static
 INLINE
 void
 vram_write32(const uint32_t addr_,
-             const uint32_t datum_)
+             const uint32_t val_)
 {
-  freedo_mem_write32((VRAM_OFFSET + (addr_ & 0x000FFFFF)),datum_);
+  freedo_mem_write32((VRAM_OFFSET + (addr_ & 0x000FFFFF)),val_);
+}
+
+static
+INLINE
+uint32_t
+vdl_read(const uint32_t off_)
+{
+  return vram_read32(g_VDLP.curr_vdl + (off_ << 2));
 }
 
 static
@@ -154,6 +163,35 @@ vdlp_clut_reset(void)
   memcpy(CLUTG,FIXED_CLUT,sizeof(FIXED_CLUT));
   memcpy(CLUTB,FIXED_CLUT,sizeof(FIXED_CLUT));
 }
+
+static
+INLINE
+void
+vdlp_process_vdl_entry(const uint32_t entry_)
+{
+  int i;
+  uint32_t next_entry;
+  clut_dma_ctrl_word_s *cdcw = &g_VDLP.clut_ctrl.cdcw;
+
+  g_VDLP.clut_ctrl.raw = entry_;
+
+  if(cdcw->curr_fba_override)
+    g_VDLP.curr_bmp = vdl_read(1);
+
+  if(cdcw->prev_fba_override)
+    g_VDLP.prev_bmp = vdl_read(2);
+
+  next_entry = vdl_read(3);
+  if(cdcw->next_vdl_addr_rel)
+    next_entry += (g_VDLP.curr_vdl + (4 * sizeof(uint32_t)));
+
+  for(i = 0; i < cdcw->ctrl_word_cnt; i++)
+    {
+
+    }
+}
+
+
 
 static
 INLINE
@@ -347,9 +385,9 @@ vdlp_process_line(int           line_,
 static
 INLINE
 uint32_t
-tick_bba(const uint32_t bba_)
+tick_fba(const uint32_t fba_)
 {
-  return (bba_ + ((bba_ & 2) ? ((MODULO << 2) - 2) : 2));
+  return (fba_ + ((fba_ & 2) ? ((MODULO << 2) - 2) : 2));
 
 }
 
@@ -383,8 +421,8 @@ freedo_vdlp_process_line(int           line_,
     0,0 and going left to right and top to bottom to 319,239.
   */
 
-  PREVIOUSBMP = ((CLUTDMA.dmaw.prevtick) ? tick_bba(PREVIOUSBMP) : CURRENTBMP);
-  CURRENTBMP  = tick_bba(CURRENTBMP);
+  PREVIOUSBMP = ((CLUTDMA.dmaw.prevtick) ? tick_fba(PREVIOUSBMP) : CURRENTBMP);
+  CURRENTBMP  = tick_fba(CURRENTBMP);
 
   LINE_DELAY--;
   OUTCONTROLL &= ~1; /* Vioff1ln: auto turn off vertical interpolation */

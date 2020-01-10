@@ -13,15 +13,15 @@ struct clut_dma_ctrl_word_s
 {
   uint32_t persist_len:9;        /*  8 - 0 */
   uint32_t ctrl_word_cnt:6;      /* 14 - 9 */
-  uint32_t prev_bba_override:1;  /* 15 */
-  uint32_t curr_bba_override:1;  /* 16 */
-  uint32_t prev_bba_tick:1 ;     /* 17 */
-  uint32_t next_vdl_addr_type:1; /* 18 */
+  uint32_t prev_fba_override:1;  /* 15 */
+  uint32_t curr_fba_override:1;  /* 16 */
+  uint32_t prev_fba_tick:1 ;     /* 17 */
+  uint32_t next_vdl_addr_rel:1; /* 18 */
   uint32_t vertical_mode:1;      /* 19 */
   uint32_t padding0:1;           /* 20 */
   uint32_t enable_dma:1;         /* 21 */
   uint32_t padding1:1;           /* 22 */
-  uint32_t bba_incr_modulo:3;    /* 25 - 23 */
+  uint32_t fba_incr_modulo:3;    /* 25 - 23 */
   uint32_t padding2:6;           /* 31 - 26 */
 };
 
