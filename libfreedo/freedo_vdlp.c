@@ -42,6 +42,14 @@
 
 #define VRAM_OFFSET (1024 * 1024 * 2)
 
+/* VDLP options */
+/*
+  - Output type (16bit, 24bit, 32bit) (move freedo_frame into vdlp)
+  - interpolation
+  - native vs 2x mode?
+  - Disable CLUT?
+ */
+
 /* Find details in docs: ppgfldr/ggsfldr/gpgfldr/4gpgd.html */
 typedef struct clut_dma_ctrl_word_s clut_dma_ctrl_word_s;
 struct clut_dma_ctrl_word_s
@@ -60,15 +68,9 @@ struct clut_dma_ctrl_word_s
   uint32_t padding2:6;           /* 26 - 31 */
 };
 
-union clut_dma_ctrl_word_u
-{
-  uint32_t raw;
-  clut_dma_ctrl_word_s cdcw;
-};
-
 /* ctrl_color == 0 if color value word */
-typedef struct clut_color_value_word_s clut_color_value_word_s;
-struct clut_color_value_word_s
+typedef struct color_value_word_s color_value_word_s;
+struct color_value_word_s
 {
   uint32_t blue:8;              /* 0 - 8 */
   uint32_t green:8;             /* 8 - 15 */
@@ -78,15 +80,9 @@ struct clut_color_value_word_s
   uint32_t ctrl_color:1;        /* 31 */
 };
 
-union clut_color_value_word_u
-{
-  uint32_t raw;
-  clut_color_value_word_s ccvw;
-};
-
 /* id == 0b11100000 if background value word */
-typedef struct clut_background_value_word_s clut_background_value_word_s;
-struct clut_background_value_word_s
+typedef struct background_value_word_s background_value_word_s;
+struct background_value_word_s
 {
   uint32_t blue:8;              /* 0 - 8 */
   uint32_t green:8;             /* 8 - 15 */
@@ -94,10 +90,49 @@ struct clut_background_value_word_s
   uint32_t id:8;                /* 24 - 31 */
 };
 
-union clut_background_value_word_u
+typedef struct display_ctrl_word_s display_ctrl_word_s;
+struct display_ctrl_word_s
+{
+  uint32_t vi_off_1_line:1;     /* 0 */
+  uint32_t colors_only:1;       /* 1 */
+  uint32_t hi_on:1;             /* 2 */
+  uint32_t vi_on:1;             /* 3 */
+  uint32_t line_blue_lsb:2;     /* 4 - 5 */
+  uint32_t line_hsrc:2;         /* 6 - 7 */
+  uint32_t line_vsrc:2;         /* 8 - 9 */
+  uint32_t swap_pen:1;          /* 10 */
+  uint32_t msb_replication:1;   /* 11 */
+  uint32_t random:1;            /* 12 */
+  uint32_t window_hi_on:1;      /* 13 */
+  uint32_t window_vi_on:1;      /* 14 */
+  uint32_t window_blue_lsb:2;   /* 15 - 16 */
+  uint32_t window_hsrc:2;       /* 17 - 18 */
+  uint32_t window_vsrc:2;       /* 19 - 20 */
+  uint32_t swap_hv:1;           /* 21 */
+  uint32_t enable_bg_color_detector:1; /* 22 */
+  uint32_t tran_true:1;         /* 23 */
+  uint32_t src_sel:1;           /* 24 */
+  uint32_t clut_bypass:1;       /* 25 */
+  uint32_t reserved:1;          /* 26 */
+  uint32_t pal_ntsc:1;          /* 27 */
+  uint32_t null:1;              /* 28 */
+  uint32_t ctrl_color:3;        /* 29 - 31 */
+};
+
+typedef union clut_dma_ctrl_word_u clut_dma_ctrl_word_u;
+union clut_dma_ctrl_word_u
 {
   uint32_t raw;
-  clut_background_value_word_s cbvw;
+  clut_dma_ctrl_word_s cdcw;
+};
+
+typedef union vdl_ctrl_word_u vdl_ctrl_word_u;
+union vdl_ctrl_word_u
+{
+  uint32_t raw;
+  color_value_word_s      cvw;
+  background_value_word_s bvw;
+  display_ctrl_word_s     dcw;
 };
 
 struct cdmaw
