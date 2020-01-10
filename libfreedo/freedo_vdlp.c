@@ -148,6 +148,7 @@ union vdl_ctrl_word_u
 };
 
 STATIC_ASSERT(sizeof(clut_dma_ctrl_word_u) == sizeof(uint32_t),clut_dma_ctrl_word_not_4_bytes);
+STATIC_ASSERT(sizeof(vdl_ctrl_word_u) == sizeof(uint32_t),vdl_ctrl_word_not_4_bytes);
 
 struct cdmaw
 {
