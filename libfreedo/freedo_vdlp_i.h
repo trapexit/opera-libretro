@@ -5,6 +5,8 @@
 
 #include <stdint.h>
 
+#define CLUT_LEN 32
+
 /* Find details in docs: ppgfldr/ggsfldr/gpgfldr/4gpgd.html */
 typedef struct clut_dma_ctrl_word_s clut_dma_ctrl_word_s;
 struct clut_dma_ctrl_word_s
@@ -91,6 +93,13 @@ union clut_dma_ctrl_word_u
   clut_dma_ctrl_word_s cdcw;
 };
 
+typedef union display_ctrl_word_u display_ctrl_word_u;
+union display_ctrl_word_u
+{
+  uint32_t raw;
+  display_ctrl_word_s dcw;
+};
+
 typedef union vdl_ctrl_word_u vdl_ctrl_word_u;
 union vdl_ctrl_word_u
 {
@@ -99,6 +108,22 @@ union vdl_ctrl_word_u
   background_value_word_s bvw;
   display_ctrl_word_s     dcw;
   av_output_ctrl_word_s   aocw;
+};
+
+typedef struct vdlp_s vdlp_t;
+struct vdlp_s
+{
+  uint8_t  clut_r[CLUT_LEN];
+  uint8_t  clut_g[CLUT_LEN];
+  uint8_t  clut_b[CLUT_LEN];
+  uint32_t background_color;
+  uint32_t head_vdl;
+  uint32_t curr_vdl;
+  uint32_t prev_bmp;
+  uint32_t curr_bmp;
+  clut_dma_ctrl_word_u clut_ctrl;
+  display_ctrl_word_u  disp_ctrl;
+  uint32_t line_cnt;
 };
 
 STATIC_ASSERT(sizeof(clut_dma_ctrl_word_u) == sizeof(uint32_t),clut_dma_ctrl_word_not_4_bytes);
