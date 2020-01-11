@@ -86,6 +86,13 @@ struct av_output_ctrl_word_s
   uint32_t ctrl_color:2;        /* 31 - 30 */
 };
 
+typedef union background_value_word_u background_value_word_u;
+union background_value_word_u
+{
+  uint32_t raw;
+  background_value_word_s bvw;
+};
+
 typedef union clut_dma_ctrl_word_u clut_dma_ctrl_word_u;
 union clut_dma_ctrl_word_u
 {
@@ -121,12 +128,19 @@ struct vdlp_s
   uint32_t curr_vdl;
   uint32_t prev_bmp;
   uint32_t curr_bmp;
-  clut_dma_ctrl_word_u clut_ctrl;
-  display_ctrl_word_u  disp_ctrl;
+  background_value_word_u bg_color;
+  clut_dma_ctrl_word_u    clut_ctrl;
+  display_ctrl_word_u     disp_ctrl;
   uint32_t line_cnt;
 };
 
-STATIC_ASSERT(sizeof(clut_dma_ctrl_word_u) == sizeof(uint32_t),clut_dma_ctrl_word_not_4_bytes);
-STATIC_ASSERT(sizeof(vdl_ctrl_word_u) == sizeof(uint32_t),vdl_ctrl_word_not_4_bytes);
+STATIC_ASSERT(sizeof(background_value_word_u) == sizeof(uint32_t),
+              background_value_word_not_4_bytes);
+STATIC_ASSERT(sizeof(clut_dma_ctrl_word_u) == sizeof(uint32_t),
+              clut_dma_ctrl_word_not_4_bytes);
+STATIC_ASSERT(sizeof(display_ctrl_word_u) == sizeof(uint32_t),
+              display_ctrl_word_not_4_bytes);
+STATIC_ASSERT(sizeof(vdl_ctrl_word_u) == sizeof(uint32_t),
+              vdl_ctrl_word_not_4_bytes);
 
 #endif /* FREEDO_VDLP_I_H_INCLUDED */

@@ -191,6 +191,54 @@ vdlp_clut_reset(void)
 static
 INLINE
 void
+vdlp_process_optional_cmds(const int ctrl_word_cnt_)
+{
+  int i;
+  int ignore;
+  vdl_ctrl_word_u cmd;
+
+  ignore = 1;
+  for(i = 0; i < ctrl_word_cnt_; i++)
+    {
+      cmd.raw = vdl_read(i);
+      switch((cmd.raw & 0xE0000000) >> 28)
+        {
+        case 0b000:
+        case 0b001:
+        case 0b010:
+        case 0b011:
+          vdl_set_clut(cmd);
+          break;
+        case 0b100:
+        case 0b101:
+          /*
+            Page 17 of US Patent 5,502,462
+
+            If bit 31 of an optional color/control word is one, and if
+            bit 30 is zero (10X), then the word contains control
+            information for an audio/video output circuit 105 (not
+            detailed herein) of the system. The audio/video processor
+            circuitry receives this word over the S-bus 123, and
+            forwards in to the audio/video output circuitry for
+            processing.
+          */
+          break;
+        case 0b110:
+          if(ignore)
+            continue;
+          g_VDLP.disp_ctrl.raw = cmd.raw;
+          ignore = cmd.dcw.colors_only;
+          break;
+        case 0b111:
+          g_VDLP.bg_color.raw = cmd.raw;
+          break;
+        }
+    }
+}
+
+static
+INLINE
+void
 vdlp_process_vdl_entry(const uint32_t entry_)
 {
   int i;
@@ -210,29 +258,7 @@ vdlp_process_vdl_entry(const uint32_t entry_)
     next_entry += (g_VDLP.curr_vdl + (4 * sizeof(uint32_t)));
 
   g_VDLP.curr_vdl += (4 * sizeof(uint32_t));
-  for(i = 0; i < cdcw->ctrl_word_cnt; i++)
-    {
-      vdl_ctrl_word_u cmd;
-
-      cmd.raw = vdl_read(i);
-
-      switch((cmd.raw & 0xE0000000) >> 28)
-        {
-        case 0b000:
-        case 0b001:
-        case 0b010:
-        case 0b011:
-          vdl_set_clut(cmd);
-          break;
-        case 0b100:
-        case 0b101:
-          break;
-        case 0b110:
-          break;
-        case 0b111:
-          break;
-        }
-    }
+  vdlp_process_optional_cmds(cdcw->ctrl_word_cnt);
 }
 
 
