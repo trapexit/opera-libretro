@@ -157,6 +157,14 @@ vdl_read(const uint32_t off_)
 static
 INLINE
 void
+vdl_set_clut(const vdl_ctrl_word_u cmd_)
+{
+  
+}
+
+static
+INLINE
+void
 vdlp_clut_reset(void)
 {
   memcpy(CLUTR,FIXED_CLUT,sizeof(FIXED_CLUT));
@@ -198,6 +206,7 @@ vdlp_process_vdl_entry(const uint32_t entry_)
         case 0b001:
         case 0b010:
         case 0b011:
+          vdlp_set_clut(cmd);
           break;
         case 0b100:
         case 0b101:
