@@ -159,7 +159,23 @@ INLINE
 void
 vdl_set_clut(const vdl_ctrl_word_u cmd_)
 {
-  
+  switch(cmd_.cvw.rgb_enable)
+    {
+    case 0b00:
+      g_VDLP.clut_r[cmd_.cvw.addr] = cmd_.cvw.red;
+      g_VDLP.clut_b[cmd_.cvw.addr] = cmd_.cvw.blue;
+      g_VDLP.clut_g[cmd_.cvw.addr] = cmd_.cvw.green;
+      break;
+    case 0b11:
+      g_VDLP.clut_r[cmd_.cvw.addr] = cmd_.cvw.red;
+      break;
+    case 0b01:
+      g_VDLP.clut_b[cmd_.cvw.addr] = cmd_.cvw.blue;
+      break;
+    case 0b10:
+      g_VDLP.clut_g[cmd_.cvw.addr] = cmd_.cvw.green;
+      break;
+    }
 }
 
 static
@@ -206,7 +222,7 @@ vdlp_process_vdl_entry(const uint32_t entry_)
         case 0b001:
         case 0b010:
         case 0b011:
-          vdlp_set_clut(cmd);
+          vdl_set_clut(cmd);
           break;
         case 0b100:
         case 0b101:
