@@ -185,9 +185,28 @@ vdlp_process_vdl_entry(const uint32_t entry_)
   if(cdcw->next_vdl_addr_rel)
     next_entry += (g_VDLP.curr_vdl + (4 * sizeof(uint32_t)));
 
+  g_VDLP.curr_vdl += (4 * sizeof(uint32_t));
   for(i = 0; i < cdcw->ctrl_word_cnt; i++)
     {
+      vdl_ctrl_word_u cmd;
 
+      cmd.raw = vdl_read(i);
+
+      switch((cmd.raw & 0xE0000000) >> 28)
+        {
+        case 0b000:
+        case 0b001:
+        case 0b010:
+        case 0b011:
+          break;
+        case 0b100:
+        case 0b101:
+          break;
+        case 0b110:
+          break;
+        case 0b111:
+          break;
+        }
     }
 }
 
