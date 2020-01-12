@@ -357,11 +357,6 @@ freedo_vdlp_process_line(int           line_,
     represent X,Y and low order bits represent X,Y+1. Starting from
     0,0 and going left to right and top to bottom to 319,239.
   */
-
-  printf("p: %.8x; c: %.8x\n",
-         g_VDLP.prev_bmp,
-         g_VDLP.curr_bmp);
-
   g_VDLP.prev_bmp = ((g_VDLP.clut_ctrl.cdcw.prev_fba_tick) ?
                      tick_fba(g_VDLP.prev_bmp) : g_VDLP.curr_bmp);
   g_VDLP.curr_bmp = tick_fba(g_VDLP.curr_bmp);
