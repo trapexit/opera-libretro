@@ -57,7 +57,10 @@
 
 static vdlp_t   g_VDLP = {0};
 static uint8_t *VRAM   = NULL;
-static void    *BUF    = NULL;
+static void    *g_BUF    = NULL;
+static uint32_t g_BUF_WIDTH  = 320;
+static uint32_t g_BUF_HEIGHT = 240;
+static void (*g_RENDERER)(int) = NULL;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
@@ -282,7 +285,7 @@ vdlp_render_line_320_0RGB1555(int line_)
 
   fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
 
-  dst = BUF;
+  dst = g_BUF;
   dst += (line_ * 320);
   src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
@@ -364,7 +367,7 @@ vdlp_render_line_320_RGB565(int line_)
 
   fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
 
-  dst = BUF;
+  dst = g_BUF;
   dst += (line_ * 320);
   src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
@@ -388,7 +391,7 @@ vdlp_render_line_320_XRGB8888(int line_)
 
   fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
 
-  dst = BUF;
+  dst = g_BUF;
   dst += (line_ * 320);
   src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
@@ -553,7 +556,6 @@ freedo_vdlp_init(uint8_t *vram_)
     };
 
   VRAM = vram_;
-  BUF  = malloc(4 * 320 * 240);
   g_VDLP.head_vdl = 0xB0000;
 
   for(i = 0; i < (sizeof(StartupVDL)/sizeof(uint32_t)); i++)
@@ -590,4 +592,43 @@ void*
 freedo_vdlp_buffer(void)
 {
   return BUF;
+}
+
+int
+freedo_vdlp_configure(void                *buf_,
+                      vdlp_pixel_format_e  pf_,
+                      vdlp_pixel_res_e     res_,
+                      uint32_t             flags_)
+{
+  g_BUF = buf_;
+
+  switch(res_)
+    {
+    case VDLP_PIXEL_RES_320x240:
+      g_BUF_WIDTH  = 320;
+      g_BUF_HEIGHT = 240;
+      break;
+    case VDLP_PIXEL_RES_384x288:
+      g_BUF_WIDTH  = 384;
+      g_BUF_HEIGHT = 288;
+      break;
+    case VDLP_PIXEL_RES_640x480:
+      g_BUF_WIDTH  = 640;
+      g_BUF_HEIGHT = 480;
+      break;
+    case VDLP_PIXEL_RES_768x576:
+      g_BUF_WIDTH  = 768;
+      g_BUF_HEIGHT = 576;
+      break;
+    }
+
+  switch(pf_)
+    {
+    case VDLP_PIXEL_FORMAT_0RGB1555:
+      break;
+    case VDLP_PIXEL_FORMAT_RGB565:
+      break;
+    case VDLP_PIXEL_FORMAT_XRGB8888:
+      break;
+    }
 }

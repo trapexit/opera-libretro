@@ -57,6 +57,23 @@ struct vdlp_frame_s
   unsigned int src_h;
 };
 
+typedef enum vdlp_pixel_format_e vdlp_pixel_format_e;
+enum vdlp_pixel_format_e
+  {
+    VDLP_PIXEL_FORMAT_0RGB1555,
+    VDLP_PIXEL_FORMAT_XRGB8888,
+    VDLP_PIXEL_FORMAT_RGB565
+  };
+
+typedef enum vdlp_pixel_res_e vdlp_pixel_res_e;
+enum vdlp_pixel_res_e
+  {
+    VDLP_PIXEL_RES_320x240,
+    VDLP_PIXEL_RES_384x288,
+    VDLP_PIXEL_RES_640x480,
+    VDLP_PIXEL_RES_768x576
+  };
+
 EXTERN_C_BEGIN
 
 void     freedo_vdlp_init(uint8_t *vram_);
@@ -70,6 +87,11 @@ void     freedo_vdlp_state_load(const void *buf_);
 
 void     freedo_vdlp_output_buffer_bpp(uint32_t bpp_);
 void    *freedo_vdlp_buffer(void);
+
+int      freedo_vdlp_configure(void *buf,
+                               vdlp_pixel_format_e pf,
+                               vdlp_pixel_res_e res,
+                               uint32_t flags_);
 
 EXTERN_C_END
 
