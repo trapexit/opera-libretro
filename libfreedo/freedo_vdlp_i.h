@@ -42,9 +42,9 @@ struct color_value_word_s
 typedef struct background_value_word_s background_value_word_s;
 struct background_value_word_s
 {
-  uint32_t blue:8;              /*  7 - 0  */
-  uint32_t green:8;             /* 15 - 8  */
-  uint32_t red:8;               /* 23 - 16 */
+  uint32_t b:8;                 /*  7 - 0  */
+  uint32_t g:8;                 /* 15 - 8  */
+  uint32_t r:8;                 /* 23 - 16 */
   uint32_t id:8;                /* 31 - 24 */
 };
 

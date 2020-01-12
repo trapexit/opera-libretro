@@ -624,7 +624,7 @@ retro_load_game(const struct retro_game_info *info_)
   enum retro_pixel_format fmt;
 
   fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-  //  fmt = RETRO_PIXEL_FORMAT_0RGB1555;
+  fmt = RETRO_PIXEL_FORMAT_0RGB1555;
   rv = retro_environment_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,&fmt);
   if(rv == 0)
     {
@@ -800,5 +800,5 @@ retro_run(void)
 
   lr_dsp_upload();
 
-  retro_video_refresh_cb(VIDEO_BUFFER,VIDEO_WIDTH,VIDEO_HEIGHT,VIDEO_WIDTH << 2);
+  retro_video_refresh_cb(VIDEO_BUFFER,VIDEO_WIDTH,VIDEO_HEIGHT,VIDEO_WIDTH << 1);
 }

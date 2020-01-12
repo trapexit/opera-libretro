@@ -51,6 +51,8 @@
   - interpolation
   - native vs 2x mode?
   - Disable CLUT?
+  - Add pseudo random 3bit pattern for second clut bypass mode
+  - table lookup vs shift left 3?
  */
 
 static vdlp_t   g_VDLP = {0};
@@ -227,7 +229,49 @@ vdlp_execute(void)
 
 static
 INLINE
-vdlp_render_line(int line_)
+vdlp_render_line_320_0RGB1555(int line_)
+{
+  int x;
+  int fixed_clut;
+  uint16_t *src;
+  uint16_t *dst;
+
+  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
+    return;
+
+  fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+
+  dst = BUF;
+  dst += (line_ * 320);
+  src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+
+  for(x = 0; x < 320; x++)
+    {
+      if(*src == 0)
+        {
+          *dst = (((g_VDLP.bg_color.bvw.r >> 3) << 0xA) |
+                  ((g_VDLP.bg_color.bvw.g >> 3) << 0x5) |
+                  ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
+        }
+      else if(fixed_clut && (*src & 0x8000))
+        {
+          *dst = (*src & 0x7FFF);
+        }
+      else
+        {
+          *dst = (((g_VDLP.clut_r[(*src >> 0xA) & 0x1F] >> 3) << 0xA) |
+                  ((g_VDLP.clut_g[(*src >> 0x5) & 0x1F] >> 3) << 0x5) |
+                  ((g_VDLP.clut_b[(*src >> 0x0) & 0x1F] >> 3) << 0x0));
+        }
+
+      dst += 1;
+      src += 2;
+    }
+}
+
+static
+INLINE
+vdlp_render_line_320_XRGB8888(int line_)
 {
   int x;
   int fixed_clut;
@@ -236,7 +280,7 @@ vdlp_render_line(int line_)
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return;
-  
+
   fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
 
   dst = BUF;
@@ -327,7 +371,8 @@ vdlp_process_line(int           line_,
   /* else */
   /*   vdlp_process_line_320(line_,frame_); */
 
-  vdlp_render_line(line_);
+  //vdlp_render_line_320_XRGB8888(line_);
+  vdlp_render_line_320_0RGB1555(line_);
 }
 
 /* tick / increment frame buffer address */
