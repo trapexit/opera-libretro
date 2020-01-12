@@ -37,27 +37,25 @@
 
 #include <stdint.h>
 
+typedef struct vdlp_line_s vdlp_line_t;
 struct vdlp_line_s
 {
   uint16_t line[640];
-  uint8_t  xCLUTB[32];
-  uint8_t  xCLUTG[32];
-  uint8_t  xCLUTR[32];
-  uint32_t xOUTCONTROLL;
-  uint32_t xCLUTDMA;
-  uint32_t xBACKGROUND;
+  uint8_t  clut_r[32];
+  uint8_t  clut_g[32];  
+  uint8_t  clut_b[32];
+  uint32_t clut_ctrl;
+  uint32_t disp_ctrl;
+  uint32_t background;
 };
 
-typedef struct vdlp_line_s vdlp_line_t;
-
+typedef struct vdlp_frame_s vdlp_frame_t;
 struct vdlp_frame_s
 {
   vdlp_line_t  lines[480];
   unsigned int src_w;
   unsigned int src_h;
 };
-
-typedef struct vdlp_frame_s vdlp_frame_t;
 
 EXTERN_C_BEGIN
 

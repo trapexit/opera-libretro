@@ -176,7 +176,7 @@ vdlp_process_optional_cmds(const int ctrl_word_cnt_)
           ignore = cmd.dcw.colors_only;
           break;
         case 0b111:
-          //          g_VDLP.bg_color.raw = cmd.raw;
+          g_VDLP.bg_color.raw = cmd.raw;
           break;
         }
     }
@@ -244,14 +244,14 @@ vdlp_process_line_320(int           line_,
       for(i = 0; i < 320; i++)
         *dst++ = *(uint16_t*)(src++);
 
-      memcpy(line->xCLUTR,g_VDLP.clut_r,sizeof(g_VDLP.clut_r));
-      memcpy(line->xCLUTG,g_VDLP.clut_g,sizeof(g_VDLP.clut_g));
-      memcpy(line->xCLUTB,g_VDLP.clut_b,sizeof(g_VDLP.clut_b));
+      memcpy(line->clut_r,g_VDLP.clut_r,sizeof(g_VDLP.clut_r));
+      memcpy(line->clut_g,g_VDLP.clut_g,sizeof(g_VDLP.clut_g));
+      memcpy(line->clut_b,g_VDLP.clut_b,sizeof(g_VDLP.clut_b));
     }
 
-  line->xOUTCONTROLL = g_VDLP.disp_ctrl.raw;
-  line->xCLUTDMA     = g_VDLP.clut_ctrl.raw;
-  line->xBACKGROUND  = g_VDLP.bg_color.raw;
+  line->disp_ctrl  = g_VDLP.disp_ctrl.raw;
+  line->clut_ctrl  = g_VDLP.clut_ctrl.raw;
+  line->background = g_VDLP.bg_color.raw;
 }
 
 static
@@ -290,17 +290,17 @@ vdlp_process_line_640(int           line_,
           *dst2++ = *(uint16_t*)(src4++);
         }
 
-      /* memcpy(line0->xCLUTR,CLUTR,32); */
-      /* memcpy(line0->xCLUTG,CLUTG,32); */
-      /* memcpy(line0->xCLUTB,CLUTB,32); */
-      /* memcpy(line1->xCLUTR,CLUTR,32); */
-      /* memcpy(line1->xCLUTG,CLUTG,32); */
-      /* memcpy(line1->xCLUTB,CLUTB,32); */
+      memcpy(line0->clut_r,g_VDLP.clut_r,32);
+      memcpy(line0->clut_g,g_VDLP.clut_g,32);
+      memcpy(line0->clut_b,g_VDLP.clut_b,32);
+      memcpy(line1->clut_r,g_VDLP.clut_r,32);
+      memcpy(line1->clut_g,g_VDLP.clut_g,32);
+      memcpy(line1->clut_b,g_VDLP.clut_b,32);
     }
 
-  line0->xOUTCONTROLL = line1->xOUTCONTROLL = g_VDLP.disp_ctrl.raw;
-  line0->xCLUTDMA     = line1->xCLUTDMA     = g_VDLP.clut_ctrl.raw;
-  line0->xBACKGROUND  = line1->xBACKGROUND  = g_VDLP.bg_color.raw;
+  line0->disp_ctrl  = line1->disp_ctrl  = g_VDLP.disp_ctrl.raw;
+  line0->clut_ctrl  = line1->clut_ctrl  = g_VDLP.clut_ctrl.raw;
+  line0->background = line1->background = g_VDLP.bg_color.raw;
 }
 
 static
