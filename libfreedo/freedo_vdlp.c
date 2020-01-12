@@ -40,6 +40,7 @@
 #include <boolean.h>
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define VRAM_OFFSET (1024 * 1024 * 2)
@@ -54,6 +55,7 @@
 
 static vdlp_t   g_VDLP = {0};
 static uint8_t *VRAM   = NULL;
+static void *BUF = NULL;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
@@ -225,33 +227,44 @@ vdlp_execute(void)
 
 static
 INLINE
-void
-vdlp_process_line_320(int           line_,
-                      vdlp_frame_t *frame_)
+vdlp_render_line(int line_)
 {
-  vdlp_line_t *line;
+  int x;
+  int fixed_clut;
+  uint16_t *src;
+  uint32_t *dst;
 
-  line = &frame_->lines[line_];
-  if(g_VDLP.clut_ctrl.cdcw.enable_dma)
+  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
+    return;
+  
+  fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+
+  dst = BUF;
+  dst += (line_ * 320);
+  src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+
+  for(x = 0; x < 320; x++)
     {
-      int i;
-      uint16_t *dst;
-      uint32_t *src;
+      if(*src == 0)
+        {
+          *dst = g_VDLP.bg_color.raw;
+        }
+      else if(fixed_clut && (*src & 0x8000))
+        {
+          *dst = ((FIXED_CLUT[(*src >> 0x0) & 0x1F] << 0x00) |
+                  (FIXED_CLUT[(*src >> 0x5) & 0x1F] << 0x08) |
+                  (FIXED_CLUT[(*src >> 0xA) & 0x1F] << 0x10));
+        }
+      else
+        {
+          *dst = ((g_VDLP.clut_b[(*src >> 0x0) & 0x1F] << 0x00) |
+                  (g_VDLP.clut_g[(*src >> 0x5) & 0x1F] << 0x08) |
+                  (g_VDLP.clut_r[(*src >> 0xA) & 0x1F] << 0x10));
+        }
 
-      dst = line->line;
-      src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-
-      for(i = 0; i < 320; i++)
-        *dst++ = *(uint16_t*)(src++);
-
-      memcpy(line->clut_r,g_VDLP.clut_r,sizeof(g_VDLP.clut_r));
-      memcpy(line->clut_g,g_VDLP.clut_g,sizeof(g_VDLP.clut_g));
-      memcpy(line->clut_b,g_VDLP.clut_b,sizeof(g_VDLP.clut_b));
+      dst += 1;
+      src += 2;
     }
-
-  line->disp_ctrl  = g_VDLP.disp_ctrl.raw;
-  line->clut_ctrl  = g_VDLP.clut_ctrl.raw;
-  line->background = g_VDLP.bg_color.raw;
 }
 
 static
@@ -309,10 +322,12 @@ void
 vdlp_process_line(int           line_,
                   vdlp_frame_t *frame_)
 {
-  if(HIRESMODE)
-    vdlp_process_line_640(line_,frame_);
-  else
-    vdlp_process_line_320(line_,frame_);
+  /* if(HIRESMODE) */
+  /*   vdlp_process_line_640(line_,frame_); */
+  /* else */
+  /*   vdlp_process_line_320(line_,frame_); */
+
+  vdlp_render_line(line_);
 }
 
 /* tick / increment frame buffer address */
@@ -387,6 +402,7 @@ freedo_vdlp_init(uint8_t *vram_)
     };
 
   VRAM = vram_;
+  BUF  = malloc(4 * 320 * 240);
   g_VDLP.head_vdl = 0xB0000;
 
   for(i = 0; i < (sizeof(StartupVDL)/sizeof(uint32_t)); i++)
@@ -417,4 +433,10 @@ void
 freedo_vdlp_state_load(const void *buf_)
 {
   //memcpy(&vdl,buf_,sizeof(vdlp_datum_t));
+}
+
+void*
+freedo_vdlp_buffer(void)
+{
+  return BUF;
 }

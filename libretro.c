@@ -182,8 +182,8 @@ libfreedo_callback(int   cmd_,
   switch(cmd_)
     {
     case EXT_SWAPFRAME:
-      freedo_frame_get_bitmap_xrgb_8888(FRAME,VIDEO_BUFFER,VIDEO_WIDTH,VIDEO_HEIGHT);
-      return FRAME;
+      memcpy(VIDEO_BUFFER,freedo_vdlp_buffer(),4 * 320 * 240);
+      break;
     case EXT_DSP_TRIGGER:
       lr_dsp_process();
       break;
@@ -624,6 +624,7 @@ retro_load_game(const struct retro_game_info *info_)
   enum retro_pixel_format fmt;
 
   fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+  //  fmt = RETRO_PIXEL_FORMAT_0RGB1555;
   rv = retro_environment_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,&fmt);
   if(rv == 0)
     {

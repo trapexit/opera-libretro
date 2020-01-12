@@ -42,7 +42,7 @@ struct vdlp_line_s
 {
   uint16_t line[640];
   uint8_t  clut_r[32];
-  uint8_t  clut_g[32];  
+  uint8_t  clut_g[32];
   uint8_t  clut_b[32];
   uint32_t clut_ctrl;
   uint32_t disp_ctrl;
@@ -67,6 +67,9 @@ void     freedo_vdlp_process_line(int line_, vdlp_frame_t *frame_);
 uint32_t freedo_vdlp_state_size(void);
 void     freedo_vdlp_state_save(void *buf_);
 void     freedo_vdlp_state_load(const void *buf_);
+
+void     freedo_vdlp_output_buffer_bpp(uint32_t bpp_);
+void    *freedo_vdlp_buffer(void);
 
 EXTERN_C_END
 

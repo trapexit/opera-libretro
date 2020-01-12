@@ -35,7 +35,7 @@ freedo_frame_get_bitmap_xrgb_8888(const vdlp_frame_t *src_frame_,
     {
       const vdlp_line_t *line       = &src_frame_->lines[y];
       const uint16_t    *pixel      = line->line;
-      const int          fixed_clut = (line->xOUTCONTROLL & 0x02000000);
+      const int          fixed_clut = (line->disp_ctrl & 0x02000000);
 
       for(x = 0; x < width_; x++)
         {
@@ -53,7 +53,7 @@ freedo_frame_get_bitmap_xrgb_8888(const vdlp_frame_t *src_frame_,
                 xBACKGROUND is clearly defined and set as 32bit in the
                 VDLP module. Hense the change below.
               */
-              *dest_ = line->xBACKGROUND;
+              *dest_ = line->background;
             }
           else if(fixed_clut && (pixel[x] & 0x8000))
             {
@@ -63,9 +63,9 @@ freedo_frame_get_bitmap_xrgb_8888(const vdlp_frame_t *src_frame_,
             }
           else
             {
-              *dest_ = ((line->xCLUTB[(pixel[x] >>  0) & 0x1F] << 0) |
-                        (line->xCLUTG[(pixel[x] >>  5) & 0x1F] << 8) |
-                        (line->xCLUTR[(pixel[x] >> 10) & 0x1F] << 16));
+              *dest_ = ((line->clut_b[(pixel[x] >>  0) & 0x1F] << 0) |
+                        (line->clut_g[(pixel[x] >>  5) & 0x1F] << 8) |
+                        (line->clut_r[(pixel[x] >> 10) & 0x1F] << 16));
             }
 
           dest_++;;
