@@ -57,27 +57,10 @@
 
 static vdlp_t   g_VDLP = {0};
 static uint8_t *VRAM   = NULL;
-static void *BUF = NULL;
+static void    *BUF    = NULL;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
-
-/*
-  for(int i = 0; i < 32; i++)
-    FIXED_CLUT[i] = (((i & 0x1F) << 3) | ((i >> 2) & 7));
-*/
-static const uint8_t FIXED_CLUT[32] =
-  {
-    0x00, 0x08, 0x10, 0x18,
-    0x21, 0x29, 0x31, 0x39,
-    0x42, 0x4A, 0x52, 0x5A,
-    0x63, 0x6B, 0x73, 0x7B,
-    0x84, 0x8C, 0x94, 0x9C,
-    0xA5, 0xAD, 0xB5, 0xBD,
-    0xC6, 0xCE, 0xD6, 0xDE,
-    0xE7, 0xEF, 0xF7, 0xFF
-  };
-
 
 static
 INLINE
@@ -112,18 +95,18 @@ vdl_set_clut(const vdl_ctrl_word_u cmd_)
   switch(cmd_.cvw.rgb_enable)
     {
     case 0b00:
-      g_VDLP.clut_r[cmd_.cvw.addr] = cmd_.cvw.red;
-      g_VDLP.clut_b[cmd_.cvw.addr] = cmd_.cvw.blue;
-      g_VDLP.clut_g[cmd_.cvw.addr] = cmd_.cvw.green;
+      g_VDLP.clut_r[cmd_.cvw.addr] = cmd_.cvw.r;
+      g_VDLP.clut_b[cmd_.cvw.addr] = cmd_.cvw.b;
+      g_VDLP.clut_g[cmd_.cvw.addr] = cmd_.cvw.g;
       break;
     case 0b11:
-      g_VDLP.clut_r[cmd_.cvw.addr] = cmd_.cvw.red;
+      g_VDLP.clut_r[cmd_.cvw.addr] = cmd_.cvw.r;
       break;
     case 0b01:
-      g_VDLP.clut_b[cmd_.cvw.addr] = cmd_.cvw.blue;
+      g_VDLP.clut_b[cmd_.cvw.addr] = cmd_.cvw.b;
       break;
     case 0b10:
-      g_VDLP.clut_g[cmd_.cvw.addr] = cmd_.cvw.green;
+      g_VDLP.clut_g[cmd_.cvw.addr] = cmd_.cvw.g;
       break;
     }
 }
@@ -144,10 +127,10 @@ void
 vdlp_process_optional_cmds(const int ctrl_word_cnt_)
 {
   int i;
-  int ignore;
+  int colors_only;
   vdl_ctrl_word_u cmd;
 
-  ignore = 1;
+  colors_only = 0;
   for(i = 0; i < ctrl_word_cnt_; i++)
     {
       cmd.raw = vdl_read(i);
@@ -174,10 +157,10 @@ vdlp_process_optional_cmds(const int ctrl_word_cnt_)
           */
           break;
         case 0b110:
-          if(ignore)
+          if(colors_only)
             continue;
           g_VDLP.disp_ctrl.raw = cmd.raw;
-          ignore = cmd.dcw.colors_only;
+          colors_only = cmd.dcw.colors_only;
           break;
         case 0b111:
           g_VDLP.bg_color.raw = cmd.raw;

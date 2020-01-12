@@ -29,9 +29,9 @@ struct clut_dma_ctrl_word_s
 typedef struct color_value_word_s color_value_word_s;
 struct color_value_word_s
 {
-  uint32_t blue:8;              /*  7 - 0  */
-  uint32_t green:8;             /* 15 - 8  */
-  uint32_t red:8;               /* 23 - 16 */
+  uint32_t b:8;              /*  7 - 0  */
+  uint32_t g:8;             /* 15 - 8  */
+  uint32_t r:8;               /* 23 - 16 */
   uint32_t addr:5;              /* 28 - 24 */
   uint32_t rgb_enable:2;        /* 30 - 29 */
   uint32_t ctrl_color:1;        /* 31      */
