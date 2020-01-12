@@ -52,63 +52,9 @@
   - Disable CLUT?
  */
 
-struct cdmaw
-{
-  uint32_t lines:9;             //0-8
-  uint32_t numword:6;           //9-14
-  uint32_t prevover:1;          //15
-  uint32_t currover:1;          //16
-  uint32_t prevtick:1;          //17
-  uint32_t abs:1;               //18
-  uint32_t vmode:1;             //19
-  uint32_t pad0:1;              //20
-  uint32_t enadma:1;            //21
-  uint32_t pad1:1;              //22
-  uint32_t modulo:3;            //23-25
-  uint32_t pad2:6;              //26-31
-};
+static vdlp_t   g_VDLP = {0};
+static uint8_t *VRAM   = NULL;
 
-union CDMW
-{
-  uint32_t     raw;
-  struct cdmaw dmaw;
-};
-
-struct vdlp_datum_s
-{
-  uint8_t    CLUTB[32];
-  uint8_t    CLUTG[32];
-  uint8_t    CLUTR[32];
-  uint32_t   BACKGROUND;
-  uint32_t   HEADVDL;
-  uint32_t   MODULO;
-  uint32_t   CURRENTVDL;
-  uint32_t   CURRENTBMP;
-  uint32_t   PREVIOUSBMP;
-  uint32_t   OUTCONTROLL;
-  union CDMW CLUTDMA;
-  int        line_delay;
-};
-
-typedef struct vdlp_datum_s vdlp_datum_t;
-
-#define CLUTB       vdl.CLUTB
-#define CLUTG       vdl.CLUTG
-#define CLUTR       vdl.CLUTR
-#define BACKGROUND  vdl.BACKGROUND
-#define HEADVDL     vdl.HEADVDL
-#define MODULO      vdl.MODULO
-#define CURRENTVDL  vdl.CURRENTVDL
-#define CURRENTBMP  vdl.CURRENTBMP
-#define PREVIOUSBMP vdl.PREVIOUSBMP
-#define OUTCONTROLL vdl.OUTCONTROLL
-#define CLUTDMA     vdl.CLUTDMA
-#define LINE_DELAY  vdl.line_delay
-
-static vdlp_t g_VDLP = {0};
-
-static vdlp_datum_t vdl;
-static uint8_t *VRAM = NULL;
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
 
@@ -183,9 +129,9 @@ INLINE
 void
 vdlp_clut_reset(void)
 {
-  memcpy(CLUTR,FIXED_CLUT,sizeof(FIXED_CLUT));
-  memcpy(CLUTG,FIXED_CLUT,sizeof(FIXED_CLUT));
-  memcpy(CLUTB,FIXED_CLUT,sizeof(FIXED_CLUT));
+  /* memcpy(CLUTR,FIXED_CLUT,sizeof(FIXED_CLUT)); */
+  /* memcpy(CLUTG,FIXED_CLUT,sizeof(FIXED_CLUT)); */
+  /* memcpy(CLUTB,FIXED_CLUT,sizeof(FIXED_CLUT)); */
 }
 
 static
@@ -258,96 +204,11 @@ vdlp_process_vdl_entry(const uint32_t entry_)
     next_entry += (g_VDLP.curr_vdl + (4 * sizeof(uint32_t)));
 
   g_VDLP.curr_vdl += (4 * sizeof(uint32_t));
+
   vdlp_process_optional_cmds(cdcw->ctrl_word_cnt);
 
   g_VDLP.curr_vdl = next_entry;
   g_VDLP.line_cnt = cdcw->persist_len;
-}
-
-
-
-static
-INLINE
-void
-vdlp_execute_next_vdl(const uint32_t vdl_)
-{
-  int i;
-  int numcmd;
-  uint32_t NEXTVDL;
-  uint32_t ignore_flag;
-
-  ignore_flag = 0;
-  CLUTDMA.raw = vdl_;
-
-  if(CLUTDMA.dmaw.currover)
-    CURRENTBMP = ((FIXMODE & FIX_BIT_TIMING_5) ?
-                  vram_read32(CURRENTVDL+8) :
-                  vram_read32(CURRENTVDL+4));
-
-  if(CLUTDMA.dmaw.prevover)
-    PREVIOUSBMP = ((FIXMODE & FIX_BIT_TIMING_5) ?
-                   vram_read32(CURRENTVDL+4) :
-                   vram_read32(CURRENTVDL+8));
-
-  NEXTVDL = ((CLUTDMA.dmaw.abs) ?
-             (CURRENTVDL+vram_read32(CURRENTVDL+12)+16) :
-             vram_read32(CURRENTVDL+12));
-
-  CURRENTVDL += 16;
-
-  numcmd = CLUTDMA.dmaw.numword;
-  for(i = 0; i < numcmd; i++)
-    {
-      uint32_t cmd;
-
-      cmd = vram_read32(CURRENTVDL);
-      CURRENTVDL += 4;
-
-      if(!(cmd & VDL_CONTROL))
-        {
-          const uint32_t idx = ((cmd & VDL_PEN_MASK) >> VDL_PEN_SHIFT);
-
-          switch(cmd & VDL_RGBCTL_MASK)
-            {
-            case VDL_FULLRGB:
-              CLUTR[idx] = ((cmd & VDL_R_MASK) >> VDL_R_SHIFT);
-              CLUTG[idx] = ((cmd & VDL_G_MASK) >> VDL_G_SHIFT);
-              CLUTB[idx] = ((cmd & VDL_B_MASK) >> VDL_B_SHIFT);
-              break;
-            case VDL_REDONLY:
-              CLUTR[idx] = ((cmd & VDL_R_MASK) >> VDL_R_SHIFT);
-              break;
-            case VDL_GREENONLY:
-              CLUTG[idx] = ((cmd & VDL_G_MASK) >> VDL_G_SHIFT);
-              break;
-            case VDL_BLUEONLY:
-              CLUTB[idx] = ((cmd & VDL_B_MASK) >> VDL_B_SHIFT);
-              break;
-            }
-        }
-      else if(!ignore_flag)
-        {
-          if((cmd & 0xFF000000) == VDL_BACKGROUND)
-            {
-              BACKGROUND = (((cmd & 0x000000FF) << 16) |
-                            ((cmd & 0x0000FF00) <<  0) |
-                            ((cmd & 0x00FF0000) >> 16));
-            }
-          else if((cmd & 0xE0000000) == 0xC0000000)
-            {
-              OUTCONTROLL = cmd;
-              ignore_flag = (OUTCONTROLL & 2);
-            }
-          else if(cmd == 0xFFFFFFFF)
-            {
-              vdlp_clut_reset();
-            }
-        }
-    }
-
-  CURRENTVDL = NEXTVDL;
-  MODULO     = PIXELS_PER_LINE_MODULO[CLUTDMA.dmaw.modulo];
-  LINE_DELAY = CLUTDMA.dmaw.lines;
 }
 
 static
@@ -357,9 +218,9 @@ vdlp_execute(void)
 {
   uint32_t tmp;
 
-  tmp = vram_read32(CURRENTVDL);
+  tmp = vram_read32(g_VDLP.curr_vdl);
   if(tmp)
-    vdlp_execute_next_vdl(tmp);
+    vdlp_process_vdl_entry(tmp);
 }
 
 static
@@ -371,26 +232,26 @@ vdlp_process_line_320(int           line_,
   vdlp_line_t *line;
 
   line = &frame_->lines[line_];
-  if(CLUTDMA.dmaw.enadma)
+  if(g_VDLP.clut_ctrl.cdcw.enable_dma)
     {
       int i;
       uint16_t *dst;
       uint32_t *src;
 
       dst = line->line;
-      src = (uint32_t*)(VRAM + ((CURRENTBMP^2) & 0x0FFFFF));
+      src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
       for(i = 0; i < 320; i++)
         *dst++ = *(uint16_t*)(src++);
 
-      memcpy(line->xCLUTR,CLUTR,32);
-      memcpy(line->xCLUTG,CLUTG,32);
-      memcpy(line->xCLUTB,CLUTB,32);
+      memcpy(line->xCLUTR,g_VDLP.clut_r,sizeof(g_VDLP.clut_r));
+      memcpy(line->xCLUTG,g_VDLP.clut_g,sizeof(g_VDLP.clut_g));
+      memcpy(line->xCLUTB,g_VDLP.clut_b,sizeof(g_VDLP.clut_b));
     }
 
-  line->xOUTCONTROLL = OUTCONTROLL;
-  line->xCLUTDMA     = CLUTDMA.raw;
-  line->xBACKGROUND  = BACKGROUND;
+  line->xOUTCONTROLL = g_VDLP.disp_ctrl.raw;
+  line->xCLUTDMA     = g_VDLP.clut_ctrl.raw;
+  line->xBACKGROUND  = g_VDLP.bg_color.raw;
 }
 
 static
@@ -404,7 +265,7 @@ vdlp_process_line_640(int           line_,
 
   line0 = &frame_->lines[(line_ << 1) + 0];
   line1 = &frame_->lines[(line_ << 1) + 1];
-  if(CLUTDMA.dmaw.enadma)
+  if(g_VDLP.clut_ctrl.cdcw.enable_dma)
     {
       int i;
       uint16_t *dst1;
@@ -416,10 +277,10 @@ vdlp_process_line_640(int           line_,
 
       dst1 = line0->line;
       dst2 = line1->line;
-      src1 = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF) + (0*1024*1024));
-      src2 = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF) + (1*1024*1024));
-      src3 = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF) + (2*1024*1024));
-      src4 = (uint32_t*)(VRAM + ((PREVIOUSBMP^2) & 0x0FFFFF) + (3*1024*1024));
+      src1 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (0*1024*1024));
+      src2 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (1*1024*1024));
+      src3 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (2*1024*1024));
+      src4 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (3*1024*1024));
 
       for(i = 0; i < 320; i++)
         {
@@ -429,17 +290,17 @@ vdlp_process_line_640(int           line_,
           *dst2++ = *(uint16_t*)(src4++);
         }
 
-      memcpy(line0->xCLUTR,CLUTR,32);
-      memcpy(line0->xCLUTG,CLUTG,32);
-      memcpy(line0->xCLUTB,CLUTB,32);
-      memcpy(line1->xCLUTR,CLUTR,32);
-      memcpy(line1->xCLUTG,CLUTG,32);
-      memcpy(line1->xCLUTB,CLUTB,32);
+      /* memcpy(line0->xCLUTR,CLUTR,32); */
+      /* memcpy(line0->xCLUTG,CLUTG,32); */
+      /* memcpy(line0->xCLUTB,CLUTB,32); */
+      /* memcpy(line1->xCLUTR,CLUTR,32); */
+      /* memcpy(line1->xCLUTG,CLUTG,32); */
+      /* memcpy(line1->xCLUTB,CLUTB,32); */
     }
 
-  line0->xOUTCONTROLL = line1->xOUTCONTROLL = OUTCONTROLL;
-  line0->xCLUTDMA     = line1->xCLUTDMA     = CLUTDMA.raw;
-  line0->xBACKGROUND  = line1->xBACKGROUND  = BACKGROUND;
+  line0->xOUTCONTROLL = line1->xOUTCONTROLL = g_VDLP.disp_ctrl.raw;
+  line0->xCLUTDMA     = line1->xCLUTDMA     = g_VDLP.clut_ctrl.raw;
+  line0->xBACKGROUND  = line1->xBACKGROUND  = g_VDLP.bg_color.raw;
 }
 
 static
@@ -454,14 +315,17 @@ vdlp_process_line(int           line_,
     vdlp_process_line_320(line_,frame_);
 }
 
-/* tick / increment bitmap-buffer address */
+/* tick / increment frame buffer address */
 static
 INLINE
 uint32_t
 tick_fba(const uint32_t fba_)
 {
-  return (fba_ + ((fba_ & 2) ? ((MODULO << 2) - 2) : 2));
+  uint32_t modulo;
 
+  modulo = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+
+  return (fba_ + ((fba_ & 2) ? ((modulo << 2) - 2) : 2));
 }
 
 void
@@ -473,12 +337,12 @@ freedo_vdlp_process_line(int           line_,
   line_ &= 0x07FF;
   if(line_ == 0)
     {
-      LINE_DELAY = 0;
-      CURRENTVDL = HEADVDL;
+      g_VDLP.line_cnt = 0;
+      g_VDLP.curr_vdl = g_VDLP.head_vdl;
       vdlp_execute();
     }
 
-  if(LINE_DELAY == 0)
+  if(g_VDLP.line_cnt == 0)
     vdlp_execute();
 
   y = (line_ - 16);
@@ -494,11 +358,16 @@ freedo_vdlp_process_line(int           line_,
     0,0 and going left to right and top to bottom to 319,239.
   */
 
-  PREVIOUSBMP = ((CLUTDMA.dmaw.prevtick) ? tick_fba(PREVIOUSBMP) : CURRENTBMP);
-  CURRENTBMP  = tick_fba(CURRENTBMP);
+  printf("p: %.8x; c: %.8x\n",
+         g_VDLP.prev_bmp,
+         g_VDLP.curr_bmp);
 
-  LINE_DELAY--;
-  OUTCONTROLL &= ~1; /* Vioff1ln: auto turn off vertical interpolation */
+  g_VDLP.prev_bmp = ((g_VDLP.clut_ctrl.cdcw.prev_fba_tick) ?
+                     tick_fba(g_VDLP.prev_bmp) : g_VDLP.curr_bmp);
+  g_VDLP.curr_bmp = tick_fba(g_VDLP.curr_bmp);
+
+  g_VDLP.disp_ctrl.dcw.vi_off_1_line = 0;
+  g_VDLP.line_cnt--;
 }
 
 
@@ -522,11 +391,11 @@ freedo_vdlp_init(uint8_t *vram_)
       0x002C0000, 0x002B0000
     };
 
-  VRAM    = vram_;
-  HEADVDL = 0xB0000;
+  VRAM = vram_;
+  g_VDLP.head_vdl = 0xB0000;
 
   for(i = 0; i < (sizeof(StartupVDL)/sizeof(uint32_t)); i++)
-    vram_write32((HEADVDL + (i * sizeof(uint32_t))),StartupVDL[i]);
+    vram_write32((0xB0000 + (i * sizeof(uint32_t))),StartupVDL[i]);
 
   vdlp_clut_reset();
 }
@@ -534,23 +403,23 @@ freedo_vdlp_init(uint8_t *vram_)
 void
 freedo_vdlp_process(const uint32_t addr_)
 {
-  HEADVDL = addr_;
+  g_VDLP.head_vdl = addr_;
 }
 
 uint32_t
 freedo_vdlp_state_size(void)
 {
-  return sizeof(vdlp_datum_t);
+  return sizeof(vdlp_t);
 }
 
 void
 freedo_vdlp_state_save(void *buf_)
 {
-  memcpy(buf_,&vdl,sizeof(vdlp_datum_t));
+  //memcpy(buf_,&vdl,sizeof(vdlp_datum_t));
 }
 
 void
 freedo_vdlp_state_load(const void *buf_)
 {
-  memcpy(&vdl,buf_,sizeof(vdlp_datum_t));
+  //memcpy(&vdl,buf_,sizeof(vdlp_datum_t));
 }
