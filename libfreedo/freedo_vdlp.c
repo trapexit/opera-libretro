@@ -295,15 +295,15 @@ vdlp_render_line_320_XRGB8888(int line_)
         }
       else if(fixed_clut && (*src & 0x8000))
         {
-          *dst = ((FIXED_CLUT[(*src >> 0x0) & 0x1F] << 0x00) |
-                  (FIXED_CLUT[(*src >> 0x5) & 0x1F] << 0x08) |
-                  (FIXED_CLUT[(*src >> 0xA) & 0x1F] << 0x10));
+          *dst = (((*src & 0x7C00) << 0x0) |
+                  ((*src & 0x03E0) << 0x0) |
+                  ((*src & 0x001F) << 0x0));
         }
       else
         {
-          *dst = ((g_VDLP.clut_b[(*src >> 0x0) & 0x1F] << 0x00) |
+          *dst = ((g_VDLP.clut_r[(*src >> 0xA) & 0x1F] << 0x10) |
                   (g_VDLP.clut_g[(*src >> 0x5) & 0x1F] << 0x08) |
-                  (g_VDLP.clut_r[(*src >> 0xA) & 0x1F] << 0x10));
+                  (g_VDLP.clut_b[(*src >> 0x0) & 0x1F] << 0x00));
         }
 
       dst += 1;
