@@ -176,7 +176,7 @@ vdlp_process_optional_cmds(const int ctrl_word_cnt_)
           ignore = cmd.dcw.colors_only;
           break;
         case 0b111:
-          g_VDLP.bg_color.raw = cmd.raw;
+          //          g_VDLP.bg_color.raw = cmd.raw;
           break;
         }
     }
