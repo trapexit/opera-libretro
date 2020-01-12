@@ -34,7 +34,6 @@
 #include "freedo_core.h"
 #include "freedo_diag_port.h"
 #include "freedo_dsp.h"
-#include "freedo_frame.h"
 #include "freedo_madam.h"
 #include "freedo_sport.h"
 #include "freedo_vdlp.h"
@@ -128,8 +127,7 @@ freedo_3do_destroy()
 
 static
 void
-freedo_3do_internal_frame(vdlp_frame_t *frame_,
-                          int           cycles_)
+freedo_3do_internal_frame(int cycles_)
 {
   int line;
   int half_frame;
@@ -147,21 +145,18 @@ freedo_3do_internal_frame(vdlp_frame_t *frame_,
       half_frame = freedo_clock_vdl_half_frame();
 
       freedo_clio_vcnt_update(line,half_frame);
-      freedo_vdlp_process_line(line,frame_);
+      freedo_vdlp_process_line(line);
 
       if(line == freedo_clio_line_v0())
         freedo_clio_fiq_generate(1<<0,0);
 
       if(line == freedo_clio_line_v1())
-        {
-          freedo_clio_fiq_generate(1<<1,0);
-          io_interface(EXT_SWAPFRAME,frame_);
-        }
+        freedo_clio_fiq_generate(1<<1,0);
     }
 }
 
 void
-freedo_3do_process_frame(vdlp_frame_t *frame_)
+freedo_3do_process_frame(void)
 {
   uint32_t cnt;
   uint32_t cycles;
@@ -185,7 +180,7 @@ freedo_3do_process_frame(vdlp_frame_t *frame_)
 
       if(cnt >= 32)
         {
-          freedo_3do_internal_frame(frame_,cnt);
+          freedo_3do_internal_frame(cnt);
           cycles += cnt;
           cnt = 0;
         }

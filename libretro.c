@@ -33,8 +33,6 @@
 
 #define CDIMAGE_SECTOR_SIZE 2048
 
-static vdlp_frame_t *FRAME = NULL;
-
 static cdimage_t  CDIMAGE;
 static uint32_t   CDIMAGE_SECTOR;
 static uint32_t  *VIDEO_BUFFER = NULL;
@@ -131,13 +129,7 @@ void
 video_init(void)
 {
   if(VIDEO_BUFFER == NULL)
-    VIDEO_BUFFER = (uint32_t*)malloc(640 * 480 * sizeof(uint32_t));
-
-  if(FRAME == NULL)
-    FRAME = (vdlp_frame_t*)malloc(sizeof(vdlp_frame_t));
-
-  memset(FRAME,0,sizeof(vdlp_frame_t));
-  memset(VIDEO_BUFFER,0,(640 * 480 * sizeof(uint32_t)));
+    VIDEO_BUFFER = (uint32_t*)calloc(640 * 480,sizeof(uint32_t));
 }
 
 static
@@ -147,10 +139,6 @@ video_destroy(void)
   if(VIDEO_BUFFER != NULL)
     free(VIDEO_BUFFER);
   VIDEO_BUFFER = NULL;
-
-  if(FRAME != NULL)
-    free(FRAME);
-  FRAME = NULL;
 }
 
 static
@@ -182,7 +170,6 @@ libfreedo_callback(int   cmd_,
   switch(cmd_)
     {
     case EXT_SWAPFRAME:
-      memcpy(VIDEO_BUFFER,freedo_vdlp_buffer(),4 * 320 * 240);
       break;
     case EXT_DSP_TRIGGER:
       lr_dsp_process();
@@ -659,6 +646,8 @@ retro_load_game(const struct retro_game_info *info_)
   if(check_option_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
 
+  freedo_vdlp_configure(VIDEO_BUFFER,0,0,0);
+
   return true;
 }
 
@@ -795,7 +784,7 @@ retro_run(void)
 
   lr_input_update(ACTIVE_DEVICES);
 
-  freedo_3do_process_frame(FRAME);
+  freedo_3do_process_frame();
 
   lr_input_crosshairs_draw(VIDEO_BUFFER,VIDEO_WIDTH,VIDEO_HEIGHT);
 

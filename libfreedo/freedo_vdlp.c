@@ -55,11 +55,12 @@
   - table lookup vs shift left 3?
  */
 
-static vdlp_t   g_VDLP = {0};
-static uint8_t *VRAM   = NULL;
-static void    *g_BUF    = NULL;
-static uint32_t g_BUF_WIDTH  = 320;
-static uint32_t g_BUF_HEIGHT = 240;
+static vdlp_t    g_VDLP        = {0};
+static uint8_t  *VRAM          = NULL;
+static void     *g_BUF         = NULL;
+static void     *g_CURBUF      = NULL;
+static uint32_t  g_BUF_WIDTH   = 320;
+static uint32_t  g_BUF_HEIGHT  = 240;
 static void (*g_RENDERER)(int) = NULL;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
@@ -215,197 +216,127 @@ vdlp_execute(void)
 
 static
 INLINE
-vdlp_render_line_320_0RGB1555_clutbypass_1(uint16_t *src_,
-                                           uint16_t *dst_)
+void
+vdlp_render_line_0RGB1555(void)
 {
   int x;
-
-  for(x = 0; x < 320; x++)
-    {
-      if(*src_ == 0)
-        {
-          *dst_ = (((g_VDLP.bg_color.bvw.r >> 3) << 0xA) |
-                   ((g_VDLP.bg_color.bvw.g >> 3) << 0x5) |
-                   ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
-        }
-      else if(*src_ & 0x8000)
-        {
-          *dst_ = (*src_ & 0x7FFF);
-        }
-      else
-        {
-          *dst_ = (((g_VDLP.clut_r[(*src_ >> 0xA) & 0x1F] >> 3) << 0xA) |
-                   ((g_VDLP.clut_g[(*src_ >> 0x5) & 0x1F] >> 3) << 0x5) |
-                   ((g_VDLP.clut_b[(*src_ >> 0x0) & 0x1F] >> 3) << 0x0));
-        }
-
-      dst_ += 1;
-      src_ += 2;
-    }
-}
-
-static
-INLINE
-vdlp_render_line_320_0RGB1555_clutbypass_0(uint16_t *src_,
-                                           uint16_t *dst_)
-{
-  int x;
-
-  for(x = 0; x < 320; x++)
-    {
-      if(*src_ == 0)
-        {
-          *dst_ = (((g_VDLP.bg_color.bvw.r >> 3) << 0xA) |
-                   ((g_VDLP.bg_color.bvw.g >> 3) << 0x5) |
-                   ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
-        }
-      else
-        {
-          *dst_ = (((g_VDLP.clut_r[(*src_ >> 0xA) & 0x1F] >> 3) << 0xA) |
-                   ((g_VDLP.clut_g[(*src_ >> 0x5) & 0x1F] >> 3) << 0x5) |
-                   ((g_VDLP.clut_b[(*src_ >> 0x0) & 0x1F] >> 3) << 0x0));
-        }
-
-      dst_ += 1;
-      src_ += 2;
-    }
-}
-
-static
-INLINE
-vdlp_render_line_320_0RGB1555(int line_)
-{
-  int x;
-  int fixed_clut;
+  int width;
+  int bypass_clut;
   uint16_t *src;
   uint16_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return;
 
-  fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+  bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
-  dst = g_BUF;
-  dst += (line_ * 320);
-  src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  dst = g_CURBUF;
+  src = (uint16_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
-  if(g_VDLP.disp_ctrl.dcw.clut_bypass)
-    vdlp_render_line_320_0RGB1555_clutbypass_1(src,dst);
-  else
-    vdlp_render_line_320_0RGB1555_clutbypass_0(src,dst);
-}
-
-static
-INLINE
-vdlp_render_line_320_RGB565_clutbypass_1(uint16_t *src_,
-                                         uint16_t *dst_)
-{
-  int x;
-
-  for(x = 0; x < 320; x++)
+  for(x = 0; x < width; x++)
     {
-      if(*src_ == 0)
+      if(*src == 0)
         {
-          *dst_ = (((g_VDLP.bg_color.bvw.r >> 3) << 0xB) |
-                   ((g_VDLP.bg_color.bvw.g >> 2) << 0x5) |
-                   ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
+          *dst = (((g_VDLP.bg_color.bvw.r >> 3) << 0xA) |
+                  ((g_VDLP.bg_color.bvw.g >> 3) << 0x5) |
+                  ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
         }
-      else if(*src_ & 0x8000)
+      else if(bypass_clut && (*src & 0x8000))
         {
-          *dst_ = (*src_ & 0x7FFF);
+          *dst = (*src & 0x7FFF);
         }
       else
         {
-          *dst_ = (((g_VDLP.clut_r[(*src_ >> 0xA) & 0x1F] >> 3) << 0xB) |
-                   ((g_VDLP.clut_g[(*src_ >> 0x5) & 0x1F] >> 2) << 0x5) |
-                   ((g_VDLP.clut_b[(*src_ >> 0x0) & 0x1F] >> 3) << 0x0));
+          *dst = (((g_VDLP.clut_r[(*src >> 0xA) & 0x1F] >> 3) << 0xA) |
+                  ((g_VDLP.clut_g[(*src >> 0x5) & 0x1F] >> 3) << 0x5) |
+                  ((g_VDLP.clut_b[(*src >> 0x0) & 0x1F] >> 3) << 0x0));
         }
 
-      dst_ += 1;
-      src_ += 2;
+      dst += 1;
+      src += 2;
     }
+
+  g_CURBUF = dst;
 }
 
 static
 INLINE
-vdlp_render_line_320_RGB565_clutbypass_0(uint16_t *src_,
-                                         uint16_t *dst_)
+void
+vdlp_render_line_RGB565(void)
 {
   int x;
-
-  for(x = 0; x < 320; x++)
-    {
-      if(*src_ == 0)
-        {
-          *dst_ = (((g_VDLP.bg_color.bvw.r >> 3) << 0xB) |
-                   ((g_VDLP.bg_color.bvw.g >> 2) << 0x5) |
-                   ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
-        }
-      else
-        {
-          *dst_ = (((g_VDLP.clut_r[(*src_ >> 0xA) & 0x1F] >> 3) << 0xB) |
-                   ((g_VDLP.clut_g[(*src_ >> 0x5) & 0x1F] >> 2) << 0x5) |
-                   ((g_VDLP.clut_b[(*src_ >> 0x0) & 0x1F] >> 3) << 0x0));
-        }
-
-      dst_ += 1;
-      src_ += 2;
-    }
-}
-
-static
-INLINE
-vdlp_render_line_320_RGB565(int line_)
-{
-  int x;
-  int fixed_clut;
+  int width;
+  int bypass_clut;
   uint16_t *src;
   uint16_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return;
 
-  fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+  bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
-  dst = g_BUF;
-  dst += (line_ * 320);
-  src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  dst = g_CURBUF;
+  src = (uint16_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
-  if(g_VDLP.disp_ctrl.dcw.clut_bypass)
-    vdlp_render_line_320_RGB565_clutbypass_1(src,dst);
-  else
-    vdlp_render_line_320_RGB565_clutbypass_0(src,dst);
+  for(x = 0; x < width; x++)
+    {
+      if(*src == 0)
+        {
+          *dst = (((g_VDLP.bg_color.bvw.r >> 3) << 0xB) |
+                  ((g_VDLP.bg_color.bvw.g >> 2) << 0x5) |
+                  ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
+        }
+      else if(bypass_clut && (*src & 0x8000))
+        {
+          *dst = (*src & 0x7FFF);
+        }
+      else
+        {
+          *dst = (((g_VDLP.clut_r[(*src >> 0xA) & 0x1F] >> 3) << 0xB) |
+                  ((g_VDLP.clut_g[(*src >> 0x5) & 0x1F] >> 2) << 0x5) |
+                  ((g_VDLP.clut_b[(*src >> 0x0) & 0x1F] >> 3) << 0x0));
+        }
+
+      dst += 1;
+      src += 2;
+    }
+
+  g_CURBUF = dst;
 }
 
 static
 INLINE
-vdlp_render_line_320_XRGB8888(int line_)
+void
+vdlp_render_line_XRGB8888(void)
 {
   int x;
-  int fixed_clut;
+  int width;
+  int bypass_clut;
   uint16_t *src;
   uint32_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return;
 
-  fixed_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+  bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
-  dst = g_BUF;
-  dst += (line_ * 320);
-  src = (uint32_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  dst = g_CURBUF;
+  src = (uint16_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
-  for(x = 0; x < 320; x++)
+  for(x = 0; x < width; x++)
     {
       if(*src == 0)
         {
           *dst = g_VDLP.bg_color.raw;
         }
-      else if(fixed_clut && (*src & 0x8000))
+      else if(bypass_clut && (*src & 0x8000))
         {
-          *dst = (((*src & 0x7C00) << 0x0) |
-                  ((*src & 0x03E0) << 0x0) |
-                  ((*src & 0x001F) << 0x0));
+          *dst = (((*src & 0x7C00) << 0x9) |
+                  ((*src & 0x03E0) << 0x6) |
+                  ((*src & 0x001F) << 0x3));
         }
       else
         {
@@ -417,6 +348,8 @@ vdlp_render_line_320_XRGB8888(int line_)
       dst += 1;
       src += 2;
     }
+
+  g_CURBUF = dst;
 }
 
 static
@@ -471,15 +404,14 @@ vdlp_process_line_640(int           line_,
 static
 INLINE
 void
-vdlp_process_line(int           line_,
-                  vdlp_frame_t *frame_)
+vdlp_render_line(void)
 {
   /* if(HIRESMODE) */
   /*   vdlp_process_line_640(line_,frame_); */
   /* else */
   /*   vdlp_process_line_320(line_,frame_); */
 
-  vdlp_render_line_320_XRGB8888(line_);
+  vdlp_render_line_XRGB8888();
   //vdlp_render_line_320_0RGB1555(line_);
   //vdlp_render_line_320_RGB565(line_);
 }
@@ -498,14 +430,14 @@ tick_fba(const uint32_t fba_)
 }
 
 void
-freedo_vdlp_process_line(int           line_,
-                         vdlp_frame_t *frame_)
+freedo_vdlp_process_line(int line_)
 {
   int y;
 
   line_ &= 0x07FF;
   if(line_ == 0)
     {
+      g_CURBUF = g_BUF;
       g_VDLP.line_cnt = 0;
       g_VDLP.curr_vdl = g_VDLP.head_vdl;
       vdlp_execute();
@@ -516,7 +448,7 @@ freedo_vdlp_process_line(int           line_,
 
   y = (line_ - 16);
   if((y >= 0) && (y < 240))
-    vdlp_process_line(y,frame_);
+    vdlp_render_line();
 
   /*
     See ppgfldr/ggsfldr/gpgfldr/2gpgb.html for details on the frame
@@ -591,7 +523,7 @@ freedo_vdlp_state_load(const void *buf_)
 void*
 freedo_vdlp_buffer(void)
 {
-  return BUF;
+  return g_BUF;
 }
 
 int
@@ -620,6 +552,7 @@ freedo_vdlp_configure(void                *buf_,
       g_BUF_WIDTH  = 768;
       g_BUF_HEIGHT = 576;
       break;
+
     }
 
   switch(pf_)
@@ -631,4 +564,6 @@ freedo_vdlp_configure(void                *buf_,
     case VDLP_PIXEL_FORMAT_XRGB8888:
       break;
     }
+
+  return 0;
 }

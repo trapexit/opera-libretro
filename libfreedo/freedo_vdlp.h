@@ -79,7 +79,7 @@ EXTERN_C_BEGIN
 void     freedo_vdlp_init(uint8_t *vram_);
 
 void     freedo_vdlp_process(const uint32_t addr_);
-void     freedo_vdlp_process_line(int line_, vdlp_frame_t *frame_);
+void     freedo_vdlp_process_line(int line_);
 
 uint32_t freedo_vdlp_state_size(void);
 void     freedo_vdlp_state_save(void *buf_);
