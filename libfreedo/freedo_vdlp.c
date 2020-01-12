@@ -259,6 +259,9 @@ vdlp_process_vdl_entry(const uint32_t entry_)
 
   g_VDLP.curr_vdl += (4 * sizeof(uint32_t));
   vdlp_process_optional_cmds(cdcw->ctrl_word_cnt);
+
+  g_VDLP.curr_vdl = next_entry;
+  g_VDLP.line_cnt = cdcw->persist_len;
 }
 
 
