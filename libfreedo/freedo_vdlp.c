@@ -47,7 +47,6 @@
 
 /* VDLP options */
 /*
-  - Output type (16bit, 24bit, 32bit) (move freedo_frame into vdlp)
   - interpolation
   - native vs 2x mode?
   - Disable CLUT?
