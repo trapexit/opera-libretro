@@ -56,7 +56,7 @@
  */
 
 static vdlp_t    g_VDLP        = {0};
-static uint8_t  *VRAM          = NULL;
+static uint8_t  *g_VRAM        = NULL;
 static void     *g_BUF         = NULL;
 static void     *g_CURBUF      = NULL;
 static uint32_t  g_BUF_WIDTH   = 320;
@@ -232,7 +232,7 @@ vdlp_render_line_0RGB1555(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
   for(x = 0; x < width; x++)
     {
@@ -278,7 +278,7 @@ vdlp_render_line_RGB565(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
   for(x = 0; x < width; x++)
     {
@@ -324,7 +324,7 @@ vdlp_render_line_XRGB8888(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
 
   for(x = 0; x < width; x++)
     {
@@ -375,10 +375,10 @@ vdlp_process_line_640(int           line_,
 
       dst1 = line0->line;
       dst2 = line1->line;
-      src1 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (0*1024*1024));
-      src2 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (1*1024*1024));
-      src3 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (2*1024*1024));
-      src4 = (uint32_t*)(VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (3*1024*1024));
+      src1 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (0*1024*1024));
+      src2 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (1*1024*1024));
+      src3 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (2*1024*1024));
+      src4 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (3*1024*1024));
 
       for(i = 0; i < 320; i++)
         {
@@ -487,7 +487,7 @@ freedo_vdlp_init(uint8_t *vram_)
       0x002C0000, 0x002B0000
     };
 
-  VRAM = vram_;
+  g_VRAM = vram_;
   g_VDLP.head_vdl = 0xB0000;
 
   for(i = 0; i < (sizeof(StartupVDL)/sizeof(uint32_t)); i++)
@@ -518,12 +518,6 @@ void
 freedo_vdlp_state_load(const void *buf_)
 {
   //memcpy(&vdl,buf_,sizeof(vdlp_datum_t));
-}
-
-void*
-freedo_vdlp_buffer(void)
-{
-  return g_BUF;
 }
 
 int

@@ -85,9 +85,6 @@ uint32_t freedo_vdlp_state_size(void);
 void     freedo_vdlp_state_save(void *buf_);
 void     freedo_vdlp_state_load(const void *buf_);
 
-void     freedo_vdlp_output_buffer_bpp(uint32_t bpp_);
-void    *freedo_vdlp_buffer(void);
-
 int      freedo_vdlp_configure(void *buf,
                                vdlp_pixel_format_e pf,
                                vdlp_pixel_res_e res,
