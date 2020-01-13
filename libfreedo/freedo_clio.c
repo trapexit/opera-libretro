@@ -613,9 +613,9 @@ freedo_clio_peek(uint32_t addr_)
 
 void
 freedo_clio_vcnt_update(int line_,
-                        int half_frame_)
+                        int field_)
 {
-  CLIO.regs[0x34] = ((half_frame_ << 11) + line_);
+  CLIO.regs[0x34] = ((field_ << 11) + line_);
 }
 
 void
