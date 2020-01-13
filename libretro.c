@@ -646,7 +646,10 @@ retro_load_game(const struct retro_game_info *info_)
   if(check_option_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
 
-  freedo_vdlp_configure(VIDEO_BUFFER,0,0,0);
+  freedo_vdlp_configure(VIDEO_BUFFER,
+                        VDLP_PIXEL_FORMAT_XRGB8888,
+                        VDLP_PIXEL_RES_320x240,
+                        0);
 
   return true;
 }

@@ -61,7 +61,7 @@ static void     *g_BUF         = NULL;
 static void     *g_CURBUF      = NULL;
 static uint32_t  g_BUF_WIDTH   = 320;
 static uint32_t  g_BUF_HEIGHT  = 240;
-static void (*g_RENDERER)(int) = NULL;
+static void (*g_RENDERER)(void) = NULL;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
@@ -411,9 +411,7 @@ vdlp_render_line(void)
   /* else */
   /*   vdlp_process_line_320(line_,frame_); */
 
-  vdlp_render_line_XRGB8888();
-  //vdlp_render_line_320_0RGB1555(line_);
-  //vdlp_render_line_320_RGB565(line_);
+  g_RENDERER();
 }
 
 /* tick / increment frame buffer address */
@@ -489,6 +487,7 @@ freedo_vdlp_init(uint8_t *vram_)
 
   g_VRAM = vram_;
   g_VDLP.head_vdl = 0xB0000;
+  g_RENDERER = vdlp_render_line_XRGB8888;
 
   for(i = 0; i < (sizeof(StartupVDL)/sizeof(uint32_t)); i++)
     vram_write32((0xB0000 + (i * sizeof(uint32_t))),StartupVDL[i]);
@@ -552,10 +551,13 @@ freedo_vdlp_configure(void                *buf_,
   switch(pf_)
     {
     case VDLP_PIXEL_FORMAT_0RGB1555:
+      g_RENDERER = vdlp_render_line_0RGB1555;
       break;
     case VDLP_PIXEL_FORMAT_RGB565:
+      g_RENDERER = vdlp_render_line_RGB565;
       break;
     case VDLP_PIXEL_FORMAT_XRGB8888:
+      g_RENDERER = vdlp_render_line_XRGB8888;
       break;
     }
 
