@@ -186,7 +186,7 @@ freedo_clock_vdl_queued(void)
   if(g_CLOCK.vdl_acc >= limit)
     {
       g_CLOCK.vdl_acc -= limit;
-      g_CLOCK.vdlline  = ((g_CLOCK.vdlline + 1) % g_CLOCK.field_size);
+      g_CLOCK.vdlline  = ((g_CLOCK.vdlline + 1) % (g_CLOCK.field_size << 1));
 
       return true;
     }

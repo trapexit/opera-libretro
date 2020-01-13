@@ -127,7 +127,8 @@ freedo_3do_destroy()
 
 static
 void
-freedo_3do_internal_frame(int cycles_)
+freedo_3do_internal_frame(uint32_t  cycles_,
+                          uint32_t *lines_)
 {
   int line;
   int half_frame;
@@ -141,6 +142,7 @@ freedo_3do_internal_frame(int cycles_)
 
   if(freedo_clock_vdl_queued())
     {
+      (*lines_)++;
       line       = freedo_clock_vdl_current_line();
       half_frame = freedo_clock_vdl_half_frame();
 
@@ -158,16 +160,14 @@ freedo_3do_internal_frame(int cycles_)
 void
 freedo_3do_process_frame(void)
 {
+  uint32_t lines;
   uint32_t cnt;
-  uint32_t cycles;
-  uint64_t cycles_per_field;
 
   if(flagtime)
     flagtime--;
 
+  lines = 0;
   cnt  = 0;
-  cycles = 0;
-  cycles_per_field = freedo_clock_cpu_cycles_per_field();
   do
     {
       if(freedo_madam_fsm_get() == FSM_INPROCESS)
@@ -177,14 +177,12 @@ freedo_3do_process_frame(void)
         }
 
       cnt += freedo_arm_execute();
-
       if(cnt >= 32)
         {
-          freedo_3do_internal_frame(cnt);
-          cycles += cnt;
+          freedo_3do_internal_frame(cnt,&lines);
           cnt = 0;
         }
-    } while(cycles < cycles_per_field);
+    } while(lines < 263);
 }
 
 uint32_t
