@@ -214,7 +214,6 @@ vdlp_execute(void)
 }
 
 static
-INLINE
 void
 vdlp_render_line_0RGB1555(void)
 {
@@ -260,7 +259,6 @@ vdlp_render_line_0RGB1555(void)
 }
 
 static
-INLINE
 void
 vdlp_render_line_RGB565(void)
 {
@@ -352,7 +350,6 @@ vdlp_render_line_XRGB8888(void)
 }
 
 static
-INLINE
 void
 vdlp_process_line_640(int           line_,
                       vdlp_frame_t *frame_)
@@ -544,7 +541,8 @@ freedo_vdlp_configure(void                *buf_,
       g_BUF_WIDTH  = 768;
       g_BUF_HEIGHT = 576;
       break;
-
+    default:
+      return -1;
     }
 
   switch(pf_)
@@ -558,6 +556,8 @@ freedo_vdlp_configure(void                *buf_,
     case VDLP_PIXEL_FORMAT_XRGB8888:
       g_RENDERER = vdlp_render_line_XRGB8888;
       break;
+    default:
+      return -1;
     }
 
   return 0;
