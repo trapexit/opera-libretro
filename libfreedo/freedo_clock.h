@@ -42,8 +42,7 @@ EXTERN_C_BEGIN
 void     freedo_clock_init(void);
 
 int      freedo_clock_vdl_current_line(void);
-int      freedo_clock_vdl_half_frame(void);
-int      freedo_clock_vdl_current_overline(void);
+int      freedo_clock_vdl_current_field(void);
 
 bool     freedo_clock_vdl_queued(void);
 bool     freedo_clock_dsp_queued(void);

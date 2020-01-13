@@ -131,7 +131,7 @@ freedo_3do_internal_frame(uint32_t  cycles_,
                           uint32_t *lines_)
 {
   int line;
-  int half_frame;
+  int field;
 
   freedo_clock_push_cycles(cycles_);
   if(freedo_clock_dsp_queued())
@@ -143,10 +143,10 @@ freedo_3do_internal_frame(uint32_t  cycles_,
   if(freedo_clock_vdl_queued())
     {
       (*lines_)++;
-      line       = freedo_clock_vdl_current_line();
-      half_frame = freedo_clock_vdl_half_frame();
+      line  = freedo_clock_vdl_current_line();
+      field = freedo_clock_vdl_current_field();
 
-      freedo_clio_vcnt_update(line,half_frame);
+      freedo_clio_vcnt_update(line,field);
       freedo_vdlp_process_line(line);
 
       if(line == freedo_clio_line_v0())

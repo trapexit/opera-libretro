@@ -167,15 +167,9 @@ freedo_clock_vdl_current_line(void)
 }
 
 int
-freedo_clock_vdl_half_frame(void)
+freedo_clock_vdl_current_field(void)
 {
   return (g_CLOCK.vdlline / g_CLOCK.field_size);
-}
-
-int
-freedo_clock_vdl_current_overline(void)
-{
-  return g_CLOCK.vdlline;
 }
 
 bool
