@@ -126,9 +126,11 @@ freedo_3do_destroy()
 }
 
 static
+INLINE
 void
 freedo_3do_internal_frame(uint32_t  cycles_,
-                          uint32_t *lines_)
+                          uint32_t *lines_,
+                          int field_)
 {
   int line;
   int field;
@@ -142,9 +144,10 @@ freedo_3do_internal_frame(uint32_t  cycles_,
 
   if(freedo_clock_vdl_queued())
     {
-      (*lines_)++;
-      line  = freedo_clock_vdl_current_line();
-      field = freedo_clock_vdl_current_field();
+      line = *lines_;
+      field = field_;
+      //line  = freedo_clock_vdl_current_line();
+      //field = freedo_clock_vdl_current_field();
 
       freedo_clio_vcnt_update(line,field);
       freedo_vdlp_process_line(line);
@@ -154,6 +157,8 @@ freedo_3do_internal_frame(uint32_t  cycles_,
 
       if(line == freedo_clio_line_v1())
         freedo_clio_fiq_generate(1<<1,0);
+
+      (*lines_)++;
     }
 }
 
@@ -162,6 +167,7 @@ freedo_3do_process_frame(void)
 {
   uint32_t lines;
   uint32_t cnt;
+  static int field = 0;
 
   if(flagtime)
     flagtime--;
@@ -179,10 +185,12 @@ freedo_3do_process_frame(void)
       cnt += freedo_arm_execute();
       if(cnt >= 32)
         {
-          freedo_3do_internal_frame(cnt,&lines);
+          freedo_3do_internal_frame(cnt,&lines,field);
           cnt = 0;
         }
     } while(lines < 263);
+
+  field = !field;
 }
 
 uint32_t
