@@ -351,6 +351,55 @@ vdlp_render_line_XRGB8888(void)
 
 static
 void
+vdlp_render_line_XRGB8888_hires(void)
+{
+  int i;
+  int x;
+  int width;
+  int bypass_clut;
+  uint16_t *src;
+  uint16_t *dst;
+
+  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
+    return;
+
+  bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+
+  dst = g_CURBUF;
+  for(i = 0; i < 4; i++)
+    {
+      src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (i * 1024*1024));
+
+      for(x = 0; x < width; x++)
+        {
+          if(*src == 0)
+            {
+              *dst = g_VDLP.bg_color.raw;
+            }
+          else if(bypass_clut && (*src & 0x8000))
+            {
+              *dst = (((*src & 0x7C00) << 0x9) |
+                      ((*src & 0x03E0) << 0x6) |
+                      ((*src & 0x001F) << 0x3));
+            }
+          else
+            {
+              *dst = ((g_VDLP.clut_r[(*src >> 0xA) & 0x1F] << 0x10) |
+                      (g_VDLP.clut_g[(*src >> 0x5) & 0x1F] << 0x08) |
+                      (g_VDLP.clut_b[(*src >> 0x0) & 0x1F] << 0x00));
+            }
+
+          dst += 1;
+          src += 2;
+        }
+    }
+
+  g_CURBUF = dst;
+}
+
+static
+void
 vdlp_process_line_640(int           line_,
                       vdlp_frame_t *frame_)
 {
