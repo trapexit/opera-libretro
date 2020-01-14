@@ -387,6 +387,34 @@ vdlp_render_line_XRGB8888(void)
 
 static
 void
+vdlp_render_line_XRGB8888_bypass_clut(void)
+{
+  int x;
+  int width;
+  uint16_t *src;
+  uint32_t *dst;
+
+  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
+    return;
+
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+
+  dst = g_CURBUF;
+  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+
+  for(x = 0; x < width; x++)
+    {
+      *dst = vdlp_render_pixel_XRGB8888_simple(*src);
+
+      dst += 1;
+      src += 2;
+    }
+
+  g_CURBUF = dst;
+}
+
+static
+void
 vdlp_render_line_XRGB8888_hires(void)
 {
   int i;
@@ -574,7 +602,7 @@ freedo_vdlp_configure(void                *buf_,
       g_RENDERER = vdlp_render_line_RGB565;
       break;
     case VDLP_PIXEL_FORMAT_XRGB8888:
-      g_RENDERER = vdlp_render_line_XRGB8888_hires;
+      g_RENDERER = vdlp_render_line_XRGB8888;
       break;
     default:
       return -1;
