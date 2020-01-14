@@ -37,6 +37,10 @@
 
 #include <stdint.h>
 
+#define VDLP_FLAG_CLUT_BYPASS   (1<<0)
+#define VDLP_FLAG_HIRES_CEL     (1<<1)
+#define VDLP_FLAG_INTERPOLATION (1<<2)
+
 typedef struct vdlp_line_s vdlp_line_t;
 struct vdlp_line_s
 {

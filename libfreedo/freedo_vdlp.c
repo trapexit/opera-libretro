@@ -45,7 +45,7 @@
 
 #define VRAM_OFFSET (1024 * 1024 * 2)
 
-/* VDLP options */
+/* VDLP options TODO */
 /*
   - interpolation
   - Disable CLUT?
