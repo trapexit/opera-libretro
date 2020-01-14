@@ -48,10 +48,8 @@
 /* VDLP options */
 /*
   - interpolation
-  - native vs 2x mode?
   - Disable CLUT?
   - Add pseudo random 3bit pattern for second clut bypass mode
-  - table lookup vs shift left 3?
  */
 
 static vdlp_t    g_VDLP        = {0};
@@ -214,6 +212,24 @@ vdlp_execute(void)
 }
 
 static
+uint16_t
+vdlp_render_pixel_0RGB1555(const uint16_t p_,
+                           const int      bypass_clut_)
+{
+  if(p_ == 0)
+    return (((g_VDLP.bg_color.bvw.r >> 3) << 0xA) |
+            ((g_VDLP.bg_color.bvw.g >> 3) << 0x5) |
+            ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
+
+  if(bypass_clut_ && (p_ & 0x8000))
+    return (p_ & 0x7FFF);
+
+  return (((g_VDLP.clut_r[(p_ >> 0xA) & 0x1F] >> 3) << 0xA) |
+          ((g_VDLP.clut_g[(p_ >> 0x5) & 0x1F] >> 3) << 0x5) |
+          ((g_VDLP.clut_b[(p_ >> 0x0) & 0x1F] >> 3) << 0x0));
+}
+
+static
 void
 vdlp_render_line_0RGB1555(void)
 {
@@ -234,22 +250,7 @@ vdlp_render_line_0RGB1555(void)
 
   for(x = 0; x < width; x++)
     {
-      if(*src == 0)
-        {
-          *dst = (((g_VDLP.bg_color.bvw.r >> 3) << 0xA) |
-                  ((g_VDLP.bg_color.bvw.g >> 3) << 0x5) |
-                  ((g_VDLP.bg_color.bvw.b >> 3) << 0x0));
-        }
-      else if(bypass_clut && (*src & 0x8000))
-        {
-          *dst = (*src & 0x7FFF);
-        }
-      else
-        {
-          *dst = (((g_VDLP.clut_r[(*src >> 0xA) & 0x1F] >> 3) << 0xA) |
-                  ((g_VDLP.clut_g[(*src >> 0x5) & 0x1F] >> 3) << 0x5) |
-                  ((g_VDLP.clut_b[(*src >> 0x0) & 0x1F] >> 3) << 0x0));
-        }
+      *dst = vdlp_render_pixel_0RGB1555(*src,bypass_clut);
 
       dst += 1;
       src += 2;
@@ -306,6 +307,16 @@ vdlp_render_line_RGB565(void)
 static
 INLINE
 uint32_t
+vdlp_render_pixel_XRGB8888_simple(const uint16_t p_)
+{
+  return (((p_ & 0x7C00) << 0x9) |
+          ((p_ & 0x03E0) << 0x6) |
+          ((p_ & 0x001F) << 0x3));
+}
+
+static
+INLINE
+uint32_t
 vdlp_render_pixel_XRGB8888(const uint16_t p_,
                            const int      bypass_clut_)
 {
@@ -323,7 +334,6 @@ vdlp_render_pixel_XRGB8888(const uint16_t p_,
 }
 
 static
-INLINE
 void
 vdlp_render_line_XRGB8888(void)
 {
@@ -398,67 +408,6 @@ vdlp_render_line_XRGB8888_hires(void)
   g_CURBUF = dst;
 }
 
-static
-void
-vdlp_process_line_640(int           line_,
-                      vdlp_frame_t *frame_)
-{
-  vdlp_line_t *line0;
-  vdlp_line_t *line1;
-
-  line0 = &frame_->lines[(line_ << 1) + 0];
-  line1 = &frame_->lines[(line_ << 1) + 1];
-  if(g_VDLP.clut_ctrl.cdcw.enable_dma)
-    {
-      int i;
-      uint16_t *dst1;
-      uint16_t *dst2;
-      uint32_t *src1;
-      uint32_t *src2;
-      uint32_t *src3;
-      uint32_t *src4;
-
-      dst1 = line0->line;
-      dst2 = line1->line;
-      src1 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (0*1024*1024));
-      src2 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (1*1024*1024));
-      src3 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (2*1024*1024));
-      src4 = (uint32_t*)(g_VRAM + ((g_VDLP.prev_bmp^2) & 0x0FFFFF) + (3*1024*1024));
-
-      for(i = 0; i < 320; i++)
-        {
-          *dst1++ = *(uint16_t*)(src1++);
-          *dst1++ = *(uint16_t*)(src2++);
-          *dst2++ = *(uint16_t*)(src3++);
-          *dst2++ = *(uint16_t*)(src4++);
-        }
-
-      memcpy(line0->clut_r,g_VDLP.clut_r,32);
-      memcpy(line0->clut_g,g_VDLP.clut_g,32);
-      memcpy(line0->clut_b,g_VDLP.clut_b,32);
-      memcpy(line1->clut_r,g_VDLP.clut_r,32);
-      memcpy(line1->clut_g,g_VDLP.clut_g,32);
-      memcpy(line1->clut_b,g_VDLP.clut_b,32);
-    }
-
-  line0->disp_ctrl  = line1->disp_ctrl  = g_VDLP.disp_ctrl.raw;
-  line0->clut_ctrl  = line1->clut_ctrl  = g_VDLP.clut_ctrl.raw;
-  line0->background = line1->background = g_VDLP.bg_color.raw;
-}
-
-static
-INLINE
-void
-vdlp_render_line(void)
-{
-  /* if(HIRESMODE) */
-  /*   vdlp_process_line_640(line_,frame_); */
-  /* else */
-  /*   vdlp_process_line_320(line_,frame_); */
-
-  g_RENDERER();
-}
-
 /* tick / increment frame buffer address */
 static
 INLINE
@@ -491,7 +440,7 @@ freedo_vdlp_process_line(int line_)
 
   y = (line_ - 16);
   if((y >= 0) && (y < 240))
-    vdlp_render_line();
+    g_RENDERER();
 
   /*
     See ppgfldr/ggsfldr/gpgfldr/2gpgb.html for details on the frame
