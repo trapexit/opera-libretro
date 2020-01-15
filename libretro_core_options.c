@@ -84,7 +84,7 @@ static struct retro_core_option_definition option_defs_us[] = {
    },
    {
       "4do_high_resolution",
-      "High Resolution CEL Rendering",
+      "HiRes CEL Rendering",
       "The 3DO has internal resolution of 320x240. Enabling this option causes CELs to be rendered at 2X the resolution into a 2X output buffer, increasing the fidelity of 3D models. Has a significant performance impact.",
       {
          { "disabled", NULL },
