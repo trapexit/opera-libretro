@@ -54,7 +54,6 @@ struct freedo_clock_s
   uint32_t dsp_acc;
   uint32_t vdl_acc;
   uint32_t timer_acc;
-  uint32_t vdlline;
   uint32_t field_size;
   uint32_t field_rate;
   uint32_t cycles_per_field;
@@ -68,7 +67,6 @@ static freedo_clock_t g_CLOCK =
     0,                          /* .dsp_acc */
     0,                          /* .vdl_acc */
     0,                          /* .timer_acc */
-    0,                          /* .vdlline */
     NTSC_FIELD_SIZE,            /* .field_size */
     NTSC_FIELD_RATE,            /* .field_rate */
     DEFAULT_CYCLES_PER_FIELD,   /* .cycles_per_field */
@@ -152,24 +150,11 @@ freedo_clock_init(void)
   g_CLOCK.dsp_acc             = 0;
   g_CLOCK.vdl_acc             = 0;
   g_CLOCK.timer_acc           = 0;
-  g_CLOCK.vdlline             = 0;
   g_CLOCK.field_size          = NTSC_FIELD_SIZE;
   g_CLOCK.field_rate          = NTSC_FIELD_RATE;
   g_CLOCK.cycles_per_field    = DEFAULT_CYCLES_PER_FIELD;
   g_CLOCK.cycles_per_snd      = DEFAULT_CYCLES_PER_SND;
   g_CLOCK.cycles_per_scanline = DEFAULT_CYCLES_PER_SCANLINE;
-}
-
-int
-freedo_clock_vdl_current_line(void)
-{
-  return (g_CLOCK.vdlline % g_CLOCK.field_size);
-}
-
-int
-freedo_clock_vdl_current_field(void)
-{
-  return (g_CLOCK.vdlline / g_CLOCK.field_size);
 }
 
 bool
@@ -180,7 +165,6 @@ freedo_clock_vdl_queued(void)
   if(g_CLOCK.vdl_acc >= limit)
     {
       g_CLOCK.vdl_acc -= limit;
-      g_CLOCK.vdlline  = ((g_CLOCK.vdlline + 1) % (g_CLOCK.field_size << 1));
 
       return true;
     }

@@ -129,12 +129,9 @@ static
 INLINE
 void
 freedo_3do_internal_frame(uint32_t  cycles_,
-                          uint32_t *lines_,
-                          int field_)
+                          uint32_t *line_,
+                          int       field_)
 {
-  int line;
-  int field;
-
   freedo_clock_push_cycles(cycles_);
   if(freedo_clock_dsp_queued())
     io_interface(EXT_DSP_TRIGGER,NULL);
@@ -144,36 +141,31 @@ freedo_3do_internal_frame(uint32_t  cycles_,
 
   if(freedo_clock_vdl_queued())
     {
-      line = *lines_;
-      field = field_;
-      //line  = freedo_clock_vdl_current_line();
-      //field = freedo_clock_vdl_current_field();
+      freedo_clio_vcnt_update(*line_,field_);
+      freedo_vdlp_process_line(*line_);
 
-      freedo_clio_vcnt_update(line,field);
-      freedo_vdlp_process_line(line);
-
-      if(line == freedo_clio_line_v0())
+      if(*line_ == freedo_clio_line_v0())
         freedo_clio_fiq_generate(1<<0,0);
 
-      if(line == freedo_clio_line_v1())
+      if(*line_ == freedo_clio_line_v1())
         freedo_clio_fiq_generate(1<<1,0);
 
-      (*lines_)++;
+      (*line_)++;
     }
 }
 
 void
 freedo_3do_process_frame(void)
 {
-  uint32_t lines;
   uint32_t cnt;
+  uint32_t line;
   static int field = 0;
 
   if(flagtime)
     flagtime--;
 
-  lines = 0;
-  cnt  = 0;
+  cnt   = 0;
+  line = 0;
   do
     {
       if(freedo_madam_fsm_get() == FSM_INPROCESS)
@@ -185,10 +177,10 @@ freedo_3do_process_frame(void)
       cnt += freedo_arm_execute();
       if(cnt >= 32)
         {
-          freedo_3do_internal_frame(cnt,&lines,field);
+          freedo_3do_internal_frame(cnt,&line,field);
           cnt = 0;
         }
-    } while(lines < 263);
+    } while(line < 263);
 
   field = !field;
 }
