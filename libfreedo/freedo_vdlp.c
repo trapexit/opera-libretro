@@ -68,7 +68,7 @@ INLINE
 uint32_t
 vram_read32(const uint32_t addr_)
 {
-  return freedo_mem_read32(VRAM_OFFSET + (addr_ & 0x000FFFFF));
+  return *(uint32_t*)&g_VRAM[addr_ & 0x000FFFFF];
 }
 
 static
@@ -77,7 +77,7 @@ void
 vram_write32(const uint32_t addr_,
              const uint32_t val_)
 {
-  freedo_mem_write32((VRAM_OFFSET + (addr_ & 0x000FFFFF)),val_);
+  *((uint32_t*)&g_VRAM[addr_]) = val_;
 }
 
 static
