@@ -72,15 +72,15 @@ static struct retro_core_option_definition option_defs_us[] = {
      "XRGB8888"
    },
    {
-     "4do_vdlp_render_mode",
-     "VDLP Render Mode",
-     "",
+     "4do_vdlp_bypass_clut",
+     "VDLP Bypass CLUT",
+     "Force 3DO VDLP to bypass the CLUT (color lookup table). May result in incorrect colors but faster rendering.",
      {
-       { "standard",    "Standard" },
-       { "bypass_clut", "Bypass CLUT" },
+       { "disabled", NULL },
+       { "enabled",  NULL },
        { NULL, NULL }
      },
-     "standard"
+     "disabled"
    },
    {
       "4do_high_resolution",

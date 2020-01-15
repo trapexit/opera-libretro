@@ -49,9 +49,9 @@ static freedo_ext_interface_t io_interface;
 
 extern int flagtime;
 
-int HIRESMODE = 0;
-int FIXMODE   = 0;
-int CNBFIX    = 0;
+int      HIRESMODE = 0;
+uint32_t FIXMODE   = 0;
+int      CNBFIX    = 0;
 
 int
 freedo_3do_init(freedo_ext_interface_t callback_)

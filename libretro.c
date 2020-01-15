@@ -39,6 +39,8 @@ static uint32_t  *VIDEO_BUFFER = NULL;
 static uint32_t   VIDEO_WIDTH;
 static uint32_t   VIDEO_HEIGHT;
 static uint32_t   ACTIVE_DEVICES;
+static vdlp_pixel_format_e g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_XRGB8888;
+static uint32_t            g_VDLP_FLAGS        = VDLP_FLAG_NONE;
 
 static const freedo_bios_t *BIOS = NULL;
 static const freedo_bios_t *FONT = NULL;
@@ -372,9 +374,31 @@ check_option_4do_cpu_overclock(void)
 
 static
 void
+check_option_4do_vdlp_pixel_format(void)
+{
+  int rv;
+  struct retro_variable var;
+
+  var.key   = "4do_vdlp_pixel_format";
+  var.value = NULL;
+
+  rv = retro_environment_cb(RETRO_ENVIRONMENT_GET_VARIABLE,&var);
+  if(rv && var.value)
+    {
+      if(!strcmp(var.value,"XRGB8888"))
+        g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_XRGB8888;
+      else if(!strcmp(var.value,"RGB565"))
+        g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_RGB565;
+      else if(!strcmp(var.value,"0RGB1555"))
+        g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_0RGB1555;
+    }
+}
+
+static
+void
 check_option_set_reset_bits(const char *key_,
-                         int        *input_,
-                         int         bitmask_)
+                            uint32_t   *input_,
+                            uint32_t    bitmask_)
 {
   *input_ = (option_enabled(key_) ?
              (*input_ | bitmask_) :
@@ -490,6 +514,8 @@ check_options(void)
 {
   check_option_4do_bios();
   check_option_4do_font();
+  check_option_4do_vdlp_pixel_format();
+  check_option_set_reset_bits("4do_vdlp_bypass_clut",&g_VDLP_FLAGS,VDLP_FLAG_CLUT_BYPASS);
   check_option_4do_high_resolution();
   check_option_4do_cpu_overclock();
   check_option_4do_dsp_threaded();

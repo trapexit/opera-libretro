@@ -615,7 +615,6 @@ freedo_vdlp_process_line(int line_)
 {
   int y;
 
-  line_ &= 0x07FF;
   if(line_ == 0)
     {
       g_CURBUF = g_BUF;
