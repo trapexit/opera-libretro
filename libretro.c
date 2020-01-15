@@ -630,20 +630,36 @@ load_rom2(void)
   return 0;
 }
 
+enum retro_pixel_format
+vdlp_pixel_format_to_libretro(vdlp_pixel_format_e pf_)
+{
+  switch(pf_)
+    {
+    case VDLP_PIXEL_FORMAT_0RGB1555:
+      return RETRO_PIXEL_FORMAT_0RGB1555;
+    case VDLP_PIXEL_FORMAT_RGB565:
+      return RETRO_PIXEL_FORMAT_RGB565;
+    case VDLP_PIXEL_FORMAT_XRGB8888:
+      return RETRO_PIXEL_FORMAT_XRGB8888;
+    }
+
+  return RETRO_PIXEL_FORMAT_XRGB8888;
+}
+
 bool
 retro_load_game(const struct retro_game_info *info_)
 {
   int rv;
   enum retro_pixel_format fmt;
 
-  fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-  //  fmt = RETRO_PIXEL_FORMAT_0RGB1555;
-  //  fmt = RETRO_PIXEL_FORMAT_RGB565;
+  chkopts();
+
+  fmt = vdlp_pixel_format_to_libretro(g_VDLP_PIXEL_FORMAT);
   rv = retro_environment_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,&fmt);
   if(rv == 0)
     {
       retro_log_printf_cb(RETRO_LOG_ERROR,
-                          "[4DO]: XRGB8888 is not supported.\n");
+                          "[4DO]: pixel format is not supported.\n");
       return false;
     }
 
@@ -659,7 +675,6 @@ retro_load_game(const struct retro_game_info *info_)
         }
     }
 
-  chkopts();
   video_init();
   cdimage_set_sector(0);
   freedo_3do_init(libfreedo_callback);
@@ -673,7 +688,7 @@ retro_load_game(const struct retro_game_info *info_)
     retro_nvram_load(freedo_arm_nvram_get());
 
   freedo_vdlp_configure(VIDEO_BUFFER,
-                        VDLP_PIXEL_FORMAT_XRGB8888,
+                        g_VDLP_PIXEL_FORMAT,
                         VDLP_PIXEL_RES_320x240,
                         0);
 
