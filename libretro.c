@@ -690,7 +690,7 @@ retro_load_game(const struct retro_game_info *info_)
   freedo_vdlp_configure(VIDEO_BUFFER,
                         g_VDLP_PIXEL_FORMAT,
                         VDLP_PIXEL_RES_320x240,
-                        0);
+                        g_VDLP_FLAGS);
 
   return true;
 }
