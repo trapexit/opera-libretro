@@ -275,7 +275,7 @@ option_enabled(const char *key_)
 
 static
 void
-check_option_4do_bios(void)
+chkopt_4do_bios(void)
 {
   int rv;
   const freedo_bios_t *bios;
@@ -305,7 +305,7 @@ check_option_4do_bios(void)
 
 static
 void
-check_option_4do_font(void)
+chkopt_4do_font(void)
 {
   int rv;
   const freedo_bios_t *font;
@@ -335,7 +335,7 @@ check_option_4do_font(void)
 
 static
 void
-check_option_4do_high_resolution(void)
+chkopt_4do_high_resolution(void)
 {
   if(option_enabled("4do_high_resolution"))
     {
@@ -353,7 +353,7 @@ check_option_4do_high_resolution(void)
 
 static
 void
-check_option_4do_cpu_overclock(void)
+chkopt_4do_cpu_overclock(void)
 {
   int rv;
   struct retro_variable var;
@@ -374,7 +374,7 @@ check_option_4do_cpu_overclock(void)
 
 static
 void
-check_option_4do_vdlp_pixel_format(void)
+chkopt_4do_vdlp_pixel_format(void)
 {
   int rv;
   struct retro_variable var;
@@ -396,7 +396,7 @@ check_option_4do_vdlp_pixel_format(void)
 
 static
 void
-check_option_set_reset_bits(const char *key_,
+chkopt_set_reset_bits(const char *key_,
                             uint32_t   *input_,
                             uint32_t    bitmask_)
 {
@@ -407,7 +407,7 @@ check_option_set_reset_bits(const char *key_,
 
 static
 bool
-check_option_nvram_per_game(void)
+chkopt_nvram_per_game(void)
 {
   int rv;
   struct retro_variable var;
@@ -427,14 +427,14 @@ check_option_nvram_per_game(void)
 
 static
 bool
-check_option_nvram_shared(void)
+chkopt_nvram_shared(void)
 {
-  return !check_option_nvram_per_game();
+  return !chkopt_nvram_per_game();
 }
 
 static
 void
-check_option_4do_active_devices(void)
+chkopt_4do_active_devices(void)
 {
   int rv;
   struct retro_variable var;
@@ -454,7 +454,7 @@ check_option_4do_active_devices(void)
 
 static
 void
-check_option_4do_madam_matrix_engine(void)
+chkopt_4do_madam_matrix_engine(void)
 {
   int rv;
   struct retro_variable var;
@@ -474,7 +474,7 @@ check_option_4do_madam_matrix_engine(void)
 
 static
 void
-check_option_4do_kprint(void)
+chkopt_4do_kprint(void)
 {
   int rv;
 
@@ -488,7 +488,7 @@ check_option_4do_kprint(void)
 
 static
 void
-check_option_4do_dsp_threaded(void)
+chkopt_4do_dsp_threaded(void)
 {
   bool rv;
 
@@ -499,7 +499,7 @@ check_option_4do_dsp_threaded(void)
 
 static
 void
-check_option_4do_swi_hle(void)
+chkopt_4do_swi_hle(void)
 {
   bool rv;
 
@@ -510,24 +510,24 @@ check_option_4do_swi_hle(void)
 
 static
 void
-check_options(void)
+chkopts(void)
 {
-  check_option_4do_bios();
-  check_option_4do_font();
-  check_option_4do_vdlp_pixel_format();
-  check_option_set_reset_bits("4do_vdlp_bypass_clut",&g_VDLP_FLAGS,VDLP_FLAG_CLUT_BYPASS);
-  check_option_4do_high_resolution();
-  check_option_4do_cpu_overclock();
-  check_option_4do_dsp_threaded();
-  check_option_4do_active_devices();
-  check_option_set_reset_bits("4do_hack_timing_1",&FIXMODE,FIX_BIT_TIMING_1);
-  check_option_set_reset_bits("4do_hack_timing_3",&FIXMODE,FIX_BIT_TIMING_3);
-  check_option_set_reset_bits("4do_hack_timing_5",&FIXMODE,FIX_BIT_TIMING_5);
-  check_option_set_reset_bits("4do_hack_timing_6",&FIXMODE,FIX_BIT_TIMING_6);
-  check_option_set_reset_bits("4do_hack_graphics_step_y",&FIXMODE,FIX_BIT_GRAPHICS_STEP_Y);
-  check_option_4do_kprint();
-  check_option_4do_madam_matrix_engine();
-  check_option_4do_swi_hle();
+  chkopt_4do_bios();
+  chkopt_4do_font();
+  chkopt_4do_vdlp_pixel_format();
+  chkopt_set_reset_bits("4do_vdlp_bypass_clut",&g_VDLP_FLAGS,VDLP_FLAG_CLUT_BYPASS);
+  chkopt_4do_high_resolution();
+  chkopt_4do_cpu_overclock();
+  chkopt_4do_dsp_threaded();
+  chkopt_4do_active_devices();
+  chkopt_set_reset_bits("4do_hack_timing_1",&FIXMODE,FIX_BIT_TIMING_1);
+  chkopt_set_reset_bits("4do_hack_timing_3",&FIXMODE,FIX_BIT_TIMING_3);
+  chkopt_set_reset_bits("4do_hack_timing_5",&FIXMODE,FIX_BIT_TIMING_5);
+  chkopt_set_reset_bits("4do_hack_timing_6",&FIXMODE,FIX_BIT_TIMING_6);
+  chkopt_set_reset_bits("4do_hack_graphics_step_y",&FIXMODE,FIX_BIT_GRAPHICS_STEP_Y);
+  chkopt_4do_kprint();
+  chkopt_4do_madam_matrix_engine();
+  chkopt_4do_swi_hle();
 }
 
 void
@@ -659,7 +659,7 @@ retro_load_game(const struct retro_game_info *info_)
         }
     }
 
-  check_options();
+  chkopts();
   video_init();
   cdimage_set_sector(0);
   freedo_3do_init(libfreedo_callback);
@@ -669,7 +669,7 @@ retro_load_game(const struct retro_game_info *info_)
 
   /* XXX: Is this really a frontend responsibility? */
   nvram_init(freedo_arm_nvram_get());
-  if(check_option_nvram_shared())
+  if(chkopt_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
 
   freedo_vdlp_configure(VIDEO_BUFFER,
@@ -695,7 +695,7 @@ retro_load_game_special(unsigned                      game_type_,
 void
 retro_unload_game(void)
 {
-  if(check_option_nvram_shared())
+  if(chkopt_nvram_shared())
     retro_nvram_save(freedo_arm_nvram_get());
 
   lr_dsp_destroy();
@@ -724,7 +724,7 @@ retro_get_memory_data(unsigned id_)
   switch(id_)
     {
     case RETRO_MEMORY_SAVE_RAM:
-      if(check_option_nvram_shared())
+      if(chkopt_nvram_shared())
         return NULL;
       return freedo_arm_nvram_get();
     case RETRO_MEMORY_SYSTEM_RAM:
@@ -742,7 +742,7 @@ retro_get_memory_size(unsigned id_)
   switch(id_)
     {
     case RETRO_MEMORY_SAVE_RAM:
-      if(check_option_nvram_shared())
+      if(chkopt_nvram_shared())
         return 0;
       return freedo_arm_nvram_size();
     case RETRO_MEMORY_SYSTEM_RAM:
@@ -784,13 +784,13 @@ retro_deinit(void)
 void
 retro_reset(void)
 {
-  if(check_option_nvram_shared())
+  if(chkopt_nvram_shared())
     retro_nvram_save(freedo_arm_nvram_get());
 
   lr_dsp_destroy();
   freedo_3do_destroy();
 
-  check_options();
+  chkopts();
   video_init();
   cdimage_set_sector(0);
   freedo_3do_init(libfreedo_callback);
@@ -800,7 +800,7 @@ retro_reset(void)
 
   /* XXX: Is this really a frontend responsibility? */
   nvram_init(freedo_arm_nvram_get());
-  if(check_option_nvram_shared())
+  if(chkopt_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
 }
 
@@ -809,7 +809,7 @@ retro_run(void)
 {
   bool updated = false;
   if(retro_environment_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,&updated) && updated)
-    check_options();
+    chkopts();
 
   lr_input_update(ACTIVE_DEVICES);
 
