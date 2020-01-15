@@ -60,6 +60,39 @@ static struct retro_core_option_definition option_defs_us[] = {
       },
       "1.0x (12.50Mhz)"
    },
+   {
+     "4do_vdlp_pixel_format",
+     "VDLP Pixel Format",
+     "Selects what pixel format 4DO will request from the runtime as well as the pixel conversion logic.",
+     {
+       { "0RGB1555", NULL },
+       { "RGB565",   NULL },
+       { "XRGB8888", NULL }
+     },
+     "XRGB8888"
+   },
+   {
+     "4do_vdlp_render_mode",
+     "VDLP Render Mode",
+     "",
+     {
+       { "standard",    "Standard" },
+       { "bypass_clut", "Bypass CLUT" },
+       { NULL, NULL }
+     },
+     "standard"
+   },
+   {
+      "4do_high_resolution",
+      "High Resolution CEL Rendering",
+      "The 3DO has internal resolution of 320x240. Enabling this option causes CELs to be rendered at 2X the resolution into a 2X output buffer, increasing the fidelity of 3D models. Has a significant performance impact.",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
 #if THREADED_DSP
    {
       "4do_dsp_threaded",
@@ -73,17 +106,6 @@ static struct retro_core_option_definition option_defs_us[] = {
       "disabled"
    },
 #endif
-   {
-      "4do_high_resolution",
-      "High Resolution",
-      "The 3DO has a default internal resolution of 320x240, but outputs video at 640x480. Enabling 'High Resolution' mode forces content to be rendered at the full 640x480 output resolution, increasing the fidelity of 3D models. Has a significant performance impact.",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
    {
       "4do_nvram_storage",
       "NVRAM Storage",
