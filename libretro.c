@@ -353,7 +353,7 @@ chkopt_4do_high_resolution(void)
 
   freedo_vdlp_configure(VIDEO_BUFFER,
                         g_VDLP_PIXEL_FORMAT,
-                        (HIRESMODE ? VDLP_PIXEL_RES_640x480 : VDLP_PIXEL_RES_320x240),
+                        0,
                         g_VDLP_FLAGS);
 }
 
@@ -404,7 +404,7 @@ chkopt_4do_vdlp_pixel_format(void)
 
   freedo_vdlp_configure(VIDEO_BUFFER,
                         g_VDLP_PIXEL_FORMAT,
-                        VDLP_PIXEL_RES_320x240,
+                        0,
                         g_VDLP_FLAGS);
 
 
@@ -420,7 +420,7 @@ chkopt_4do_vdlp_bypass_clut(void)
                         VDLP_FLAG_CLUT_BYPASS);
   freedo_vdlp_configure(VIDEO_BUFFER,
                         g_VDLP_PIXEL_FORMAT,
-                        VDLP_PIXEL_RES_320x240,
+                        0,
                         g_VDLP_FLAGS);
 }
 
@@ -734,7 +734,7 @@ retro_load_game(const struct retro_game_info *info_)
 
   freedo_vdlp_configure(VIDEO_BUFFER,
                         g_VDLP_PIXEL_FORMAT,
-                        VDLP_PIXEL_RES_320x240,
+                        0,
                         g_VDLP_FLAGS);
 
   return true;
@@ -877,6 +877,11 @@ retro_reset(void)
   nvram_init(freedo_arm_nvram_get());
   if(chkopt_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
+
+  freedo_vdlp_configure(VIDEO_BUFFER,
+                        g_VDLP_PIXEL_FORMAT,
+                        0,
+                        g_VDLP_FLAGS);
 }
 
 void
