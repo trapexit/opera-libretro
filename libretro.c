@@ -38,7 +38,9 @@ static uint32_t   CDIMAGE_SECTOR;
 static uint32_t  *VIDEO_BUFFER = NULL;
 static uint32_t   VIDEO_WIDTH;
 static uint32_t   VIDEO_HEIGHT;
+static uint32_t   g_VIDEO_PITCH_SHIFT;
 static uint32_t   ACTIVE_DEVICES;
+static int                 g_PIXEL_FORMAT_SET  = false;
 static vdlp_pixel_format_e g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_XRGB8888;
 static uint32_t            g_VDLP_FLAGS        = VDLP_FLAG_NONE;
 
@@ -197,20 +199,6 @@ retro_get_system_info(struct retro_system_info *info_)
   info_->valid_extensions = "iso|bin|chd|cue";
 }
 
-void
-retro_get_system_av_info(struct retro_system_av_info *info_)
-{
-  memset(info_,0,sizeof(*info_));
-
-  info_->timing.fps            = 60;
-  info_->timing.sample_rate    = 44100;
-  info_->geometry.base_width   = VIDEO_WIDTH;
-  info_->geometry.base_height  = VIDEO_HEIGHT;
-  info_->geometry.max_width    = 640;
-  info_->geometry.max_height   = 480;
-  info_->geometry.aspect_ratio = 4.0 / 3.0;
-}
-
 size_t
 retro_serialize_size(void)
 {
@@ -271,6 +259,17 @@ option_enabled(const char *key_)
     return (strcmp(var.value,"enabled") == 0);
 
   return false;
+}
+
+static
+void
+chkopt_set_reset_bits(const char *key_,
+                            uint32_t   *input_,
+                            uint32_t    bitmask_)
+{
+  *input_ = (option_enabled(key_) ?
+             (*input_ | bitmask_) :
+             (*input_ & ~bitmask_));
 }
 
 static
@@ -379,6 +378,9 @@ chkopt_4do_vdlp_pixel_format(void)
   int rv;
   struct retro_variable var;
 
+  if(g_PIXEL_FORMAT_SET)
+    return;
+
   var.key   = "4do_vdlp_pixel_format";
   var.value = NULL;
 
@@ -392,17 +394,28 @@ chkopt_4do_vdlp_pixel_format(void)
       else if(!strcmp(var.value,"0RGB1555"))
         g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_0RGB1555;
     }
+
+
+  freedo_vdlp_configure(VIDEO_BUFFER,
+                        g_VDLP_PIXEL_FORMAT,
+                        VDLP_PIXEL_RES_320x240,
+                        g_VDLP_FLAGS);
+
+
+  g_PIXEL_FORMAT_SET = true;
 }
 
 static
 void
-chkopt_set_reset_bits(const char *key_,
-                            uint32_t   *input_,
-                            uint32_t    bitmask_)
+chkopt_4do_vdlp_bypass_clut(void)
 {
-  *input_ = (option_enabled(key_) ?
-             (*input_ | bitmask_) :
-             (*input_ & ~bitmask_));
+  chkopt_set_reset_bits("4do_vdlp_bypass_clut",
+                        &g_VDLP_FLAGS,
+                        VDLP_FLAG_CLUT_BYPASS);
+  freedo_vdlp_configure(VIDEO_BUFFER,
+                        g_VDLP_PIXEL_FORMAT,
+                        VDLP_PIXEL_RES_320x240,
+                        g_VDLP_FLAGS);
 }
 
 static
@@ -515,7 +528,7 @@ chkopts(void)
   chkopt_4do_bios();
   chkopt_4do_font();
   chkopt_4do_vdlp_pixel_format();
-  chkopt_set_reset_bits("4do_vdlp_bypass_clut",&g_VDLP_FLAGS,VDLP_FLAG_CLUT_BYPASS);
+  chkopt_4do_vdlp_bypass_clut();
   chkopt_4do_high_resolution();
   chkopt_4do_cpu_overclock();
   chkopt_4do_dsp_threaded();
@@ -646,13 +659,12 @@ vdlp_pixel_format_to_libretro(vdlp_pixel_format_e pf_)
   return RETRO_PIXEL_FORMAT_XRGB8888;
 }
 
-bool
-retro_load_game(const struct retro_game_info *info_)
+static
+int
+set_pixel_format(void)
 {
   int rv;
   enum retro_pixel_format fmt;
-
-  chkopts();
 
   fmt = vdlp_pixel_format_to_libretro(g_VDLP_PIXEL_FORMAT);
   rv = retro_environment_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,&fmt);
@@ -662,6 +674,33 @@ retro_load_game(const struct retro_game_info *info_)
                           "[4DO]: pixel format is not supported.\n");
       return false;
     }
+
+  switch(fmt)
+    {
+    case RETRO_PIXEL_FORMAT_XRGB8888:
+      g_VIDEO_PITCH_SHIFT = 2;
+      break;
+    default:
+    case RETRO_PIXEL_FORMAT_RGB565:
+    case RETRO_PIXEL_FORMAT_0RGB1555:
+      g_VIDEO_PITCH_SHIFT = 1;
+      break;
+    }
+
+  return true;
+}
+
+
+bool
+retro_load_game(const struct retro_game_info *info_)
+{
+  int rv;
+
+  chkopts();
+
+  rv = set_pixel_format();
+  if(rv == false)
+    return false;
 
   if(info_)
     {
@@ -719,6 +758,20 @@ retro_unload_game(void)
   retro_cdimage_close(&CDIMAGE);
 
   video_destroy();
+}
+
+void
+retro_get_system_av_info(struct retro_system_av_info *info_)
+{
+  memset(info_,0,sizeof(*info_));
+
+  info_->timing.fps            = 60;
+  info_->timing.sample_rate    = 44100;
+  info_->geometry.base_width   = VIDEO_WIDTH;
+  info_->geometry.base_height  = VIDEO_HEIGHT;
+  info_->geometry.max_width    = 640;
+  info_->geometry.max_height   = 480;
+  info_->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
 unsigned
@@ -806,6 +859,7 @@ retro_reset(void)
   freedo_3do_destroy();
 
   chkopts();
+
   video_init();
   cdimage_set_sector(0);
   freedo_3do_init(libfreedo_callback);
@@ -834,5 +888,8 @@ retro_run(void)
 
   lr_dsp_upload();
 
-  retro_video_refresh_cb(VIDEO_BUFFER,VIDEO_WIDTH,VIDEO_HEIGHT,VIDEO_WIDTH << 2);
+  retro_video_refresh_cb(VIDEO_BUFFER,
+                         VIDEO_WIDTH,
+                         VIDEO_HEIGHT,
+                         VIDEO_WIDTH << g_VIDEO_PITCH_SHIFT);
 }
