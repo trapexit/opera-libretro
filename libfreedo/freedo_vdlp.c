@@ -245,7 +245,7 @@ vdlp_render_line_0RGB1555(void)
   int x;
   int width;
   int bypass_clut;
-  uint16_t *src;
+  uint32_t *src;
   uint16_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
@@ -255,14 +255,10 @@ vdlp_render_line_0RGB1555(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-
+  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
   for(x = 0; x < width; x++)
     {
-      *dst = vdlp_render_pixel_0RGB1555(*src,bypass_clut);
-
-      dst += 1;
-      src += 2;
+      *dst++ = vdlp_render_pixel_0RGB1555(*(uint16_t*)src++,bypass_clut);
     }
 
   g_CURBUF = dst;
@@ -274,7 +270,7 @@ vdlp_render_line_0RGB1555_bypass_clut(void)
 {
   int x;
   int width;
-  uint16_t *src;
+  uint32_t *src;
   uint16_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
@@ -283,14 +279,10 @@ vdlp_render_line_0RGB1555_bypass_clut(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-
+  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
   for(x = 0; x < width; x++)
     {
-      *dst = vdlp_render_pixel_0RGB1555_bypass_clut(*src);
-
-      dst += 1;
-      src += 2;
+      *dst++ = vdlp_render_pixel_0RGB1555_bypass_clut(*(uint16_t*)src++);
     }
 
   g_CURBUF = dst;
@@ -305,10 +297,10 @@ vdlp_render_line_0RGB1555_hires(void)
   int bypass_clut;
   uint16_t *dst0;
   uint16_t *dst1;
-  uint16_t *src0;
-  uint16_t *src1;
-  uint16_t *src2;
-  uint16_t *src3;
+  uint32_t *src0;
+  uint32_t *src1;
+  uint32_t *src2;
+  uint32_t *src3;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return;
@@ -318,22 +310,16 @@ vdlp_render_line_0RGB1555_hires(void)
 
   dst0  = g_CURBUF;
   dst1 += (width << 1);
-  src0 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (0 * 1024*1024));
-  src1 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (1 * 1024*1024));
-  src2 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (2 * 1024*1024));
-  src3 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (3 * 1024*1024));
-
+  src0  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (0 * 1024*1024));
+  src1  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (1 * 1024*1024));
+  src2  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (2 * 1024*1024));
+  src3  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (3 * 1024*1024));
   for(x = 0; x < width; x++)
     {
-      *dst0++ = vdlp_render_pixel_0RGB1555(*src0,bypass_clut);
-      *dst0++ = vdlp_render_pixel_0RGB1555(*src1,bypass_clut);
-      *dst1++ = vdlp_render_pixel_0RGB1555(*src2,bypass_clut);
-      *dst1++ = vdlp_render_pixel_0RGB1555(*src3,bypass_clut);
-
-      src0 += 2;
-      src1 += 2;
-      src2 += 2;
-      src3 += 2;
+      *dst0++ = vdlp_render_pixel_0RGB1555(*(uint16_t*)src0++,bypass_clut);
+      *dst0++ = vdlp_render_pixel_0RGB1555(*(uint16_t*)src1++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_0RGB1555(*(uint16_t*)src2++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_0RGB1555(*(uint16_t*)src3++,bypass_clut);
     }
 
   g_CURBUF = dst1;
@@ -373,7 +359,7 @@ vdlp_render_line_RGB565(void)
   int x;
   int width;
   int bypass_clut;
-  uint16_t *src;
+  uint32_t *src;
   uint16_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
@@ -383,14 +369,10 @@ vdlp_render_line_RGB565(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-
+  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
   for(x = 0; x < width; x++)
     {
-      *dst = vdlp_render_pixel_RGB565(*src,bypass_clut);
-
-      dst += 1;
-      src += 2;
+      *dst++ = vdlp_render_pixel_RGB565(*(uint16_t*)src++,bypass_clut);
     }
 
   g_CURBUF = dst;
@@ -403,7 +385,7 @@ vdlp_render_line_RGB565_bypass_clut(void)
   int x;
   int width;
   int bypass_clut;
-  uint16_t *src;
+  uint32_t *src;
   uint16_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
@@ -413,14 +395,10 @@ vdlp_render_line_RGB565_bypass_clut(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-
+  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
   for(x = 0; x < width; x++)
     {
-      *dst = vdlp_render_pixel_RGB565(*src,bypass_clut);
-
-      dst += 1;
-      src += 2;
+      *dst++ = vdlp_render_pixel_RGB565(*(uint16_t*)src++,bypass_clut);
     }
 
   g_CURBUF = dst;
@@ -435,10 +413,10 @@ vdlp_render_line_RGB565_hires(void)
   int bypass_clut;
   uint16_t *dst0;
   uint16_t *dst1;
-  uint16_t *src0;
-  uint16_t *src1;
-  uint16_t *src2;
-  uint16_t *src3;
+  uint32_t *src0;
+  uint32_t *src1;
+  uint32_t *src2;
+  uint32_t *src3;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return;
@@ -448,22 +426,16 @@ vdlp_render_line_RGB565_hires(void)
 
   dst0  = g_CURBUF;
   dst1 += (width << 1);
-
-  src0 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (0 * 1024*1024));
-  src1 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (1 * 1024*1024));
-  src2 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (2 * 1024*1024));
-  src3 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (3 * 1024*1024));
+  src0  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (0 * 1024*1024));
+  src1  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (1 * 1024*1024));
+  src2  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (2 * 1024*1024));
+  src3  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (3 * 1024*1024));
   for(x = 0; x < width; x++)
     {
-      *dst0++ = vdlp_render_pixel_RGB565(*src0,bypass_clut);
-      *dst0++ = vdlp_render_pixel_RGB565(*src1,bypass_clut);
-      *dst1++ = vdlp_render_pixel_RGB565(*src2,bypass_clut);
-      *dst1++ = vdlp_render_pixel_RGB565(*src3,bypass_clut);
-
-      src0 += 2;
-      src1 += 2;
-      src2 += 2;
-      src3 += 2;
+      *dst0++ = vdlp_render_pixel_RGB565(*(uint16_t*)src0++,bypass_clut);
+      *dst0++ = vdlp_render_pixel_RGB565(*(uint16_t*)src1++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_RGB565(*(uint16_t*)src2++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_RGB565(*(uint16_t*)src3++,bypass_clut);
     }
 
   g_CURBUF = dst1;
@@ -503,7 +475,7 @@ vdlp_render_line_XRGB8888(void)
   int x;
   int width;
   int bypass_clut;
-  uint16_t *src;
+  uint32_t *src;
   uint32_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
@@ -513,14 +485,10 @@ vdlp_render_line_XRGB8888(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-
+  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
   for(x = 0; x < width; x++)
     {
-      *dst = vdlp_render_pixel_XRGB8888(*src,bypass_clut);
-
-      dst += 1;
-      src += 2;
+      *dst++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src++,bypass_clut);
     }
 
   g_CURBUF = dst;
@@ -532,7 +500,7 @@ vdlp_render_line_XRGB8888_bypass_clut(void)
 {
   int x;
   int width;
-  uint16_t *src;
+  uint32_t *src;
   uint32_t *dst;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
@@ -541,14 +509,10 @@ vdlp_render_line_XRGB8888_bypass_clut(void)
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   dst = g_CURBUF;
-  src = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-
+  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
   for(x = 0; x < width; x++)
     {
-      *dst = vdlp_render_pixel_XRGB8888_bypass_clut(*src);
-
-      dst += 1;
-      src += 2;
+      *dst++ = vdlp_render_pixel_XRGB8888_bypass_clut(*(uint16_t*)src++);
     }
 
   g_CURBUF = dst;
@@ -563,10 +527,10 @@ vdlp_render_line_XRGB8888_hires(void)
   int bypass_clut;
   uint32_t *dst0;
   uint32_t *dst1;
-  uint16_t *src0;
-  uint16_t *src1;
-  uint16_t *src2;
-  uint16_t *src3;
+  uint32_t *src0;
+  uint32_t *src1;
+  uint32_t *src2;
+  uint32_t *src3;
 
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return;
@@ -576,22 +540,16 @@ vdlp_render_line_XRGB8888_hires(void)
 
   dst0  = g_CURBUF;
   dst1 += (width << 1);
-
-  src0 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (0 * 1024*1024));
-  src1 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (1 * 1024*1024));
-  src2 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (2 * 1024*1024));
-  src3 = (uint16_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (3 * 1024*1024));
+  src0  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (0 * 1024*1024));
+  src1  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (1 * 1024*1024));
+  src2  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (2 * 1024*1024));
+  src3  = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (3 * 1024*1024));
   for(x = 0; x < width; x++)
     {
-      *dst0++ = vdlp_render_pixel_XRGB8888(*src0,bypass_clut);
-      *dst0++ = vdlp_render_pixel_XRGB8888(*src1,bypass_clut);
-      *dst1++ = vdlp_render_pixel_XRGB8888(*src2,bypass_clut);
-      *dst1++ = vdlp_render_pixel_XRGB8888(*src3,bypass_clut);
-
-      src0 += 2;
-      src1 += 2;
-      src2 += 2;
-      src3 += 2;
+      *dst0++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src0++,bypass_clut);
+      *dst0++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src1++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src2++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src3++,bypass_clut);
     }
 
   g_CURBUF = dst1;
