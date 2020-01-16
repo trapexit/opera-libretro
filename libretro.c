@@ -341,13 +341,20 @@ chkopt_4do_high_resolution(void)
       HIRESMODE    = 1;
       VIDEO_WIDTH  = 640;
       VIDEO_HEIGHT = 480;
+      g_VDLP_FLAGS |= VDLP_FLAG_HIRES_CEL;
     }
   else
     {
       HIRESMODE    = 0;
       VIDEO_WIDTH  = 320;
       VIDEO_HEIGHT = 240;
+      g_VDLP_FLAGS &= ~VDLP_FLAG_HIRES_CEL;
     }
+
+  freedo_vdlp_configure(VIDEO_BUFFER,
+                        g_VDLP_PIXEL_FORMAT,
+                        (HIRESMODE ? VDLP_PIXEL_RES_640x480 : VDLP_PIXEL_RES_320x240),
+                        g_VDLP_FLAGS);
 }
 
 static
@@ -394,7 +401,6 @@ chkopt_4do_vdlp_pixel_format(void)
       else if(!strcmp(var.value,"0RGB1555"))
         g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_0RGB1555;
     }
-
 
   freedo_vdlp_configure(VIDEO_BUFFER,
                         g_VDLP_PIXEL_FORMAT,
