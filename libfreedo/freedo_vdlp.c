@@ -748,7 +748,6 @@ freedo_vdlp_configure(void                *buf_,
   /*   } */
 
   g_RENDERER = get_renderer(pf_,flags_);
-  printf("RENDERER: %p; FLAGS: %x\n",g_RENDERER,flags_);
   if(g_RENDERER)
     return -1;
 

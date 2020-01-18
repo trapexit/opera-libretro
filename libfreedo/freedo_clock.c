@@ -33,16 +33,16 @@
 #include "freedo_core.h"
 #include "freedo_vdlp.h"
 
-#define DEFAULT_CPU_FREQUENCY       12500000
+#define DEFAULT_CPU_FREQUENCY       12500000UL
 #define DEFAULT_CYCLES_PER_FIELD    CYCLES_PER_FIELD(DEFAULT_CPU_FREQUENCY,NTSC_FIELD_RATE)
 #define DEFAULT_CYCLES_PER_SND      (DEFAULT_CPU_FREQUENCY / SND_CLOCK)
 #define DEFAULT_CYCLES_PER_SCANLINE CYCLES_PER_SCANLINE(DEFAULT_CPU_FREQUENCY,NTSC_FIELD_SIZE,NTSC_FIELD_RATE)
-#define MIN_CPU_FREQUENCY           1000000
-#define SND_CLOCK                   44100
-#define NTSC_FIELD_SIZE             263
-#define PAL_FIELD_SIZE              288
-#define NTSC_FIELD_RATE             5994
-#define PAL_FIELD_RATE              5000
+#define MIN_CPU_FREQUENCY           1000000UL
+#define SND_CLOCK                   44100UL
+#define NTSC_FIELD_SIZE             263UL
+#define PAL_FIELD_SIZE              288UL
+#define NTSC_FIELD_RATE             5994UL
+#define PAL_FIELD_RATE              5000UL
 
 #define CYCLES_PER_FIELD(X,Y)      (((((uint64_t)(X)) * 100) / (Y)) + 1)
 #define CYCLES_PER_SCANLINE(X,Y,Z) (((uint64_t)(X) * 100) / ((Y) * (Z)))
@@ -198,7 +198,7 @@ freedo_clock_timer_queued(void)
   if(timer_delay == 0)
     return false;
 
-  limit = (g_CLOCK.cpu_frequency / (21000000 / timer_delay));
+  limit = (g_CLOCK.cpu_frequency / (21000000UL / timer_delay));
   if(g_CLOCK.timer_acc >= limit)
     {
       g_CLOCK.timer_acc -= limit;
