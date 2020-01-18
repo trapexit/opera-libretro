@@ -581,7 +581,8 @@ freedo_vdlp_process_line(int line_)
       vdlp_execute();
     }
 
-  if(g_VDLP.line_cnt == 0)
+  g_VDLP.line_cnt--;
+  if(g_VDLP.line_cnt <= 0)
     vdlp_execute();
 
   y = (line_ - 16);
@@ -601,7 +602,6 @@ freedo_vdlp_process_line(int line_)
   g_VDLP.curr_bmp = tick_fba(g_VDLP.curr_bmp);
 
   g_VDLP.disp_ctrl.dcw.vi_off_1_line = 0;
-  g_VDLP.line_cnt--;
 }
 
 

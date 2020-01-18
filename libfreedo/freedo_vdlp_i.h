@@ -131,7 +131,7 @@ struct vdlp_s
   background_value_word_u bg_color;
   clut_dma_ctrl_word_u    clut_ctrl;
   display_ctrl_word_u     disp_ctrl;
-  uint32_t line_cnt;
+  int32_t line_cnt;
 };
 
 STATIC_ASSERT(sizeof(background_value_word_u) == sizeof(uint32_t),
