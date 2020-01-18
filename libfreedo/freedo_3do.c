@@ -157,14 +157,14 @@ freedo_3do_internal_frame(uint32_t  cycles_,
 void
 freedo_3do_process_frame(void)
 {
-  uint32_t cnt;
+  int32_t cnt;
   uint32_t line;
   static int field = 0;
 
   if(flagtime)
     flagtime--;
 
-  cnt   = 0;
+  cnt  = 0;
   line = 0;
   do
     {
@@ -178,7 +178,7 @@ freedo_3do_process_frame(void)
       if(cnt >= 32)
         {
           freedo_3do_internal_frame(cnt,&line,field);
-          cnt = 0;
+          cnt -= 32;
         }
     } while(line < 263);
 
