@@ -248,9 +248,6 @@ vdlp_render_line_0RGB1555(void)
   uint32_t *src;
   uint16_t *dst;
 
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
-
   bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -272,9 +269,6 @@ vdlp_render_line_0RGB1555_bypass_clut(void)
   int width;
   uint32_t *src;
   uint16_t *dst;
-
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -301,9 +295,6 @@ vdlp_render_line_0RGB1555_hires(void)
   uint32_t *src1;
   uint32_t *src2;
   uint32_t *src3;
-
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
 
   bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
@@ -362,9 +353,6 @@ vdlp_render_line_RGB565(void)
   uint32_t *src;
   uint16_t *dst;
 
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
-
   bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -387,9 +375,6 @@ vdlp_render_line_RGB565_bypass_clut(void)
   int bypass_clut;
   uint32_t *src;
   uint16_t *dst;
-
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
 
   bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
@@ -417,9 +402,6 @@ vdlp_render_line_RGB565_hires(void)
   uint32_t *src1;
   uint32_t *src2;
   uint32_t *src3;
-
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
 
   bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
@@ -478,9 +460,6 @@ vdlp_render_line_XRGB8888(void)
   uint32_t *src;
   uint32_t *dst;
 
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
-
   bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -502,9 +481,6 @@ vdlp_render_line_XRGB8888_bypass_clut(void)
   int width;
   uint32_t *src;
   uint32_t *dst;
-
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -531,9 +507,6 @@ vdlp_render_line_XRGB8888_hires(void)
   uint32_t *src1;
   uint32_t *src2;
   uint32_t *src3;
-
-  if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
-    return;
 
   bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
