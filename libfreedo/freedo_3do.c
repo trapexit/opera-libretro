@@ -180,7 +180,7 @@ freedo_3do_process_frame(void)
           freedo_3do_internal_frame(cnt,&line,field);
           cnt -= 32;
         }
-    } while(line < 263);
+    } while(line < 262);
 
   field = !field;
 }

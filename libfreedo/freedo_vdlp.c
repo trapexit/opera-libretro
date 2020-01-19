@@ -135,7 +135,7 @@ vdlp_process_optional_cmds(const int ctrl_word_cnt_)
   for(i = 0; i < ctrl_word_cnt_; i++)
     {
       cmd.raw = vdl_read(i);
-      switch((cmd.raw & 0xE0000000) >> 28)
+      switch((cmd.raw & 0xE0000000) >> 29)
         {
         case 0b000:
         case 0b001:
@@ -576,18 +576,28 @@ freedo_vdlp_process_line(int line_)
   if(line_ == 0)
     {
       g_CURBUF = g_BUF;
-      g_VDLP.line_cnt = 0;
       g_VDLP.curr_vdl = g_VDLP.head_vdl;
       vdlp_execute();
+      /* printf("line: %d; cnt: %d; dma: %d; clut ctrl: %.8x\n", */
+      /*        line_+1, */
+      /*        g_VDLP.line_cnt, */
+      /*        g_VDLP.clut_ctrl.cdcw.enable_dma, */
+      /*        g_VDLP.clut_ctrl.raw); */
+    }
+  else
+  if(g_VDLP.line_cnt <= -1)
+    {
+      vdlp_execute();
+      /* printf("line: %d; cnt: %d; dma: %d; clut ctrl: %.8x\n", */
+      /*        line_+1, */
+      /*        g_VDLP.line_cnt, */
+      /*        g_VDLP.clut_ctrl.cdcw.enable_dma, */
+      /*        g_VDLP.clut_ctrl.raw); */
     }
 
-  g_VDLP.line_cnt--;
-  if(g_VDLP.line_cnt <= 0)
-    vdlp_execute();
-
-  y = (line_ - 16);
-  if((y >= 0) && (y < 240))
-    g_RENDERER();
+  if(g_VDLP.clut_ctrl.cdcw.enable_dma)
+    if((line_ >= 21) && (line_ < 261))
+      g_RENDERER();
 
   /*
     See ppgfldr/ggsfldr/gpgfldr/2gpgb.html for details on the frame
@@ -602,6 +612,7 @@ freedo_vdlp_process_line(int line_)
   g_VDLP.curr_bmp = tick_fba(g_VDLP.curr_bmp);
 
   g_VDLP.disp_ctrl.dcw.vi_off_1_line = 0;
+  g_VDLP.line_cnt--;
 }
 
 

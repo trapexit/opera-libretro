@@ -584,6 +584,9 @@ freedo_madam_peek(uint32_t addr_)
   if((addr_ >= 0x400) && (addr_ <= 0x53F))
     return freedo_clio_fifo_read(addr_);
 
+  if((addr_ >= 0x580) && (addr_ <= 0x59C))
+    printf("madam r 0x%x: %x\n",addr_,MADAM.mregs[addr_]);
+
   /* status of CEL */
   if(addr_ == 0x28)
     {
@@ -756,8 +759,20 @@ freedo_madam_poke(uint32_t addr_,
       HandleDMA8();
       break;
     case 0x580:
+      printf("madam w 0x580: %x\n",val_);
       freedo_vdlp_process(val_);
       return;
+    case 0x584:
+    case 0x588:
+    case 0x58C:
+    case 0x590:
+    case 0x594:
+    case 0x598:
+    case 0x59C:
+      printf("madam w 0x%x: %x\n",addr_,val_);
+      MADAM.mregs[addr_] = val_;
+      break;
+
     case SPRSTRT:
       if(MADAM.FSM == FSM_IDLE)
         MADAM.FSM = FSM_INPROCESS;
