@@ -28,7 +28,6 @@
   *  Felix Lazarev
 */
 
-#include <assert.h>
 #include "freedo_arm.h"
 #include "freedo_core.h"
 #include "freedo_vdl.h"
