@@ -28,6 +28,7 @@
   *  Felix Lazarev
 */
 
+#include <assert.h>
 #include "freedo_arm.h"
 #include "freedo_core.h"
 #include "freedo_vdl.h"
@@ -522,7 +523,6 @@ vdlp_render_line_XRGB8888_hires(void)
   uint32_t *src2;
   uint32_t *src3;
 
-  bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
   if(!g_VDLP.clut_ctrl.cdcw.enable_dma)
     return vdlp_render_line_black_hires(width,sizeof(uint32_t));
@@ -533,15 +533,16 @@ vdlp_render_line_XRGB8888_hires(void)
   src1 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (1 * 1024*1024));
   src2 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (2 * 1024*1024));
   src3 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF) + (3 * 1024*1024));
+  bypass_clut = g_VDLP.disp_ctrl.dcw.clut_bypass;
   for(x = 0; x < width; x++)
     {
       *dst0++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src0++,bypass_clut);
-      //      *dst0++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src1++,bypass_clut);
-      //      *dst1++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src2++,bypass_clut);
-      //      *dst1++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src3++,bypass_clut);
+      *dst0++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src1++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src2++,bypass_clut);
+      *dst1++ = vdlp_render_pixel_XRGB8888(*(uint16_t*)src3++,bypass_clut);
     }
 
-  g_CURBUF = dst0;
+  g_CURBUF = dst1;
 }
 
 /* tick / increment frame buffer address */
@@ -574,7 +575,7 @@ freedo_vdlp_process_line(int line_)
   if(g_VDLP.line_cnt == 0)
     vdlp_process_vdl_entry();
 
-  if((line_ >= 21) && (line_ < 262))
+  if((line_ >= 21) && (line_ < 261))
     g_RENDERER();
 
   /*
