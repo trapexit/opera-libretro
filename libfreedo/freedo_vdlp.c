@@ -169,13 +169,17 @@ vdlp_process_optional_cmds(const int ctrl_word_cnt_)
 
 static
 void
-vdlp_process_vdl_entry(const uint32_t entry_)
+vdlp_process_vdl_entry(void)
 {
-  int i;
+  uint32_t entry;
   uint32_t next_entry;
   clut_dma_ctrl_word_s *cdcw = &g_VDLP.clut_ctrl.cdcw;
 
-  g_VDLP.clut_ctrl.raw = entry_;
+  entry = vram_read32(g_VDLP.curr_vdl);
+  if(!entry)
+    return;
+  
+  g_VDLP.clut_ctrl.raw = entry;
 
   if(cdcw->curr_fba_override)
     g_VDLP.curr_bmp = vdl_read(1);
@@ -197,17 +201,6 @@ vdlp_process_vdl_entry(const uint32_t entry_)
 
 static
 void
-vdlp_execute(void)
-{
-  uint32_t tmp;
-
-  tmp = vram_read32(g_VDLP.curr_vdl);
-  if(tmp)
-    vdlp_process_vdl_entry(tmp);
-}
-
-static
-void
 vdlp_render_line_black(const uint32_t width_,
                        const uint32_t bytes_per_pixel_)
 {
@@ -215,7 +208,7 @@ vdlp_render_line_black(const uint32_t width_,
 
   dst = g_CURBUF;
 
-  memset(dst,127,(width_ * bytes_per_pixel_));
+  memset(dst,0,(width_ * bytes_per_pixel_));
 
   g_CURBUF = (dst + (width_ * bytes_per_pixel_));
 }
@@ -571,11 +564,11 @@ freedo_vdlp_process_line(int line_)
     {
       g_CURBUF = g_BUF;
       g_VDLP.curr_vdl = g_VDLP.head_vdl;
-      vdlp_execute();
+      vdlp_process_vdl_entry();
     }
 
   if(g_VDLP.line_cnt == 0)
-    vdlp_execute();
+    vdlp_process_vdl_entry();    
 
   if((line_ >= 21) && (line_ < 262))
     g_RENDERER();
