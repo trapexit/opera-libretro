@@ -215,7 +215,7 @@ vdlp_render_line_black(const uint32_t width_,
 
   dst = g_CURBUF;
 
-  memset(dst,0,(width_ * bytes_per_pixel_));
+  memset(dst,127,(width_ * bytes_per_pixel_));
 
   g_CURBUF = (dst + (width_ * bytes_per_pixel_));
 }
