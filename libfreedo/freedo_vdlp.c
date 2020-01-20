@@ -668,6 +668,8 @@ get_renderer(vdlp_pixel_format_e pf_,
           return vdlp_render_line_0RGB1555_bypass_clut;
         case VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_0RGB1555_hires;
+        case VDLP_FLAG_CLUT_BYPASS|VDLP_FLAG_HIRES_CEL:
+          return vdlp_render_line_0RGB1555_hires;
         }
       break;
     case VDLP_PIXEL_FORMAT_RGB565:
@@ -679,6 +681,8 @@ get_renderer(vdlp_pixel_format_e pf_,
           return vdlp_render_line_RGB565_bypass_clut;
         case VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_RGB565_hires;
+        case VDLP_FLAG_CLUT_BYPASS|VDLP_FLAG_HIRES_CEL:
+          return vdlp_render_line_RGB565_hires;
         }
       break;
     case VDLP_PIXEL_FORMAT_XRGB8888:
@@ -689,6 +693,8 @@ get_renderer(vdlp_pixel_format_e pf_,
         case VDLP_FLAG_CLUT_BYPASS:
           return vdlp_render_line_XRGB8888_bypass_clut;
         case VDLP_FLAG_HIRES_CEL:
+          return vdlp_render_line_XRGB8888_hires;
+        case VDLP_FLAG_CLUT_BYPASS|VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_XRGB8888_hires;
         }
       break;
