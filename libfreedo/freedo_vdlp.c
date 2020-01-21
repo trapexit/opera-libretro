@@ -703,7 +703,6 @@ get_renderer(vdlp_pixel_format_e pf_,
   return NULL;
 }
 
-
 int
 freedo_vdlp_configure(void                *buf_,
                       vdlp_pixel_format_e  pf_,
@@ -711,36 +710,6 @@ freedo_vdlp_configure(void                *buf_,
                       uint32_t             flags_)
 {
   g_BUF = buf_;
-
-  /* switch(res_) */
-  /*   { */
-  /*   case VDLP_PIXEL_RES_320x240: */
-  /*     if(flags_ & VDLP_FLAG_HIRES_CEL) */
-  /*       return -1; */
-  /*     if(flags_ & VDLP_FLAG_INTERPOLATION) */
-  /*       return -1; */
-  /*     g_BUF_WIDTH  = 320; */
-  /*     g_BUF_HEIGHT = 240; */
-  /*     break; */
-  /*   case VDLP_PIXEL_RES_384x288: */
-  /*     if(flags_ & VDLP_FLAG_HIRES_CEL) */
-  /*       return -1; */
-  /*     if(flags_ & VDLP_FLAG_INTERPOLATION) */
-  /*       return -1; */
-  /*     g_BUF_WIDTH  = 384; */
-  /*     g_BUF_HEIGHT = 288; */
-  /*     break; */
-  /*   case VDLP_PIXEL_RES_640x480: */
-  /*     g_BUF_WIDTH  = 640; */
-  /*     g_BUF_HEIGHT = 480; */
-  /*     break; */
-  /*   case VDLP_PIXEL_RES_768x576: */
-  /*     g_BUF_WIDTH  = 768; */
-  /*     g_BUF_HEIGHT = 576; */
-  /*     break; */
-  /*   default: */
-  /*     return -1; */
-  /*   } */
 
   g_RENDERER = get_renderer(pf_,flags_);
   if(g_RENDERER)
