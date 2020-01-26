@@ -1,33 +1,3 @@
-/*
-  www.freedo.org
-  The first and only working 3DO multiplayer emulator.
-
-  The FreeDO licensed under modified GNU LGPL, with following notes:
-
-  *   The owners and original authors of the FreeDO have full right to
-  *   develop closed source derivative work.
-
-  *   Any non-commercial uses of the FreeDO sources or any knowledge
-  *   obtained by studying or reverse engineering of the sources, or
-  *   any other material published by FreeDO have to be accompanied
-  *   with full credits.
-
-  *   Any commercial uses of FreeDO sources or any knowledge obtained
-  *   by studying or reverse engineering of the sources, or any other
-  *   material published by FreeDO is strictly forbidden without
-  *   owners approval.
-
-  The above notes are taking precedence over GNU LGPL in conflicting
-  situations.
-
-  Project authors:
-  *  Alexander Troosh
-  *  Maxim Grishin
-  *  Allen Wright
-  *  John Sammons
-  *  Felix Lazarev
-*/
-
 #include "freedo_arm.h"
 #include "freedo_core.h"
 #include "freedo_vdl.h"
@@ -43,21 +13,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define VRAM_OFFSET (1024 * 1024 * 2)
-
-/* VDLP options TODO */
 /*
+  VDLP options TODO
   - interpolation
-  - Disable CLUT?
-  - Add pseudo random 3bit pattern for second clut bypass mode
- */
+  - add pseudo random 3bit pattern for second clut bypass mode
+*/
 
-static vdlp_t    g_VDLP        = {0};
-static uint8_t  *g_VRAM        = NULL;
-static void     *g_BUF         = NULL;
-static void     *g_CURBUF      = NULL;
-static uint32_t  g_BUF_WIDTH   = 320;
-static uint32_t  g_BUF_HEIGHT  = 240;
+static vdlp_t   g_VDLP          = {0};
+static uint8_t *g_VRAM          = NULL;
+static void    *g_BUF           = NULL;
+static void    *g_CURBUF        = NULL;
 static void (*g_RENDERER)(void) = NULL;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
@@ -706,7 +671,6 @@ get_renderer(vdlp_pixel_format_e pf_,
 int
 freedo_vdlp_configure(void                *buf_,
                       vdlp_pixel_format_e  pf_,
-                      vdlp_pixel_res_e     res_,
                       uint32_t             flags_)
 {
   g_BUF = buf_;

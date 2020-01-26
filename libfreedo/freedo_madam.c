@@ -584,9 +584,6 @@ freedo_madam_peek(uint32_t addr_)
   if((addr_ >= 0x400) && (addr_ <= 0x53F))
     return freedo_clio_fifo_read(addr_);
 
-  if((addr_ >= 0x580) && (addr_ <= 0x59C))
-    printf("madam r 0x%x: %x\n",addr_,MADAM.mregs[addr_]);
-
   /* status of CEL */
   if(addr_ == 0x28)
     {

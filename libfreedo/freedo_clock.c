@@ -26,7 +26,18 @@ struct freedo_clock_s
   uint32_t cycles_per_timer;
 };
 
-static freedo_clock_t g_CLOCK = {0};
+static freedo_clock_t g_CLOCK =
+  {
+    DEFAULT_CPU_FREQ,
+    0,
+    0,
+    0,
+    NTSC_FIELD_SIZE,
+    NTSC_FIELD_RATE_1616,
+    32 << 16,
+    32 << 16,
+    32 << 16
+  };
 
 
 static
@@ -150,7 +161,6 @@ freedo_clock_vdl_queued(void)
   if(g_CLOCK.vdl_acc >= g_CLOCK.cycles_per_scanline)
     {
       g_CLOCK.vdl_acc -= g_CLOCK.cycles_per_scanline;
-
       return true;
     }
 
@@ -163,7 +173,6 @@ freedo_clock_dsp_queued(void)
   if(g_CLOCK.dsp_acc >= g_CLOCK.cycles_per_snd)
     {
       g_CLOCK.dsp_acc -= g_CLOCK.cycles_per_snd;
-
       return true;
     }
 
@@ -180,7 +189,6 @@ freedo_clock_timer_queued(void)
   if(g_CLOCK.timer_acc >= g_CLOCK.cycles_per_timer)
     {
       g_CLOCK.timer_acc -= g_CLOCK.cycles_per_timer;
-
       return true;
     }
 

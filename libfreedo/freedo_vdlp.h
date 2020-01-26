@@ -93,7 +93,6 @@ void     freedo_vdlp_state_load(const void *buf_);
 
 int      freedo_vdlp_configure(void *buf,
                                vdlp_pixel_format_e pf,
-                               vdlp_pixel_res_e res,
                                uint32_t flags_);
 
 EXTERN_C_END

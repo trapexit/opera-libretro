@@ -173,8 +173,6 @@ libfreedo_callback(int   cmd_,
 {
   switch(cmd_)
     {
-    case EXT_SWAPFRAME:
-      break;
     case EXT_DSP_TRIGGER:
       lr_dsp_process();
       break;
@@ -351,10 +349,7 @@ chkopt_4do_high_resolution(void)
       g_VDLP_FLAGS &= ~VDLP_FLAG_HIRES_CEL;
     }
 
-  freedo_vdlp_configure(VIDEO_BUFFER,
-                        g_VDLP_PIXEL_FORMAT,
-                        0,
-                        g_VDLP_FLAGS);
+  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 }
 
 static
@@ -402,11 +397,7 @@ chkopt_4do_vdlp_pixel_format(void)
         g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_0RGB1555;
     }
 
-  freedo_vdlp_configure(VIDEO_BUFFER,
-                        g_VDLP_PIXEL_FORMAT,
-                        0,
-                        g_VDLP_FLAGS);
-
+  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 
   g_PIXEL_FORMAT_SET = true;
 }
@@ -418,10 +409,7 @@ chkopt_4do_vdlp_bypass_clut(void)
   chkopt_set_reset_bits("4do_vdlp_bypass_clut",
                         &g_VDLP_FLAGS,
                         VDLP_FLAG_CLUT_BYPASS);
-  freedo_vdlp_configure(VIDEO_BUFFER,
-                        g_VDLP_PIXEL_FORMAT,
-                        0,
-                        g_VDLP_FLAGS);
+  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 }
 
 static
@@ -723,20 +711,16 @@ retro_load_game(const struct retro_game_info *info_)
     }
 
   video_init();
+  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
+
   cdimage_set_sector(0);
 
   load_rom1();
   load_rom2();
 
-  /* XXX: Is this really a frontend responsibility? */
   nvram_init(freedo_arm_nvram_get());
   if(chkopt_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
-
-  freedo_vdlp_configure(VIDEO_BUFFER,
-                        g_VDLP_PIXEL_FORMAT,
-                        0,
-                        g_VDLP_FLAGS);
 
   return true;
 }
@@ -870,6 +854,8 @@ retro_reset(void)
   chkopts();
 
   video_init();
+  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
+
   cdimage_set_sector(0);
 
   load_rom1();
@@ -879,11 +865,6 @@ retro_reset(void)
   nvram_init(freedo_arm_nvram_get());
   if(chkopt_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
-
-  freedo_vdlp_configure(VIDEO_BUFFER,
-                        g_VDLP_PIXEL_FORMAT,
-                        0,
-                        g_VDLP_FLAGS);
 }
 
 void
