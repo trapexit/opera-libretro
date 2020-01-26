@@ -666,7 +666,7 @@ set_pixel_format(void)
     {
       retro_log_printf_cb(RETRO_LOG_ERROR,
                           "[4DO]: pixel format is not supported.\n");
-      return false;
+      return -1;
     }
 
   switch(fmt)
@@ -681,33 +681,52 @@ set_pixel_format(void)
       break;
     }
 
-  return true;
+  return 0;
 }
 
+static
+int
+print_cdimage_open_fail(const char *path_)
+{
+  retro_log_printf_cb(RETRO_LOG_ERROR,
+                      "[4DO]: failure opening image - %s\n",
+                      path_);
+  return -1;
+}
+
+static
+int
+open_cdimage_if_needed(const struct retro_game_info *info_)
+{
+  int rv;
+
+  if(info_ == NULL)
+    return 0;
+
+  rv = retro_cdimage_open(info_->path,&CDIMAGE);
+  if(rv == -1)
+    return print_cdimage_open_fail(info_->path);
+
+  return 0;
+}
 
 bool
 retro_load_game(const struct retro_game_info *info_)
 {
   int rv;
 
-  if(info_)
-    {
-      rv = retro_cdimage_open(info_->path,&CDIMAGE);
-      if(rv == -1)
-        {
-          retro_log_printf_cb(RETRO_LOG_ERROR,
-                              "[4DO]: failure opening image - %s\n",
-                              info_->path);
-          return false;
-        }
-    }
+  rv = open_cdimage_if_needed(info_);
+  if(rv == -1)
+    return false;
+
+  cdimage_set_sector(0);
 
   freedo_3do_init(libfreedo_callback);
 
   chkopts();
 
   rv = set_pixel_format();
-  if(rv == false)
+  if(rv == -1)
     return false;
 
   video_init();
@@ -719,8 +738,6 @@ retro_load_game(const struct retro_game_info *info_)
   nvram_init(freedo_arm_nvram_get());
   if(chkopt_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
-
-  cdimage_set_sector(0);
 
   return true;
 }
