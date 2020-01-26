@@ -33,17 +33,15 @@
 
 #include "extern_c.h"
 
-#include <boolean.h>
-
 #include <stdint.h>
 
 EXTERN_C_BEGIN
 
 void     freedo_clock_init(void);
 
-bool     freedo_clock_vdl_queued(void);
-bool     freedo_clock_dsp_queued(void);
-bool     freedo_clock_timer_queued(void);
+int      freedo_clock_vdl_queued(void);
+int      freedo_clock_dsp_queued(void);
+int      freedo_clock_timer_queued(void);
 
 void     freedo_clock_push_cycles(const uint32_t clks_);
 

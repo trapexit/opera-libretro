@@ -1,87 +1,81 @@
-/*
-  www.freedo.org
-  The first and only working 3DO multiplayer emulator.
-
-  The FreeDO licensed under modified GNU LGPL, with following notes:
-
-  *   The owners and original authors of the FreeDO have full right to
-  *   develop closed source derivative work.
-
-  *   Any non-commercial uses of the FreeDO sources or any knowledge
-  *   obtained by studying or reverse engineering of the sources, or
-  *   any other material published by FreeDO have to be accompanied
-  *   with full credits.
-
-  *   Any commercial uses of FreeDO sources or any knowledge obtained
-  *   by studying or reverse engineering of the sources, or any other
-  *   material published by FreeDO is strictly forbidden without
-  *   owners approval.
-
-  The above notes are taking precedence over GNU LGPL in conflicting
-  situations.
-
-  Project authors:
-  *  Alexander Troosh
-  *  Maxim Grishin
-  *  Allen Wright
-  *  John Sammons
-  *  Felix Lazarev
-*/
-
 #include "freedo_clio.h"
 #include "freedo_clock.h"
 #include "freedo_core.h"
 #include "freedo_vdlp.h"
 
-#define DEFAULT_CPU_FREQUENCY       12500000UL
-#define DEFAULT_CYCLES_PER_FIELD    CYCLES_PER_FIELD(DEFAULT_CPU_FREQUENCY,NTSC_FIELD_RATE)
-#define DEFAULT_CYCLES_PER_SND      (DEFAULT_CPU_FREQUENCY / SND_CLOCK)
-#define DEFAULT_CYCLES_PER_SCANLINE CYCLES_PER_SCANLINE(DEFAULT_CPU_FREQUENCY,NTSC_FIELD_SIZE,NTSC_FIELD_RATE)
-#define MIN_CPU_FREQUENCY           1000000UL
-#define SND_CLOCK                   44100UL
-#define NTSC_FIELD_SIZE             263UL
-#define PAL_FIELD_SIZE              288UL
-#define NTSC_FIELD_RATE             5994UL
-#define PAL_FIELD_RATE              5000UL
-
-#define CYCLES_PER_FIELD(X,Y)      (((((uint64_t)(X)) * 100) / (Y)) + 1)
-#define CYCLES_PER_SCANLINE(X,Y,Z) (((uint64_t)(X) * 100) / ((Y) * (Z)))
+#define DEFAULT_CPU_FREQ     12500000UL
+#define MIN_CPU_FREQ         1000000UL
+#define SND_FREQ             44100UL
+#define TIMER_FREQ           65536UL
+#define NTSC_FIELD_SIZE      263UL
+#define PAL_FIELD_SIZE       288UL
+#define NTSC_FIELD_RATE_1616 3928227UL
+#define PAL_FIELD_RATE_1616  3276800UL
 
 typedef struct freedo_clock_s freedo_clock_t;
 struct freedo_clock_s
 {
-  uint32_t cpu_frequency;
+  uint32_t cpu_freq;
   int32_t  dsp_acc;
   int32_t  vdl_acc;
   int32_t  timer_acc;
   uint32_t field_size;
   uint32_t field_rate;
-  uint32_t cycles_per_field;
   uint32_t cycles_per_snd;
   uint32_t cycles_per_scanline;
+  uint32_t cycles_per_timer;
 };
 
-static freedo_clock_t g_CLOCK =
-  {
-    DEFAULT_CPU_FREQUENCY,      /* .cpu_frequency */
-    0,                          /* .dsp_acc */
-    0,                          /* .vdl_acc */
-    0,                          /* .timer_acc */
-    NTSC_FIELD_SIZE,            /* .field_size */
-    NTSC_FIELD_RATE,            /* .field_rate */
-    DEFAULT_CYCLES_PER_FIELD,   /* .cycles_per_field */
-    DEFAULT_CYCLES_PER_SND,     /* .cycles_per_snd */
-    DEFAULT_CYCLES_PER_SCANLINE /* .cycles_per_scanline */
-  };
+static freedo_clock_t g_CLOCK = {0};
 
+
+static
+uint32_t
+calc_cycles_per_snd(void)
+{
+  uint64_t rv;
+
+  rv  = ((uint64_t)g_CLOCK.cpu_freq << 16);
+  rv /= ((uint64_t)SND_FREQ);
+
+  return rv;
+}
+
+/*
+  For greater percision the field rate is stored as 16.16 so cpu_freq
+  requires the 32 rather than 16 LSL
+*/
+static
+uint32_t
+calc_cycles_per_scanline(void)
+{
+  uint64_t rv;
+
+  rv  = ((uint64_t)g_CLOCK.cpu_freq << 32);
+  rv /= ((uint64_t)g_CLOCK.field_rate * (uint64_t)g_CLOCK.field_size);
+
+  return rv;
+}
+
+static
+uint32_t
+calc_cycles_per_timer(void)
+{
+  uint64_t rv;
+
+  rv  = ((uint64_t)g_CLOCK.cpu_freq << 16);
+  rv /= ((uint64_t)TIMER_FREQ);
+
+  return rv;
+}
 
 static
 void
 recalculate_cycles_per(void)
 {
-  g_CLOCK.cycles_per_field    = CYCLES_PER_FIELD(g_CLOCK.cpu_frequency,g_CLOCK.field_rate);
-  g_CLOCK.cycles_per_snd      = (g_CLOCK.cpu_frequency / SND_CLOCK);
-  g_CLOCK.cycles_per_scanline = CYCLES_PER_SCANLINE(g_CLOCK.cpu_frequency,g_CLOCK.field_size,g_CLOCK.field_rate);
+  g_CLOCK.cycles_per_snd      = calc_cycles_per_snd();
+  g_CLOCK.cycles_per_scanline = calc_cycles_per_scanline();
+  g_CLOCK.cycles_per_timer    = calc_cycles_per_timer();
 }
 
 void
@@ -89,9 +83,9 @@ freedo_clock_cpu_set_freq(const uint32_t freq_)
 {
   uint32_t freq;
 
-  freq = ((freq_ < MIN_CPU_FREQUENCY) ? MIN_CPU_FREQUENCY : freq_);
+  freq = ((freq_ < MIN_CPU_FREQ) ? MIN_CPU_FREQ : freq_);
 
-  g_CLOCK.cpu_frequency = freq_;
+  g_CLOCK.cpu_freq = freq_;
 
   recalculate_cycles_per();
 }
@@ -101,7 +95,7 @@ freedo_clock_cpu_set_freq_mul(const float mul_)
 {
   float freq;
 
-  freq = (DEFAULT_CPU_FREQUENCY * mul_);
+  freq = (DEFAULT_CPU_FREQ * mul_);
 
   freedo_clock_cpu_set_freq((uint32_t)freq);
 }
@@ -109,19 +103,13 @@ freedo_clock_cpu_set_freq_mul(const float mul_)
 uint32_t
 freedo_clock_cpu_get_freq(void)
 {
-  return g_CLOCK.cpu_frequency;
+  return g_CLOCK.cpu_freq;
 }
 
 uint32_t
 freedo_clock_cpu_get_default_freq(void)
 {
-  return DEFAULT_CPU_FREQUENCY;
-}
-
-uint64_t
-freedo_clock_cpu_cycles_per_field(void)
-{
-  return g_CLOCK.cycles_per_field;
+  return DEFAULT_CPU_FREQ;
 }
 
 /* for backwards compatibility */
@@ -146,27 +134,22 @@ freedo_clock_state_load(const void *buf_)
 void
 freedo_clock_init(void)
 {
-  g_CLOCK.cpu_frequency       = DEFAULT_CPU_FREQUENCY;
-  g_CLOCK.dsp_acc             = 0;
-  g_CLOCK.vdl_acc             = 0;
-  g_CLOCK.timer_acc           = 0;
-  g_CLOCK.field_size          = NTSC_FIELD_SIZE;
-  g_CLOCK.field_rate          = NTSC_FIELD_RATE;
-  g_CLOCK.cycles_per_field    = DEFAULT_CYCLES_PER_FIELD;
-  g_CLOCK.cycles_per_snd      = DEFAULT_CYCLES_PER_SND;
-  g_CLOCK.cycles_per_scanline = DEFAULT_CYCLES_PER_SCANLINE;
+  g_CLOCK.cpu_freq   = DEFAULT_CPU_FREQ;
+  g_CLOCK.dsp_acc    = 0;
+  g_CLOCK.vdl_acc    = 0;
+  g_CLOCK.timer_acc  = 0;
+  g_CLOCK.field_size = NTSC_FIELD_SIZE;
+  g_CLOCK.field_rate = NTSC_FIELD_RATE_1616;
 
   recalculate_cycles_per();
 }
 
-bool
+int
 freedo_clock_vdl_queued(void)
 {
-  const uint32_t limit = g_CLOCK.cycles_per_scanline;
-
-  if(g_CLOCK.vdl_acc >= limit)
+  if(g_CLOCK.vdl_acc >= g_CLOCK.cycles_per_scanline)
     {
-      g_CLOCK.vdl_acc -= limit;
+      g_CLOCK.vdl_acc -= g_CLOCK.cycles_per_scanline;
 
       return true;
     }
@@ -174,14 +157,12 @@ freedo_clock_vdl_queued(void)
   return false;
 }
 
-bool
+int
 freedo_clock_dsp_queued(void)
 {
-  const uint32_t limit = g_CLOCK.cycles_per_snd;
-
-  if(g_CLOCK.dsp_acc >= limit)
+  if(g_CLOCK.dsp_acc >= g_CLOCK.cycles_per_snd)
     {
-      g_CLOCK.dsp_acc -= limit;
+      g_CLOCK.dsp_acc -= g_CLOCK.cycles_per_snd;
 
       return true;
     }
@@ -189,20 +170,16 @@ freedo_clock_dsp_queued(void)
   return false;
 }
 
-bool
+/*
+  It's not clear what register 0x220 of the CLIO does in relation to
+  the timer. Need to test on the real hardware.
+ */
+int
 freedo_clock_timer_queued(void)
 {
-  uint32_t limit;
-  uint32_t timer_delay;
-
-  timer_delay = freedo_clio_timer_get_delay();
-  if(timer_delay == 0)
-    return false;
-
-  limit = 190;
-  if(g_CLOCK.timer_acc >= limit)
+  if(g_CLOCK.timer_acc >= g_CLOCK.cycles_per_timer)
     {
-      g_CLOCK.timer_acc -= limit;
+      g_CLOCK.timer_acc -= g_CLOCK.cycles_per_timer;
 
       return true;
     }
@@ -213,15 +190,15 @@ freedo_clock_timer_queued(void)
 void
 freedo_clock_push_cycles(const uint32_t clks_)
 {
-  g_CLOCK.dsp_acc   += clks_;
-  g_CLOCK.vdl_acc   += clks_;
-  g_CLOCK.timer_acc += clks_;
+  g_CLOCK.dsp_acc   += (clks_ << 16);
+  g_CLOCK.vdl_acc   += (clks_ << 16);
+  g_CLOCK.timer_acc += (clks_ << 16);
 }
 
 void
 freedo_clock_region_set_ntsc(void)
 {
-  g_CLOCK.field_rate = NTSC_FIELD_RATE;
+  g_CLOCK.field_rate = NTSC_FIELD_RATE_1616;
   g_CLOCK.field_size = NTSC_FIELD_SIZE;
 
   recalculate_cycles_per();
@@ -230,7 +207,7 @@ freedo_clock_region_set_ntsc(void)
 void
 freedo_clock_region_set_pal(void)
 {
-  g_CLOCK.field_rate = PAL_FIELD_RATE;
+  g_CLOCK.field_rate = PAL_FIELD_RATE_1616;
   g_CLOCK.field_size = PAL_FIELD_SIZE;
 
   recalculate_cycles_per();

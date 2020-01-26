@@ -64,6 +64,8 @@ freedo_3do_init(freedo_ext_interface_t callback_)
 
   CNBFIX = 0;
 
+  freedo_clock_init();
+
   freedo_arm_init();
 
   dram = freedo_arm_ram_get();
@@ -112,8 +114,6 @@ freedo_3do_init(freedo_ext_interface_t callback_)
     FF	TEST END (halt)
   */
   freedo_xbus_device_load(0,NULL);
-
-  freedo_clock_init();
 
   return 0;
 }

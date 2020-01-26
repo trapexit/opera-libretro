@@ -702,6 +702,8 @@ retro_load_game(const struct retro_game_info *info_)
 {
   int rv;
 
+  freedo_3do_init(libfreedo_callback);
+
   chkopts();
 
   rv = set_pixel_format();
@@ -722,7 +724,6 @@ retro_load_game(const struct retro_game_info *info_)
 
   video_init();
   cdimage_set_sector(0);
-  freedo_3do_init(libfreedo_callback);
 
   load_rom1();
   load_rom2();
@@ -864,11 +865,12 @@ retro_reset(void)
   lr_dsp_destroy();
   freedo_3do_destroy();
 
+  freedo_3do_init(libfreedo_callback);
+
   chkopts();
 
   video_init();
   cdimage_set_sector(0);
-  freedo_3do_init(libfreedo_callback);
 
   load_rom1();
   load_rom2();
