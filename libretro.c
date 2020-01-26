@@ -35,9 +35,9 @@
 
 static cdimage_t  CDIMAGE;
 static uint32_t   CDIMAGE_SECTOR;
-static uint32_t  *VIDEO_BUFFER = NULL;
-static uint32_t   VIDEO_WIDTH;
-static uint32_t   VIDEO_HEIGHT;
+static uint32_t  *g_VIDEO_BUFFER;
+static uint32_t   g_VIDEO_WIDTH;
+static uint32_t   g_VIDEO_HEIGHT;
 static uint32_t   g_VIDEO_PITCH_SHIFT;
 static uint32_t   ACTIVE_DEVICES;
 static int                 g_PIXEL_FORMAT_SET  = false;
@@ -132,17 +132,17 @@ static
 void
 video_init(void)
 {
-  if(VIDEO_BUFFER == NULL)
-    VIDEO_BUFFER = (uint32_t*)calloc(640 * 480,sizeof(uint32_t));
+  if(g_VIDEO_BUFFER == NULL)
+    g_VIDEO_BUFFER = (uint32_t*)calloc(640 * 480,sizeof(uint32_t));
 }
 
 static
 void
 video_destroy(void)
 {
-  if(VIDEO_BUFFER != NULL)
-    free(VIDEO_BUFFER);
-  VIDEO_BUFFER = NULL;
+  if(g_VIDEO_BUFFER != NULL)
+    free(g_VIDEO_BUFFER);
+  g_VIDEO_BUFFER = NULL;
 }
 
 static
@@ -336,20 +336,20 @@ chkopt_4do_high_resolution(void)
 {
   if(option_enabled("4do_high_resolution"))
     {
-      HIRESMODE    = 1;
-      VIDEO_WIDTH  = 640;
-      VIDEO_HEIGHT = 480;
-      g_VDLP_FLAGS |= VDLP_FLAG_HIRES_CEL;
+      HIRESMODE       = 1;
+      g_VIDEO_WIDTH   = 640;
+      g_VIDEO_HEIGHT  = 480;
+      g_VDLP_FLAGS   |= VDLP_FLAG_HIRES_CEL;
     }
   else
     {
       HIRESMODE    = 0;
-      VIDEO_WIDTH  = 320;
-      VIDEO_HEIGHT = 240;
+      g_VIDEO_WIDTH  = 320;
+      g_VIDEO_HEIGHT = 240;
       g_VDLP_FLAGS &= ~VDLP_FLAG_HIRES_CEL;
     }
 
-  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
+  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 }
 
 static
@@ -397,7 +397,7 @@ chkopt_4do_vdlp_pixel_format(void)
         g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_0RGB1555;
     }
 
-  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
+  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 
   g_PIXEL_FORMAT_SET = true;
 }
@@ -409,7 +409,7 @@ chkopt_4do_vdlp_bypass_clut(void)
   chkopt_set_reset_bits("4do_vdlp_bypass_clut",
                         &g_VDLP_FLAGS,
                         VDLP_FLAG_CLUT_BYPASS);
-  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
+  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 }
 
 static
@@ -730,7 +730,7 @@ retro_load_game(const struct retro_game_info *info_)
     return false;
 
   video_init();
-  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
+  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 
   load_rom1();
   load_rom2();
@@ -775,8 +775,8 @@ retro_get_system_av_info(struct retro_system_av_info *info_)
 
   info_->timing.fps            = 60;
   info_->timing.sample_rate    = 44100;
-  info_->geometry.base_width   = VIDEO_WIDTH;
-  info_->geometry.base_height  = VIDEO_HEIGHT;
+  info_->geometry.base_width   = g_VIDEO_WIDTH;
+  info_->geometry.base_height  = g_VIDEO_HEIGHT;
   info_->geometry.max_width    = 640;
   info_->geometry.max_height   = 480;
   info_->geometry.aspect_ratio = 4.0 / 3.0;
@@ -871,7 +871,7 @@ retro_reset(void)
   chkopts();
 
   video_init();
-  freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
+  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 
   cdimage_set_sector(0);
 
@@ -895,12 +895,12 @@ retro_run(void)
 
   freedo_3do_process_frame();
 
-  lr_input_crosshairs_draw(VIDEO_BUFFER,VIDEO_WIDTH,VIDEO_HEIGHT);
+  lr_input_crosshairs_draw(g_VIDEO_BUFFER,g_VIDEO_WIDTH,g_VIDEO_HEIGHT);
 
   lr_dsp_upload();
 
-  retro_video_refresh_cb(VIDEO_BUFFER,
-                         VIDEO_WIDTH,
-                         VIDEO_HEIGHT,
-                         VIDEO_WIDTH << g_VIDEO_PITCH_SHIFT);
+  retro_video_refresh_cb(g_VIDEO_BUFFER,
+                         g_VIDEO_WIDTH,
+                         g_VIDEO_HEIGHT,
+                         g_VIDEO_WIDTH << g_VIDEO_PITCH_SHIFT);
 }
