@@ -51,9 +51,9 @@ typedef struct freedo_clock_s freedo_clock_t;
 struct freedo_clock_s
 {
   uint32_t cpu_frequency;
-  uint32_t dsp_acc;
-  uint32_t vdl_acc;
-  uint32_t timer_acc;
+  int32_t  dsp_acc;
+  int32_t  vdl_acc;
+  int32_t  timer_acc;
   uint32_t field_size;
   uint32_t field_rate;
   uint32_t cycles_per_field;
@@ -155,6 +155,8 @@ freedo_clock_init(void)
   g_CLOCK.cycles_per_field    = DEFAULT_CYCLES_PER_FIELD;
   g_CLOCK.cycles_per_snd      = DEFAULT_CYCLES_PER_SND;
   g_CLOCK.cycles_per_scanline = DEFAULT_CYCLES_PER_SCANLINE;
+
+  recalculate_cycles_per();
 }
 
 bool
@@ -187,7 +189,6 @@ freedo_clock_dsp_queued(void)
   return false;
 }
 
-/* Need to find out where the value 21000000 comes from. */
 bool
 freedo_clock_timer_queued(void)
 {
@@ -198,7 +199,7 @@ freedo_clock_timer_queued(void)
   if(timer_delay == 0)
     return false;
 
-  limit = (g_CLOCK.cpu_frequency / (21000000UL / timer_delay));
+  limit = 190;
   if(g_CLOCK.timer_acc >= limit)
     {
       g_CLOCK.timer_acc -= limit;

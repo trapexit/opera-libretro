@@ -533,7 +533,6 @@ freedo_clio_poke(uint32_t addr_,
     }
   else if(addr_ == 0x220)
     {
-      /* if(val<64)val=64; */
       CLIO.regs[addr_] = (val_ & 0x3FF);
       return 0;
     }
@@ -618,43 +617,62 @@ freedo_clio_vcnt_update(int line_,
   CLIO.regs[0x34] = ((field_ << 11) + line_);
 }
 
+static
+uint32_t
+timer_flags(const uint32_t timer_)
+{
+  return ((CLIO.regs[((timer_ < 8) ? 0x200 : 0x208)] >> ((timer_ << 2) & 0x1F)) & 0xF);
+}
+
+static
+void
+timer_disable(const uint32_t timer_)
+{
+  CLIO.regs[((timer_ < 8) ? 0x200 : 0x208)] &= ~(DECREMENT << ((timer_ << 2)));
+}
+
 void
 freedo_clio_timer_execute(void)
 {
+  uint32_t reg;
+  uint32_t flags;
   uint32_t timer;
   uint16_t counter;
-  bool NeedDecrementNextTimer = true; /* Need decrement for next timer */
+  uint32_t dec_next_timer;
 
+  dec_next_timer = true;
   for(timer = 0; timer < 16; timer++)
     {
-      uint32_t flag = (CLIO.regs[(timer<8)?0x200:0x208] >> ((timer * 4) & 31));
+      flags = timer_flags(timer);
+      if(!(flags & CASCADE))
+        dec_next_timer = true;
 
-      if(!(flag & CASCADE))
-        NeedDecrementNextTimer = true;
-
-      if(NeedDecrementNextTimer && (flag & DECREMENT))
+      if(dec_next_timer && (flags & DECREMENT))
         {
-          counter = CLIO.regs[0x100 + (timer * 8)];
-          NeedDecrementNextTimer = (counter-- == 0);
-          if(NeedDecrementNextTimer)
+          reg = (0x100 + (timer << 3));
+          counter = CLIO.regs[reg];
+          dec_next_timer = (counter-- == 0);
+          if(dec_next_timer)
             {
-              /* only odd timers can generate */
-              /* generate the interrupts because be overflow */
               if(timer & 1)
-                freedo_clio_fiq_generate(1<<(10-timer/2),0);
+                freedo_clio_fiq_generate(1<<(10-(timer>>1)),0);
 
-              /* reload timer by reload value */
-              if(flag & RELOAD)
-                counter = CLIO.regs[0x100 + (timer * 8) + 4];
-              else /* timer stopped -> reset it's flag DECREMENT */
-                CLIO.regs[(timer < 8) ? 0x200 : 0x208] &= ~(DECREMENT<<((timer*4)&31));
+              if(flags & RELOAD)
+                {
+                  counter = CLIO.regs[reg + 4];
+                }
+              else
+                {
+                  timer_disable(timer);
+                  counter = 0xFFFF;
+                }
             }
 
-          CLIO.regs[0x100 + (timer * 8)] = counter;
+          CLIO.regs[reg] = counter;
         }
       else
         {
-          NeedDecrementNextTimer = false;
+          dec_next_timer = false;
         }
     }
 }
