@@ -21,9 +21,9 @@ struct freedo_clock_s
   int32_t  timer_acc;
   uint32_t field_size;
   uint32_t field_rate;
-  uint32_t cycles_per_snd;
-  uint32_t cycles_per_scanline;
-  uint32_t cycles_per_timer;
+  int32_t  cycles_per_snd;
+  int32_t  cycles_per_scanline;
+  int32_t  cycles_per_timer;
 };
 
 static freedo_clock_t g_CLOCK =

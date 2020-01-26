@@ -690,14 +690,6 @@ retro_load_game(const struct retro_game_info *info_)
 {
   int rv;
 
-  freedo_3do_init(libfreedo_callback);
-
-  chkopts();
-
-  rv = set_pixel_format();
-  if(rv == false)
-    return false;
-
   if(info_)
     {
       rv = retro_cdimage_open(info_->path,&CDIMAGE);
@@ -710,10 +702,16 @@ retro_load_game(const struct retro_game_info *info_)
         }
     }
 
+  freedo_3do_init(libfreedo_callback);
+
+  chkopts();
+
+  rv = set_pixel_format();
+  if(rv == false)
+    return false;
+
   video_init();
   freedo_vdlp_configure(VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
-
-  cdimage_set_sector(0);
 
   load_rom1();
   load_rom2();
@@ -721,6 +719,8 @@ retro_load_game(const struct retro_game_info *info_)
   nvram_init(freedo_arm_nvram_get());
   if(chkopt_nvram_shared())
     retro_nvram_load(freedo_arm_nvram_get());
+
+  cdimage_set_sector(0);
 
   return true;
 }
