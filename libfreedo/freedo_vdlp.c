@@ -1,11 +1,11 @@
 #include "freedo_arm.h"
 #include "freedo_core.h"
+#include "freedo_region.h"
 #include "freedo_vdl.h"
 #include "freedo_vdlp.h"
 #include "freedo_vdlp_i.h"
 #include "hack_flags.h"
 #include "inline.h"
-#include "static_assert.h"
 
 #include <boolean.h>
 
@@ -521,6 +521,15 @@ tick_fba(const uint32_t fba_)
   return (fba_ + ((fba_ & 2) ? ((modulo << 2) - 2) : 2));
 }
 
+static
+INLINE
+int
+visible_scanline(const int line_)
+{
+  return ((line_ >= freedo_region_start_scanline()) &&
+          (line_  < freedo_region_end_scanline()));
+}
+
 void
 freedo_vdlp_process_line(int line_)
 {
@@ -539,7 +548,7 @@ freedo_vdlp_process_line(int line_)
   if(g_VDLP.line_cnt == 0)
     vdlp_process_vdl_entry();
 
-  if((line_ >= 21) && (line_ < 261))
+  if(visible_scanline(line_))
     g_RENDERER();
 
   /*

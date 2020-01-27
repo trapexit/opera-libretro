@@ -16,7 +16,7 @@ void freedo_region_set_PAL2(void);
 static
 INLINE
 uint32_t
-freedo_region_get_width(void)
+freedo_region_width(void)
 {
   return g_REGION.width;
 }
@@ -24,7 +24,7 @@ freedo_region_get_width(void)
 static
 INLINE
 uint32_t
-freedo_region_get_height(void)
+freedo_region_height(void)
 {
   return g_REGION.height;
 }
@@ -32,7 +32,7 @@ freedo_region_get_height(void)
 static
 INLINE
 uint32_t
-freedo_region_get_start_scanline(void)
+freedo_region_start_scanline(void)
 {
   return g_REGION.start_scanline;
 }
@@ -40,15 +40,15 @@ freedo_region_get_start_scanline(void)
 static
 INLINE
 uint32_t
-freedo_region_get_end_scanline(void)
+freedo_region_end_scanline(void)
 {
   return g_REGION.end_scanline;
 }
 
 static
 INLINE
-uin32_t
-freedo_region_get_field_rate(void)
+uint32_t
+freedo_region_field_rate(void)
 {
   return g_REGION.field_rate;
 }
