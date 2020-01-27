@@ -1,0 +1,56 @@
+#ifndef FREEDO_REGION_H_INCLUDED
+#define FREEDO_REGION_H_INCLUDED
+
+#include "freedo_region_i.h"
+
+#include "inline.h"
+
+#include <stdint.h>
+
+extern freedo_region_t g_REGION;
+
+void freedo_region_set_NTSC(void);
+void freedo_region_set_PAL1(void);
+void freedo_region_set_PAL2(void);
+
+static
+INLINE
+uint32_t
+freedo_region_get_width(void)
+{
+  return g_REGION.width;
+}
+
+static
+INLINE
+uint32_t
+freedo_region_get_height(void)
+{
+  return g_REGION.height;
+}
+
+static
+INLINE
+uint32_t
+freedo_region_get_start_scanline(void)
+{
+  return g_REGION.start_scanline;
+}
+
+static
+INLINE
+uint32_t
+freedo_region_get_end_scanline(void)
+{
+  return g_REGION.end_scanline;
+}
+
+static
+INLINE
+uin32_t
+freedo_region_get_field_rate(void)
+{
+  return g_REGION.field_rate;
+}
+
+#endif
