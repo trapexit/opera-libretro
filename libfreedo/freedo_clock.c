@@ -26,18 +26,7 @@ struct freedo_clock_s
   int32_t  cycles_per_timer;
 };
 
-static freedo_clock_t g_CLOCK =
-  {
-    DEFAULT_CPU_FREQ,
-    0,
-    0,
-    0,
-    NTSC_FIELD_SIZE,
-    NTSC_FIELD_RATE_1616,
-    32 << 16,
-    32 << 16,
-    32 << 16
-  };
+static freedo_clock_t g_CLOCK;
 
 
 static
