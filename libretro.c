@@ -7,6 +7,7 @@
 #include "libfreedo/freedo_frame.h"
 #include "libfreedo/freedo_madam.h"
 #include "libfreedo/freedo_pbus.h"
+#include "libfreedo/freedo_region.h"
 #include "libfreedo/freedo_vdlp.h"
 #include "libfreedo/hack_flags.h"
 
@@ -132,8 +133,11 @@ static
 void
 video_init(void)
 {
+  uint32_t size;
+
+  size = (freedo_region_max_width() * freedo_region_max_height() * 8);
   if(g_VIDEO_BUFFER == NULL)
-    g_VIDEO_BUFFER = (uint32_t*)calloc(640 * 480,sizeof(uint32_t));
+    g_VIDEO_BUFFER = (uint32_t*)calloc(size,sizeof(uint32_t));
 }
 
 static
@@ -343,13 +347,11 @@ chkopt_4do_high_resolution(void)
     }
   else
     {
-      HIRESMODE    = 0;
-      g_VIDEO_WIDTH  = 320;
-      g_VIDEO_HEIGHT = 240;
-      g_VDLP_FLAGS &= ~VDLP_FLAG_HIRES_CEL;
+      HIRESMODE       = 0;
+      g_VIDEO_WIDTH   = freedo_region_width();
+      g_VIDEO_HEIGHT  = freedo_region_height();
+      g_VDLP_FLAGS   &= ~VDLP_FLAG_HIRES_CEL;
     }
-
-  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 }
 
 static
@@ -397,8 +399,6 @@ chkopt_4do_vdlp_pixel_format(void)
         g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_0RGB1555;
     }
 
-  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
-
   g_PIXEL_FORMAT_SET = true;
 }
 
@@ -409,7 +409,6 @@ chkopt_4do_vdlp_bypass_clut(void)
   chkopt_set_reset_bits("4do_vdlp_bypass_clut",
                         &g_VDLP_FLAGS,
                         VDLP_FLAG_CLUT_BYPASS);
-  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 }
 
 static
@@ -535,6 +534,8 @@ chkopts(void)
   chkopt_4do_kprint();
   chkopt_4do_madam_matrix_engine();
   chkopt_4do_swi_hle();
+
+  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
 }
 
 void
@@ -720,20 +721,15 @@ retro_load_game(const struct retro_game_info *info_)
     return false;
 
   cdimage_set_sector(0);
-
   freedo_3do_init(libfreedo_callback);
-
+  video_init();
   chkopts();
+  load_rom1();
+  load_rom2();
 
   rv = set_pixel_format();
   if(rv == -1)
     return false;
-
-  video_init();
-  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
-
-  load_rom1();
-  load_rom2();
 
   nvram_init(freedo_arm_nvram_get());
   if(chkopt_nvram_shared())
@@ -773,18 +769,25 @@ retro_get_system_av_info(struct retro_system_av_info *info_)
 {
   memset(info_,0,sizeof(*info_));
 
-  info_->timing.fps            = 60;
+  info_->timing.fps            = freedo_region_field_rate();
   info_->timing.sample_rate    = 44100;
   info_->geometry.base_width   = g_VIDEO_WIDTH;
   info_->geometry.base_height  = g_VIDEO_HEIGHT;
-  info_->geometry.max_width    = 640;
-  info_->geometry.max_height   = 480;
+  info_->geometry.max_width    = (freedo_region_max_width() << 1);
+  info_->geometry.max_height   = (freedo_region_max_height() << 1);
   info_->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
 unsigned
 retro_get_region(void)
 {
+  switch(freedo_region_get())
+    {
+    case FREEDO_REGION_PAL1:
+    case FREEDO_REGION_PAL2:
+      return RETRO_REGION_PAL;
+    }
+
   return RETRO_REGION_NTSC;
 }
 
@@ -867,14 +870,9 @@ retro_reset(void)
   freedo_3do_destroy();
 
   freedo_3do_init(libfreedo_callback);
-
-  chkopts();
-
   video_init();
-  freedo_vdlp_configure(g_VIDEO_BUFFER,g_VDLP_PIXEL_FORMAT,g_VDLP_FLAGS);
-
+  chkopts();
   cdimage_set_sector(0);
-
   load_rom1();
   load_rom2();
 

@@ -13,6 +13,12 @@ void freedo_region_set_NTSC(void);
 void freedo_region_set_PAL1(void);
 void freedo_region_set_PAL2(void);
 
+freedo_region_e freedo_region_get(void);
+
+uint32_t freedo_region_max_width(void);
+uint32_t freedo_region_max_height(void);
+
+
 static
 INLINE
 uint32_t
@@ -27,6 +33,14 @@ uint32_t
 freedo_region_height(void)
 {
   return g_REGION.height;
+}
+
+static
+INLINE
+uint32_t
+freedo_region_scanlines(void)
+{
+  return g_REGION.scanlines;
 }
 
 static

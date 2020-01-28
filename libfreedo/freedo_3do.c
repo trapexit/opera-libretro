@@ -35,6 +35,7 @@
 #include "freedo_diag_port.h"
 #include "freedo_dsp.h"
 #include "freedo_madam.h"
+#include "freedo_region.h"
 #include "freedo_sport.h"
 #include "freedo_vdlp.h"
 #include "freedo_xbus.h"
@@ -180,7 +181,7 @@ freedo_3do_process_frame(void)
           freedo_3do_internal_frame(cnt,&line,field);
           cnt -= 32;
         }
-    } while(line < 262);
+    } while(line < freedo_region_scanlines());
 
   field = !field;
 }
