@@ -336,6 +336,28 @@ chkopt_4do_font(void)
 
 static
 void
+chkopt_4do_region(void)
+{
+  int rv;
+  struct retro_variable var;
+
+  var.key   = "4do_region";
+  var.value = NULL;
+
+  rv = retro_environment_cb(RETRO_ENVIRONMENT_GET_VARIABLE,&var);
+  if(rv && var.value)
+    {
+      if(!strcmp(var.value,"ntsc"))
+        freedo_region_set_NTSC();
+      else if(!strcmp(var.value,"pal1"))
+        freedo_region_set_PAL1();
+      else if(!strcmp(var.value,"pal2"))
+        freedo_region_set_PAL2();
+    }
+}
+
+static
+void
 chkopt_4do_high_resolution(void)
 {
   if(option_enabled("4do_high_resolution"))
@@ -520,6 +542,7 @@ chkopts(void)
 {
   chkopt_4do_bios();
   chkopt_4do_font();
+  chkopt_4do_region();
   chkopt_4do_vdlp_pixel_format();
   chkopt_4do_vdlp_bypass_clut();
   chkopt_4do_high_resolution();
@@ -786,9 +809,10 @@ retro_get_region(void)
     case FREEDO_REGION_PAL1:
     case FREEDO_REGION_PAL2:
       return RETRO_REGION_PAL;
+    case FREEDO_REGION_NTSC:
+    default:
+      return RETRO_REGION_NTSC;
     }
-
-  return RETRO_REGION_NTSC;
 }
 
 unsigned

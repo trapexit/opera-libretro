@@ -45,6 +45,18 @@ static struct retro_core_option_definition option_defs_us[] = {
       NULL
    },
    {
+      "4do_region",
+      "Mode",
+      "Select the region and resolution.",
+      {
+         { "NTSC 320x240@60", "ntsc" },
+         { "PAL1 320x240@50", "pal1" },
+         { "PAL2 352x288@50", "pal2" },
+         { NULL, NULL }
+      },
+      "ntsc"
+   },
+   {
       "4do_cpu_overclock",
       "CPU Overclock",
       "Increase clock speed of the emulated 3DO's 12.5MHz ARM60 CPU. Dramatically improves frame rates in many games (e.g. The Need For Speed), but increases performance requirements and in some cases has no effect (or may cause glitches).",
