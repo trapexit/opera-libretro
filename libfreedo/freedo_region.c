@@ -1,3 +1,5 @@
+#include "freedo_clock.h"
+
 #include "freedo_region_i.h"
 
 #define NTSC_WIDTH 320
@@ -42,6 +44,8 @@ freedo_region_set_NTSC(void)
   g_REGION.start_scanline = NTSC_START_SCANLINE;
   g_REGION.end_scanline   = NTSC_END_SCANLINE;
   g_REGION.field_rate     = NTSC_FIELD_RATE;
+
+  freedo_clock_region_set_ntsc();
 }
 
 void
@@ -54,6 +58,8 @@ freedo_region_set_PAL1(void)
   g_REGION.start_scanline = PAL1_START_SCANLINE;
   g_REGION.end_scanline   = PAL1_END_SCANLINE;
   g_REGION.field_rate     = PAL1_FIELD_RATE;
+
+  freedo_clock_region_set_pal();
 }
 
 void
@@ -66,6 +72,8 @@ freedo_region_set_PAL2(void)
   g_REGION.start_scanline = PAL2_START_SCANLINE;
   g_REGION.end_scanline   = PAL2_END_SCANLINE;
   g_REGION.field_rate     = PAL2_FIELD_RATE;
+
+  freedo_clock_region_set_pal();
 }
 
 freedo_region_e

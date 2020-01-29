@@ -8,7 +8,7 @@
 #define SND_FREQ             44100UL
 #define TIMER_FREQ           65536UL
 #define NTSC_FIELD_SIZE      263UL
-#define PAL_FIELD_SIZE       288UL
+#define PAL_FIELD_SIZE       312UL
 #define NTSC_FIELD_RATE_1616 3928227UL
 #define PAL_FIELD_RATE_1616  3276800UL
 
@@ -187,9 +187,12 @@ freedo_clock_timer_queued(void)
 void
 freedo_clock_push_cycles(const uint32_t clks_)
 {
-  g_CLOCK.dsp_acc   += (clks_ << 16);
-  g_CLOCK.vdl_acc   += (clks_ << 16);
-  g_CLOCK.timer_acc += (clks_ << 16);
+  uint32_t clks1616;
+
+  clks1616 = (clks_ << 16);
+  g_CLOCK.dsp_acc   += clks1616;
+  g_CLOCK.vdl_acc   += clks1616;
+  g_CLOCK.timer_acc += clks1616;
 }
 
 void
