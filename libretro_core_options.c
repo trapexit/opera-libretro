@@ -86,7 +86,7 @@ static struct retro_core_option_definition option_defs_us[] = {
    {
      "4do_vdlp_bypass_clut",
      "VDLP Bypass CLUT",
-     "Force 3DO VDLP to bypass the CLUT (color lookup table). May result in incorrect colors but faster rendering.",
+     "Force 3DO VDLP to bypass the game's CLUT (color lookup table). May result in incorrect colors but faster rendering.",
      {
        { "disabled", NULL },
        { "enabled",  NULL },
@@ -97,7 +97,7 @@ static struct retro_core_option_definition option_defs_us[] = {
    {
       "4do_high_resolution",
       "HiRes CEL Rendering",
-      "The 3DO has internal resolution of 320x240. Enabling this option causes CELs to be rendered at 2X the resolution into a 2X output buffer, increasing the fidelity of 3D models. Will not affect 2D games. Has a significant performance impact.",
+      "Enabling this option causes CELs to be rendered at 2x the resolution into a 2x output framebuffer, increasing the fidelity of 3D models. Will not affect 2D games. Has a significant performance impact.",
       {
          { "disabled", NULL },
          { "enabled",  NULL },
