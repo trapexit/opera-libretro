@@ -34,17 +34,16 @@
 
 #define CDIMAGE_SECTOR_SIZE 2048
 
-static cdimage_t  CDIMAGE;
-static uint32_t   CDIMAGE_SECTOR;
-static uint32_t  *g_VIDEO_BUFFER;
-static uint32_t   g_VIDEO_WIDTH;
-static uint32_t   g_VIDEO_HEIGHT;
-static uint32_t   g_VIDEO_PITCH_SHIFT;
-static uint32_t   ACTIVE_DEVICES;
-static int                 g_PIXEL_FORMAT_SET  = false;
-static vdlp_pixel_format_e g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_XRGB8888;
-static uint32_t            g_VDLP_FLAGS        = VDLP_FLAG_NONE;
-
+static cdimage_t            CDIMAGE;
+static uint32_t             CDIMAGE_SECTOR;
+static uint32_t            *g_VIDEO_BUFFER;
+static uint32_t             g_VIDEO_WIDTH;
+static uint32_t             g_VIDEO_HEIGHT;
+static uint32_t             g_VIDEO_PITCH_SHIFT;
+static uint32_t             ACTIVE_DEVICES;
+static int                  g_PIXEL_FORMAT_SET  = false;
+static vdlp_pixel_format_e  g_VDLP_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_XRGB8888;
+static uint32_t             g_VDLP_FLAGS        = VDLP_FLAG_NONE;
 static const freedo_bios_t *BIOS = NULL;
 static const freedo_bios_t *FONT = NULL;
 
