@@ -796,7 +796,7 @@ retro_get_system_av_info(struct retro_system_av_info *info_)
   info_->timing.sample_rate    = 44100;
   info_->geometry.base_width   = g_VIDEO_WIDTH;
   info_->geometry.base_height  = g_VIDEO_HEIGHT;
-  info_->geometry.max_width    = (freedo_region_max_width() << 1);
+  info_->geometry.max_width    = (freedo_region_max_width()  << 1);
   info_->geometry.max_height   = (freedo_region_max_height() << 1);
   info_->geometry.aspect_ratio = 4.0 / 3.0;
 }
