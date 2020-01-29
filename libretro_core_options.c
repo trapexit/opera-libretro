@@ -65,9 +65,9 @@ static struct retro_core_option_definition option_defs_us[] = {
       "Mode",
       "Select the resolution and field rate. NOTE: some EU games require a EU ROM.",
       {
-         { "NTSC 320x240@60", "ntsc" },
-         { "PAL1 320x240@50", "pal1" },
-         { "PAL2 352x288@50", "pal2" },
+         { "ntsc", "NTSC 320x240@60" },
+         { "pal1", "PAL1 320x240@50" },
+         { "pal2", "PAL2 352x288@50" },
          { NULL, NULL }
       },
       "ntsc"
