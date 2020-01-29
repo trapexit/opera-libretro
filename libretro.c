@@ -363,8 +363,8 @@ chkopt_4do_high_resolution(void)
   if(option_enabled("4do_high_resolution"))
     {
       HIRESMODE       = 1;
-      g_VIDEO_WIDTH   = 640;
-      g_VIDEO_HEIGHT  = 480;
+      g_VIDEO_WIDTH   = (freedo_region_width()  << 1);
+      g_VIDEO_HEIGHT  = (freedo_region_height() << 1);
       g_VDLP_FLAGS   |= VDLP_FLAG_HIRES_CEL;
     }
   else
