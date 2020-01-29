@@ -134,7 +134,8 @@ video_init(void)
 {
   uint32_t size;
 
-  size = (freedo_region_max_width() * freedo_region_max_height() * 8);
+  /* The 4x multiplication is for hires mode */
+  size = (freedo_region_max_width() * freedo_region_max_height() * 4);
   if(g_VIDEO_BUFFER == NULL)
     g_VIDEO_BUFFER = (uint32_t*)calloc(size,sizeof(uint32_t));
 }
