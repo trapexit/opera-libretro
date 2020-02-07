@@ -49,6 +49,12 @@ freedo_dram_w32(const uint32_t addr_,
   *((uint32_t*)&g_DRAM[addr_]) = val_;
 }
 
+uint8_t*
+freedo_vram_get(void)
+{
+  return g_VRAM;
+}
+
 uint32_t
 freedo_vram_r32(const uint32_t addr_)
 {
@@ -63,7 +69,7 @@ freedo_vram_w32(const uint32_t addr_,
 }
 
 uint32_t
-freedo_mem_r32(const uint32_t addr_)
+freedo_ram_r32(const uint32_t addr_)
 {
   uint32_t idx;
   uint32_t addr;

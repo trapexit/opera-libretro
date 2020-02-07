@@ -38,8 +38,8 @@ SOURCES_C += \
         $(4DO_DIR)/freedo_dsp.c \
         $(4DO_DIR)/freedo_fixedpoint_math.c \
         $(4DO_DIR)/freedo_madam.c \
-        $(4DO_DIR)/freedo_mem.c \
         $(4DO_DIR)/freedo_pbus.c \
+        $(4DO_DIR)/freedo_ram.c \
         $(4DO_DIR)/freedo_region.c \
         $(4DO_DIR)/freedo_rom.c \
         $(4DO_DIR)/freedo_sport.c \
