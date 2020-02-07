@@ -7,17 +7,27 @@
 
 #define MB (1024 * 1024)
 
-uint8_t *g_DRAM;
-uint8_t *g_VRAM;
-uint32_t g_RAM_TOP = 0x00300000;
+static uint8_t *g_DRAM;
+static uint8_t *g_VRAM;
+static uint32_t g_RAM_TOP = 0x00300000;
 
 int
-freedo_mem_init(void)
+freedo_ram_init(void)
 {
   g_DRAM = (uint8_t*)calloc(3,MB);
+  if(g_DRAM == NULL)
+    return -1;
+
   g_VRAM = &g_DRAM[2 * MB];
 
-  return (g_DRAM == NULL);
+  return 0;
+}
+
+void
+freedo_ram_free(void)
+{
+  if(g_DRAM != NULL)
+    free(g_DRAM);
 }
 
 uint8_t*
