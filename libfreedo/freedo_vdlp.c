@@ -31,7 +31,7 @@ INLINE
 uint32_t
 vram_read32(const uint32_t addr_)
 {
-  return *(uint32_t*)&g_VRAM[addr_ & 0x000FFFFF];
+  return *(uint32_t*)&g_VRAM[addr_];
 }
 
 static
