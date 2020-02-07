@@ -2119,12 +2119,6 @@ readusr(uint32_t n_)
   return 0;
 }
 
-uint32_t
-freedo_io_read(const uint32_t addr_)
-{
-  return mreadw(addr_);
-}
-
 void
 freedo_io_write(const uint32_t addr_,
                 const uint32_t val_)

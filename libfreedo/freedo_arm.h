@@ -50,7 +50,6 @@ uint16_t freedo_mem_read16(uint32_t addr_);
 uint32_t freedo_mem_read32(uint32_t addr_);
 
 void     freedo_io_write(uint32_t addr_, uint32_t val_);
-uint32_t freedo_io_read(uint32_t addr_);
 
 uint32_t freedo_arm_state_size(void);
 void     freedo_arm_state_save(void *buf_);
