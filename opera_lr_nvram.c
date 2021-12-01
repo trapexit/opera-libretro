@@ -68,7 +68,8 @@ nvram_load(void         *nvram_buf_,
 
 static
 int
-get_save_path(char path_[PATH_MAX_LENGTH])
+get_save_path(char         *path_,
+              const size_t  pathlen_)
 {
   int rv;
   const char *basepath;
@@ -77,14 +78,15 @@ get_save_path(char path_[PATH_MAX_LENGTH])
   if((rv == 0) || (basepath == NULL))
     return -1;
 
-  strlcpy(path_,basepath,PATH_MAX_LENGTH);
+  strlcpy(path_,basepath,pathlen_);
 
   return 0;
 }
 
 static
 int
-get_system_path(char path_[PATH_MAX_LENGTH])
+get_system_path(char         *path_,
+                const size_t  pathlen_)
 {
   int rv;
   const char *basepath;
@@ -93,35 +95,37 @@ get_system_path(char path_[PATH_MAX_LENGTH])
   if((rv == 0) || (basepath == NULL))
     return -1;
 
-  strlcpy(path_,basepath,PATH_MAX_LENGTH);
+  strlcpy(path_,basepath,pathlen_);
 
   return 0;
 }
 
 static
 int
-get_save_or_system_path(char path_[PATH_MAX_LENGTH])
+get_save_or_system_path(char         *path_,
+                        const size_t  pathlen_)
 {
   int rv;
 
-  rv = get_save_path(path_);
+  rv = get_save_path(path_,pathlen_);
   if(rv < 0)
-    rv = get_system_path(path_);
+    rv = get_system_path(path_,pathlen_);
 
   return rv;
 }
 
 static
 int
-get_opera_path(char path_[PATH_MAX_LENGTH])
+get_opera_path(char         *path_,
+               const size_t  pathlen_)
 {
   int rv;
 
-  rv = get_save_or_system_path(path_);
+  rv = get_save_or_system_path(path_,pathlen_);
   if(rv < 0)
     return -1;
 
-  fill_pathname_join(path_,path_,"opera",PATH_MAX_LENGTH);
+  fill_pathname_join(path_,path_,"opera",pathlen_);
 
   return 0;
 }
@@ -137,12 +141,12 @@ opera_lr_nvram_save_pergame(const uint8_t *nvram_buf_,
   char filename[PATH_MAX_LENGTH];
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_opera_path(filepath);
+  rv = get_opera_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
   fill_pathname_join(filepath,filepath,"per_game",sizeof(filepath));
-  snprintf(filename,PATH_MAX_LENGTH,"%s.%d.srm",name_,version_);
+  snprintf(filename,sizeof(filename),"%s.%d.srm",name_,version_);
   fill_pathname_join(filepath,filepath,filename,sizeof(filepath));
 
   rv = nvram_save(nvram_buf_,nvram_size_,filepath);
@@ -160,12 +164,12 @@ opera_lr_nvram_save_shared(const uint8_t *nvram_buf_,
   char filename[PATH_MAX_LENGTH];
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_opera_path(filepath);
+  rv = get_opera_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
   fill_pathname_join(filepath,filepath,"shared",sizeof(filepath));
-  snprintf(filename,PATH_MAX_LENGTH,"nvram.%d.srm",version_);
+  snprintf(filename,sizeof(filename),"nvram.%d.srm",version_);
   fill_pathname_join(filepath,filepath,filename,sizeof(filepath));
 
   rv = nvram_save(nvram_buf_,nvram_size_,filepath);
@@ -182,7 +186,7 @@ opera_lr_nvram_load_pergame_savedir(uint8_t      *nvram_buf_,
   int rv;
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_save_path(filepath);
+  rv = get_save_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
@@ -203,7 +207,7 @@ opera_lr_nvram_load_pergame_systemdir(uint8_t      *nvram_buf_,
   int rv;
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_system_path(filepath);
+  rv = get_system_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
@@ -226,7 +230,7 @@ opera_lr_nvram_load_pergame_operadir(uint8_t       *nvram_buf_,
   char filename[PATH_MAX_LENGTH];
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_opera_path(filepath);
+  rv = get_opera_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
@@ -271,7 +275,7 @@ opera_lr_nvram_load_shared_savedir(uint8_t      *nvram_buf_,
   int rv;
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_save_path(filepath);
+  rv = get_save_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
@@ -290,7 +294,7 @@ opera_lr_nvram_load_shared_systemdir(uint8_t      *nvram_buf_,
   int rv;
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_system_path(filepath);
+  rv = get_system_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
@@ -311,12 +315,12 @@ opera_lr_nvram_load_shared_operadir(uint8_t       *nvram_buf_,
   char filename[PATH_MAX_LENGTH];
   char filepath[PATH_MAX_LENGTH];
 
-  rv = get_opera_path(filepath);
+  rv = get_opera_path(filepath,sizeof(filepath));
   if(rv < 0)
     return -1;
 
   fill_pathname_join(filepath,filepath,"shared",sizeof(filepath));
-  snprintf(filename,PATH_MAX_LENGTH,"nvram.%d.srm",version_);
+  snprintf(filename,sizeof(filename),"nvram.%d.srm",version_);
   fill_pathname_join(filepath,filepath,filename,sizeof(filepath));
 
   rv = nvram_load(nvram_buf_,nvram_size_,filepath);
