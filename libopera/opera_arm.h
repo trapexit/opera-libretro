@@ -56,24 +56,10 @@ uint32_t opera_arm_state_size(void);
 void     opera_arm_state_save(void *buf_);
 void     opera_arm_state_load(const void *buf_);
 
-uint8_t* opera_arm_nvram_get(void);
-uint64_t opera_arm_nvram_size(void);
-
 void     opera_arm_rom_select(int n_);
 
-uint8_t* opera_arm_rom1_get(void);
-uint64_t opera_arm_rom1_size(void);
 void     opera_arm_rom1_byteswap_if_necessary(void);
-
-uint8_t* opera_arm_rom2_get(void);
-uint64_t opera_arm_rom2_size(void);
 void     opera_arm_rom2_byteswap_if_necessary(void);
-
-uint8_t* opera_arm_ram_get(void);
-uint64_t opera_arm_ram_size(void);
-
-uint8_t* opera_arm_vram_get(void);
-uint64_t opera_arm_vram_size(void);
 
 void     opera_arm_swi_hle_set(const int hle);
 int      opera_arm_swi_hle_get(void);

@@ -22,7 +22,7 @@ typedef enum vdlp_pixel_format_e vdlp_pixel_format_e;
 
 EXTERN_C_BEGIN
 
-void     opera_vdlp_init(uint8_t *vram_);
+void     opera_vdlp_init();
 
 void     opera_vdlp_set_vdl_head(const uint32_t addr);
 void     opera_vdlp_process_line(int line);

@@ -3,6 +3,7 @@
 
 #include "opera_arm.h"
 #include "opera_core.h"
+#include "opera_mem.h"
 #include "opera_region.h"
 #include "opera_vdl.h"
 #include "opera_vdlp.h"
@@ -19,7 +20,6 @@
 */
 
 static vdlp_t   g_VDLP          = {0};
-static uint8_t *g_VRAM          = NULL;
 static void    *g_BUF           = NULL;
 static void    *g_CURBUF        = NULL;
 static void (*g_RENDERER)(void) = NULL;
@@ -32,7 +32,7 @@ INLINE
 uint32_t
 vram_read32(const uint32_t addr_)
 {
-  return *(uint32_t*)&g_VRAM[addr_ & 0x000FFFFF];
+  return *(uint32_t*)&VRAM[addr_ & VRAM_SIZE_MASK];
 }
 
 static
@@ -41,7 +41,7 @@ void
 vram_write32(const uint32_t addr_,
              const uint32_t val_)
 {
-  *((uint32_t*)&g_VRAM[addr_]) = val_;
+  *((uint32_t*)&VRAM[addr_ & VRAM_SIZE_MASK]) = val_;
 }
 
 static
@@ -247,7 +247,7 @@ static void vdlp_render_line_0RGB1555(void)
   }
 
   dst = g_CURBUF;
-  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
@@ -275,7 +275,7 @@ static void vdlp_render_line_0RGB1555_bypass_clut(void)
   }
 
   dst = g_CURBUF;
-  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   for(x = 0; x < width; x++)
     dst[x] = fixed_clut_to_0RGB1555(*(uint16_t*)&src[x]);
 
@@ -300,10 +300,10 @@ static void vdlp_render_line_0RGB1555_hires(void)
 
   dst0 = g_CURBUF;
   dst1 = (dst0 + (width << 1));
-  src0 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-  src1 = (src0 + ((1024 * 1024) / sizeof(uint32_t)));
-  src2 = (src1 + ((1024 * 1024) / sizeof(uint32_t)));
-  src3 = (src2 + ((1024 * 1024) / sizeof(uint32_t)));
+  src0 = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  src1 = (src0 + (VRAM_SIZE / sizeof(uint32_t)));
+  src2 = (src1 + (VRAM_SIZE / sizeof(uint32_t)));
+  src3 = (src2 + (VRAM_SIZE / sizeof(uint32_t)));
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
@@ -346,10 +346,10 @@ static void vdlp_render_line_0RGB1555_hires_bypass_clut(void)
 
   dst0 = g_CURBUF;
   dst1 = (dst0 + (width << 1));
-  src0 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-  src1 = (src0 + ((1024 * 1024) / sizeof(uint32_t)));
-  src2 = (src1 + ((1024 * 1024) / sizeof(uint32_t)));
-  src3 = (src2 + ((1024 * 1024) / sizeof(uint32_t)));
+  src0 = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  src1 = (src0 + (VRAM_SIZE / sizeof(uint32_t)));
+  src2 = (src1 + (VRAM_SIZE / sizeof(uint32_t)));
+  src3 = (src2 + (VRAM_SIZE / sizeof(uint32_t)));
   for(x = 0; x < width; x++)
     {
       *dst0++ = fixed_clut_to_0RGB1555(*(uint16_t*)&src0[x]);
@@ -422,7 +422,7 @@ static void vdlp_render_line_RGB565(void)
   }
 
   dst = g_CURBUF;
-  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
@@ -450,7 +450,7 @@ static void vdlp_render_line_RGB565_bypass_clut(void)
   }
 
   dst = g_CURBUF;
-  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   for(x = 0; x < width; x++)
     dst[x] = fixed_clut_to_RGB565(*(uint16_t*)&src[x]);
 
@@ -475,10 +475,10 @@ static void vdlp_render_line_RGB565_hires(void)
 
   dst0 = g_CURBUF;
   dst1 = (dst0 + (width << 1));
-  src0 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-  src1 = (src0 + ((1024 * 1024) / sizeof(uint32_t)));
-  src2 = (src1 + ((1024 * 1024) / sizeof(uint32_t)));
-  src3 = (src2 + ((1024 * 1024) / sizeof(uint32_t)));
+  src0 = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  src1 = (src0 + (VRAM_SIZE / sizeof(uint32_t)));
+  src2 = (src1 + (VRAM_SIZE / sizeof(uint32_t)));
+  src3 = (src2 + (VRAM_SIZE / sizeof(uint32_t)));
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
@@ -521,10 +521,10 @@ static void vdlp_render_line_RGB565_hires_bypass_clut(void)
 
   dst0 = g_CURBUF;
   dst1 = (dst0 + (width << 1));
-  src0 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-  src1 = (src0 + ((1024 * 1024) / sizeof(uint32_t)));
-  src2 = (src1 + ((1024 * 1024) / sizeof(uint32_t)));
-  src3 = (src2 + ((1024 * 1024) / sizeof(uint32_t)));
+  src0 = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  src1 = (src0 + (VRAM_SIZE / sizeof(uint32_t)));
+  src2 = (src1 + (VRAM_SIZE / sizeof(uint32_t)));
+  src3 = (src2 + (VRAM_SIZE / sizeof(uint32_t)));
   for(x = 0; x < width; x++)
     {
       *dst0++ = fixed_clut_to_RGB565(*(uint16_t*)&src0[x]);
@@ -590,7 +590,7 @@ static void vdlp_render_line_XRGB8888(void)
   }
 
   dst = g_CURBUF;
-  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
@@ -618,7 +618,7 @@ static void vdlp_render_line_XRGB8888_bypass_clut(void)
   }
 
   dst = g_CURBUF;
-  src = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
+  src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   for(x = 0; x < width; x++)
     dst[x] = fixed_clut_to_XRGB8888(*(uint16_t*)&src[x]);
 
@@ -643,10 +643,10 @@ static void vdlp_render_line_XRGB8888_hires(void)
 
   dst0 = g_CURBUF;
   dst1 = (dst0 + (width << 1));
-  src0 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-  src1 = (src0 + ((1024 * 1024) / sizeof(uint32_t)));
-  src2 = (src1 + ((1024 * 1024) / sizeof(uint32_t)));
-  src3 = (src2 + ((1024 * 1024) / sizeof(uint32_t)));
+  src0 = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  src1 = (src0 + (VRAM_SIZE / sizeof(uint32_t)));
+  src2 = (src1 + (VRAM_SIZE / sizeof(uint32_t)));
+  src3 = (src2 + (VRAM_SIZE / sizeof(uint32_t)));
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
@@ -691,10 +691,10 @@ vdlp_render_line_XRGB8888_hires_bypass_clut(void)
 
   dst0 = g_CURBUF;
   dst1 = (dst0 + (width << 1));
-  src0 = (uint32_t*)(g_VRAM + ((g_VDLP.curr_bmp^2) & 0x0FFFFF));
-  src1 = (src0 + ((1024 * 1024) / sizeof(uint32_t)));
-  src2 = (src1 + ((1024 * 1024) / sizeof(uint32_t)));
-  src3 = (src2 + ((1024 * 1024) / sizeof(uint32_t)));
+  src0 = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  src1 = (src0 + (VRAM_SIZE / sizeof(uint32_t)));
+  src2 = (src1 + (VRAM_SIZE / sizeof(uint32_t)));
+  src3 = (src2 + (VRAM_SIZE / sizeof(uint32_t)));
   for(x = 0; x < width; x++)
     {
       *dst0++ = fixed_clut_to_XRGB8888(*(uint16_t*)&src0[x]);
@@ -767,7 +767,7 @@ opera_vdlp_process_line(int line_)
 
 
 void
-opera_vdlp_init(uint8_t *vram_)
+opera_vdlp_init()
 {
   uint32_t i;
   static const uint32_t StartupVDL[]=
@@ -786,7 +786,6 @@ opera_vdlp_init(uint8_t *vram_)
       0x002C0000, 0x002B0000
     };
 
-  g_VRAM = vram_;
   g_VDLP.head_vdl = 0xB0000;
   g_RENDERER = vdlp_render_line_XRGB8888;
 

@@ -62,6 +62,23 @@ static struct retro_core_option_definition option_defs_us[] =
       "1.0x (12.50Mhz)"
     },
     {
+      "opera_mem_capacity",
+      "Memory Capacity",
+      "Select the amount of DRAM and VRAM the system has. Only useful for homebrew.",
+      {
+        { "21", "2MB DRAM; 1MB VRAM" },
+        { "22", "2MB DRAM; 2MB VRAM" },
+        { "41", "4MB DRAM; 1MB VRAM" },
+        { "42", "4MB DRAM; 2MB VRAM" },
+        { "81", "8MB DRAM; 1MB VRAM" },
+        { "82", "8MB DRAM; 2MB VRAM" },
+        { "E2", "14MB DRAM; 2MB VRAM" },
+        { "F1", "15MB DRAM; 1MB VRAM" },
+        { NULL, NULL },
+      },
+      "21"
+    },
+    {
       "opera_region",
       "Mode",
       "Select the resolution and field rate. NOTE: some EU games require a EU ROM.",

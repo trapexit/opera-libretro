@@ -7,6 +7,7 @@
 #include <streams/file_stream.h>
 
 #include "libopera/opera_arm.h"
+#include "libopera/opera_mem.h"
 #include "libopera/opera_nvram.h"
 
 #include "opera_lr_callbacks.h"
@@ -355,15 +356,11 @@ void
 opera_lr_nvram_save(const char *gamepath_)
 {
   uint8_t version;
-  size_t nvram_size;
-  const uint8_t *nvram_buf;
 
-  nvram_buf  = opera_arm_nvram_get();
-  nvram_size = opera_arm_nvram_size();
-  version    = opera_lr_opts_nvram_version();
+  version = opera_lr_opts_nvram_version();
   if(opera_lr_opts_is_nvram_shared() || (gamepath_ == NULL))
     {
-      opera_lr_nvram_save_shared(nvram_buf,nvram_size,version);
+      opera_lr_nvram_save_shared(NVRAM,NVRAM_SIZE,version);
     }
   else
     {
@@ -375,23 +372,19 @@ opera_lr_nvram_save(const char *gamepath_)
 	 strlcpy(filename, gamepath_, sizeof(filename));
       path_remove_extension(filename);
 
-      opera_lr_nvram_save_pergame(nvram_buf,nvram_size,filename,version);
+      opera_lr_nvram_save_pergame(NVRAM,NVRAM_SIZE,filename,version);
     }
 }
 
 void
 opera_lr_nvram_load(const char *gamepath_)
 {
-  uint8_t   version;
-  uint8_t  *nvram_buf;
-  uint32_t  nvram_size;
+  uint8_t version;
 
-  nvram_buf  = opera_arm_nvram_get();
-  nvram_size = opera_arm_nvram_size();
-  version    = opera_lr_opts_nvram_version();
+  version = opera_lr_opts_nvram_version();
   if(opera_lr_opts_is_nvram_shared() || (gamepath_ == NULL))
     {
-      opera_lr_nvram_load_shared(nvram_buf,nvram_size,version);
+      opera_lr_nvram_load_shared(NVRAM,NVRAM_SIZE,version);
     }
   else
     {
@@ -403,6 +396,6 @@ opera_lr_nvram_load(const char *gamepath_)
 	 strlcpy(filename, gamepath_, sizeof(filename));
       path_remove_extension(filename);
 
-      opera_lr_nvram_load_pergame(nvram_buf,nvram_size,filename,version);
+      opera_lr_nvram_load_pergame(NVRAM,NVRAM_SIZE,filename,version);
     }
 }

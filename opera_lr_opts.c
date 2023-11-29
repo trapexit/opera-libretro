@@ -26,10 +26,12 @@
 #include "libopera/opera_clock.h"
 #include "libopera/opera_core.h"
 #include "libopera/opera_madam.h"
+#include "libopera/opera_mem.h"
 #include "libopera/opera_region.h"
 #include "libopera/opera_vdlp.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -42,6 +44,7 @@ uint32_t g_OPT_VDLP_FLAGS               = 0;
 uint32_t g_OPT_VDLP_PIXEL_FORMAT        = 0;
 uint32_t g_OPT_ACTIVE_DEVICES           = 0;
 uint32_t g_OPT_HIDE_LIGHTGUN_CROSSHAIRS = 0;
+opera_mem_cfg_t g_MEM_CFG = DRAM_VRAM_STOCK;
 
 static
 int
@@ -383,6 +386,21 @@ opera_lr_opts_process_hacks(void)
 }
 
 void
+opera_lr_opts_process_memory(void)
+{
+  const char *val;
+
+  val = getval("mem_capacity");
+  if(val == NULL)
+    return;
+
+  unsigned v;
+  sscanf(val,"%x",&v);
+
+  //  opera_mem_init((opera_mem_cfg_t)v);
+}
+
+void
 opera_lr_opts_process(void)
 {
   opera_lr_opts_process_bios();
@@ -399,4 +417,5 @@ opera_lr_opts_process(void)
   opera_lr_opts_process_madam_matrix_engine();
   opera_lr_opts_process_swi_hle();
   opera_lr_opts_process_hacks();
+  opera_lr_opts_process_memory();
 }

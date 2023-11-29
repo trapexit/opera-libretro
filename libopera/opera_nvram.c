@@ -1,4 +1,4 @@
-#include "opera_arm.h"
+#include "opera_mem.h"
 
 #include "retro_endianness.h"
 
@@ -42,7 +42,7 @@ struct nvram_header_t
 void
 opera_nvram_init(void)
 {
-  nvram_header_t *nvram_hdr = (nvram_header_t*)opera_arm_nvram_get();
+  nvram_header_t *nvram_hdr = (nvram_header_t*)NVRAM;
 
   memset(nvram_hdr,0,sizeof(nvram_header_t));
 

@@ -35,6 +35,8 @@
 #include "opera_diag_port.h"
 #include "opera_dsp.h"
 #include "opera_madam.h"
+#include "opera_mem.h"
+#include "opera_nvram.h"
 #include "opera_region.h"
 #include "opera_sport.h"
 #include "opera_vdlp.h"
@@ -44,6 +46,19 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+
+typedef struct opera_state_hdr_v1_t opera_state_hdr_v1_t;
+struct opera_state_hdr_v1_t
+{
+  uint8_t version;
+};
+
+typedef union opera_state_hdr_t opera_state_hdr_t;
+union opera_state_hdr_t
+{
+  uint8_t version;
+  opera_state_hdr_v1_t v1;
+};
 
 static opera_ext_interface_t io_interface;
 
@@ -57,8 +72,10 @@ int
 opera_3do_init(opera_ext_interface_t callback_)
 {
   int i;
-  uint8_t *dram;
   uint8_t *vram;
+
+  opera_mem_init(DRAM_VRAM_STOCK);
+  opera_nvram_init();
 
   io_interface = callback_;
 
@@ -68,12 +85,9 @@ opera_3do_init(opera_ext_interface_t callback_)
 
   opera_arm_init();
 
-  dram = opera_arm_ram_get();
-  vram = opera_arm_vram_get();
-
-  opera_vdlp_init(vram);
-  opera_sport_init(vram);
-  opera_madam_init(dram);
+  opera_vdlp_init();
+  opera_sport_init();
+  opera_madam_init();
   opera_xbus_init(xbus_cdrom_plugin);
 
   /*
@@ -123,6 +137,7 @@ opera_3do_destroy()
 {
   opera_arm_destroy();
   opera_xbus_destroy();
+  opera_mem_destroy();
 }
 
 static
@@ -192,15 +207,14 @@ opera_3do_state_size(void)
 {
   uint32_t tmp;
 
-  tmp  = 0;
-  tmp += 16 * 4;
+  tmp  = sizeof(opera_state_hdr_t);
   tmp += opera_arm_state_size();
-  tmp += opera_vdlp_state_size();
-  tmp += opera_dsp_state_size();
   tmp += opera_clio_state_size();
   tmp += opera_clock_state_size();
-  tmp += opera_sport_state_size();
+  tmp += opera_dsp_state_size();
   tmp += opera_madam_state_size();
+  tmp += opera_sport_state_size();
+  tmp += opera_vdlp_state_size();
   tmp += opera_xbus_state_size();
 
   return tmp;
@@ -210,52 +224,88 @@ void
 opera_3do_state_save(void *buf_)
 {
   uint8_t *data;
-  uint32_t *indexes;
+  opera_state_hdr_v1_t *hdr;
 
-  data    = buf_;
-  indexes = buf_;
+  data = buf_;
+  hdr  = buf_;
 
-  indexes[0] = 0x97970101;
-  indexes[1] = 16 * 4;
-  indexes[2] = indexes[1] + opera_arm_state_size();
-  indexes[3] = indexes[2] + opera_vdlp_state_size();
-  indexes[4] = indexes[3] + opera_dsp_state_size();
-  indexes[5] = indexes[4] + opera_clio_state_size();
-  indexes[6] = indexes[5] + opera_clock_state_size();
-  indexes[7] = indexes[6] + opera_sport_state_size();
-  indexes[8] = indexes[7] + opera_madam_state_size();
-  indexes[9] = indexes[8] + opera_xbus_state_size();
+  hdr->version = 0x01;
+  data += sizeof(opera_state_hdr_v1_t);
 
-  opera_arm_state_save(&data[indexes[1]]);
-  opera_vdlp_state_save(&data[indexes[2]]);
-  opera_dsp_state_save(&data[indexes[3]]);
-  opera_clio_state_save(&data[indexes[4]]);
-  opera_clock_state_save(&data[indexes[5]]);
-  opera_sport_state_save(&data[indexes[6]]);
-  opera_madam_state_save(&data[indexes[7]]);
-  opera_xbus_state_save(&data[indexes[8]]);
+  opera_arm_state_save(data);
+  data += opera_arm_state_size();
+
+  opera_clio_state_save(data);
+  data += opera_clio_state_size();
+
+  opera_clock_state_save(data);
+  data += opera_clock_state_size();
+
+  opera_dsp_state_save(data);
+  data += opera_dsp_state_size();
+
+  opera_madam_state_save(data);
+  data += opera_madam_state_size();
+
+  opera_sport_state_save(data);
+  data += opera_sport_state_size();
+
+  opera_vdlp_state_save(data);
+  data += opera_vdlp_state_size();
+
+  opera_xbus_state_save(data);
+  data += opera_xbus_state_size();
+}
+
+static
+int
+opera_3do_state_load_v1(const void *buf_)
+{
+  const uint8_t *data;
+
+  data = buf_;
+
+  data += sizeof(opera_state_hdr_v1_t);
+
+  opera_arm_state_load(data);
+  data += opera_arm_state_size();
+
+  opera_clio_state_load(data);
+  data += opera_clio_state_size();
+
+  opera_clock_state_load(data);
+  data += opera_clock_state_size();
+
+  opera_dsp_state_load(data);
+  data += opera_dsp_state_size();
+
+  opera_madam_state_load(data);
+  data += opera_madam_state_size();
+
+  opera_sport_state_load(data);
+  data += opera_sport_state_size();
+
+  opera_vdlp_state_load(data);
+  data += opera_vdlp_state_size();
+
+  opera_xbus_state_load(data);
+  data += opera_xbus_state_size();
+
+  return 1;
 }
 
 int
-opera_3do_state_load(const void *buf_)
+opera_3do_state_load(const void *data_)
 {
-  const uint8_t *data;
-  const uint32_t *indexes;
+  const opera_state_hdr_t *hdr;
 
-  data    = buf_;
-  indexes = buf_;
+  hdr = data_;
 
-  if(indexes[0] != 0x97970101)
-    return 0;
+  switch(hdr->version)
+    {
+    case 0x01:
+      return opera_3do_state_load_v1(data_);
+    }
 
-  opera_arm_state_load(&data[indexes[1]]);
-  opera_vdlp_state_load(&data[indexes[2]]);
-  opera_dsp_state_load(&data[indexes[3]]);
-  opera_clio_state_load(&data[indexes[4]]);
-  opera_clock_state_load(&data[indexes[5]]);
-  opera_sport_state_load(&data[indexes[6]]);
-  opera_madam_state_load(&data[indexes[7]]);
-  opera_xbus_state_load(&data[indexes[8]]);
-
-  return 1;
+  return 0;
 }

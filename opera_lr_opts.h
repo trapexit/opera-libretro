@@ -16,6 +16,8 @@ extern uint32_t g_OPT_VDLP_PIXEL_FORMAT;
 
 extern uint32_t g_OPT_ACTIVE_DEVICES;
 
+extern opera_mem_cfg_t g_MEM_CFG;
+
 void                 opera_lr_opts_process(void);
 bool                 opera_lr_opts_is_enabled(const char *key);
 bool                 opera_lr_opts_is_nvram_shared(void);

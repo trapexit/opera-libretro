@@ -25,7 +25,7 @@ xbus_cdrom_plugin(int   proc_,
       opera_cdrom_send_cmd(&g_CDROM_DEVICE,(uint8_t)(uintptr_t)data_);
       break;
     case XBP_FIQ:
-      return (void*)opera_cdrom_test_fiq(&g_CDROM_DEVICE);
+      return (void*)(uintptr_t)opera_cdrom_test_fiq(&g_CDROM_DEVICE);
     case XBP_GET_DATA:
       return (void*)(uintptr_t)opera_cdrom_fifo_get_data(&g_CDROM_DEVICE);
     case XBP_GET_STATUS:

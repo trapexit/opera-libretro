@@ -17,6 +17,7 @@
 #include "libopera/opera_clock.h"
 #include "libopera/opera_core.h"
 #include "libopera/opera_madam.h"
+#include "libopera/opera_mem.h"
 #include "libopera/opera_pbus.h"
 #include "libopera/opera_region.h"
 #include "libopera/opera_vdlp.h"
@@ -294,9 +295,7 @@ static
 int
 load_rom1(void)
 {
-  uint8_t *rom;
-  int64_t  size;
-  int64_t  rv;
+  int64_t rv;
 
   if(g_OPT_BIOS == NULL)
     {
@@ -304,9 +303,7 @@ load_rom1(void)
       return -1;
     }
 
-  rom  = opera_arm_rom1_get();
-  size = opera_arm_rom1_size();
-  if((rv = read_file_from_system_directory(g_OPT_BIOS->filename,rom,size)) < 0)
+  if((rv = read_file_from_system_directory(g_OPT_BIOS->filename,ROM1,ROM1_SIZE)) < 0)
     {
       retro_log_printf_cb(RETRO_LOG_ERROR,
                           "[Opera]: unable to find or load BIOS ROM - %s\n",
@@ -324,18 +321,14 @@ int
 load_rom2(void)
 {
   int64_t  rv;
-  uint8_t *rom;
-  int64_t  size;
 
-  rom  = opera_arm_rom2_get();
-  size = opera_arm_rom2_size();
   if(g_OPT_FONT == NULL)
     {
-      memset(rom,0,size);
+      memset(ROM2,0,ROM2_SIZE);
       return 0;
     }
 
-  if((rv = read_file_from_system_directory(g_OPT_FONT->filename,rom,size)) < 0)
+  if((rv = read_file_from_system_directory(g_OPT_FONT->filename,ROM2,ROM2_SIZE)) < 0)
     {
       retro_log_printf_cb(RETRO_LOG_ERROR,
                           "[Opera]: unable to find or load FONT ROM - %s\n",
@@ -454,10 +447,10 @@ retro_load_game(const struct retro_game_info *info_)
   if(rv == -1)
     return false;
 
-  cdimage_set_sector(0);
   opera_3do_init(libopera_callback);
   video_init();
   process_opts();
+  cdimage_set_sector(0);
   load_rom1();
   load_rom2();
 
@@ -465,7 +458,6 @@ retro_load_game(const struct retro_game_info *info_)
   if(rv < 0)
     return false;
 
-  opera_nvram_init();
   opera_lr_nvram_load(game_info_path_get());
 
   return true;
@@ -537,9 +529,9 @@ retro_get_memory_data(unsigned id_)
     case RETRO_MEMORY_SAVE_RAM:
       return NULL;
     case RETRO_MEMORY_SYSTEM_RAM:
-      return opera_arm_ram_get();
+      return DRAM;
     case RETRO_MEMORY_VIDEO_RAM:
-      return opera_arm_vram_get();
+      return VRAM;
     }
 
   return NULL;
@@ -553,9 +545,9 @@ retro_get_memory_size(unsigned id_)
     case RETRO_MEMORY_SAVE_RAM:
       return 0;
     case RETRO_MEMORY_SYSTEM_RAM:
-      return opera_arm_ram_size();
+      return DRAM_SIZE;
     case RETRO_MEMORY_VIDEO_RAM:
-      return opera_arm_vram_size();
+      return VRAM_SIZE;
     }
 
   return 0;
@@ -599,8 +591,6 @@ retro_reset(void)
   load_rom1();
   load_rom2();
 
-  /* XXX: Is this really a frontend responsibility? */
-  opera_nvram_init();
   opera_lr_nvram_load(game_info_path_get());
 }
 

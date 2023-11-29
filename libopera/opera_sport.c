@@ -30,6 +30,7 @@
 
 #include "inline.h"
 #include "opera_core.h"
+#include "opera_mem.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -48,13 +49,12 @@ struct sport_s
 
 typedef struct sport_s sport_t;
 
-static sport_t  SPORT = {0};
-static void    *VRAM;
+static sport_t SPORT = {0};
 
 void
-opera_sport_init(uint8_t * const vram_)
+opera_sport_init()
 {
-  VRAM = vram_;
+
 }
 
 void
@@ -69,7 +69,7 @@ void
 sport_set_color(const uint32_t idx_)
 {
   int i;
-  uint32_t *vram = VRAM;
+  uint32_t *vram = (uint32_t*)VRAM;
 
   vram = &vram[idx_];
   for(i = 0; i < SPORT_ELEM_COUNT; i++)
@@ -83,7 +83,7 @@ sport_set_color_with_mask(const uint32_t idx_,
                           const uint32_t mask_)
 {
   int i;
-  uint32_t *vram = VRAM;
+  uint32_t *vram = (uint32_t*)VRAM;
 
   vram = &vram[idx_];
   for(i = 0; i < SPORT_ELEM_COUNT; i++)
@@ -96,7 +96,7 @@ void
 sport_memcpy(const uint32_t didx_,
              const uint32_t sidx_)
 {
-  uint32_t *vram = VRAM;
+  uint32_t *vram = (uint32_t*)VRAM;
 
   memcpy(&vram[didx_],&vram[sidx_],SPORT_BUFSIZE);
 }
@@ -104,12 +104,12 @@ sport_memcpy(const uint32_t didx_,
 static
 INLINE
 void
-sport_memcpy_highres(const uint32_t didx_,
-                     const uint32_t sidx_)
+sport_memcpy_hires(const uint32_t didx_,
+                   const uint32_t sidx_)
 {
-  sport_memcpy(didx_ + (1*1024*1024/sizeof(uint32_t)),sidx_);
-  sport_memcpy(didx_ + (2*1024*1024/sizeof(uint32_t)),sidx_);
-  sport_memcpy(didx_ + (3*1024*1024/sizeof(uint32_t)),sidx_);
+  sport_memcpy(didx_ + (1*VRAM_SIZE/sizeof(uint32_t)),sidx_);
+  sport_memcpy(didx_ + (2*VRAM_SIZE/sizeof(uint32_t)),sidx_);
+  sport_memcpy(didx_ + (3*VRAM_SIZE/sizeof(uint32_t)),sidx_);
 }
 
 static
@@ -129,7 +129,7 @@ sport_flash_write(const uint32_t rawidx_,
   if(!HIRESMODE)
     return;
 
-  sport_memcpy_highres(idx,idx);
+  sport_memcpy_hires(idx,idx);
 }
 
 static
@@ -142,7 +142,7 @@ sport_copy_page_color(void)
   if(!HIRESMODE)
     return;
 
-  sport_memcpy_highres(SPORT.destination,SPORT.source);
+  sport_memcpy_hires(SPORT.destination,SPORT.source);
 }
 
 static
@@ -155,7 +155,7 @@ sport_copy_page_color_with_mask(const uint32_t mask_)
   uint32_t *svram;
   uint32_t *dvram;
 
-  vram  = VRAM;
+  vram  = (uint32_t*)VRAM;
   svram = &vram[SPORT.source];
   dvram = &vram[SPORT.destination];
 
@@ -165,7 +165,7 @@ sport_copy_page_color_with_mask(const uint32_t mask_)
   if(!HIRESMODE)
     return;
 
-  sport_memcpy_highres(SPORT.destination,SPORT.destination);
+  sport_memcpy_hires(SPORT.destination,SPORT.destination);
 }
 
 static

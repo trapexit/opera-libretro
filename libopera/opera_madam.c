@@ -37,6 +37,7 @@
 #include "opera_clio.h"
 #include "opera_core.h"
 #include "opera_madam.h"
+#include "opera_mem.h"
 #include "opera_pbus.h"
 #include "opera_vdlp.h"
 
@@ -486,7 +487,6 @@ static struct
   int      Transparent;
 } pproj;
 
-static uint8_t  *DRAM;
 static uint32_t  retuval;
 static uint32_t  BITADDR;
 static uint32_t  CCBFLAGS;
@@ -1159,15 +1159,13 @@ DMAPBus(void)
 }
 
 void
-opera_madam_init(uint8_t *mem_)
+opera_madam_init()
 {
   int32_t i;
   int32_t j;
   int32_t n;
 
   opera_madam_reset();
-
-  DRAM = mem_;
 
   bitoper.bitset = 1;
 
@@ -1178,7 +1176,8 @@ opera_madam_init(uint8_t *mem_)
                     MADAM_ID_GREEN_SOFTWARE);
 
   /* DRAM dux init */
-  MADAM.mregs[0x4]   = 0x29;
+  MADAM.mregs[0x4] = 0x20;
+  MADAM.mregs[0x4] = opera_mem_madam_red_sysbits(MADAM.mregs[0x4]);
   MADAM.mregs[0x574] = 0xFFFFFFFC;
 
   for(i = 0; i < 32; i++)
@@ -1234,13 +1233,17 @@ mwrite16(const uint32_t addr_,
 #else
   const uint32_t addr = addr_ ^ 2;
 #endif
+  uint16_t *ram = (uint16_t*)&DRAM[addr];
 
-  *((uint16_t*)&DRAM[addr]) = val_;
-  if(!HIRESMODE || (addr < 0x200000))
+  ram[0] = val_;
+  if(!HIRESMODE || (addr_ < DRAM_SIZE))
     return;
-  *((uint16_t*)&DRAM[addr + 1*1024*1024]) = val_;
-  *((uint16_t*)&DRAM[addr + 2*1024*1024]) = val_;
-  *((uint16_t*)&DRAM[addr + 3*1024*1024]) = val_;
+
+  unsigned const offset = (VRAM_SIZE / sizeof(uint16_t));
+
+  ram[1 * offset] = val_;
+  ram[2 * offset] = val_;
+  ram[3 * offset] = val_;
 }
 
 static
@@ -2742,7 +2745,7 @@ readPIX(int32_t x_,
   if(HIRESMODE)
     {
       src += XY2OFF(x_ >> 1,y_ >> 1,MADAM.rmod);
-      src += ((((y_ & 1) << 1) + (x_ & 1)) * 1024 * 1024);
+      src += ((((y_ & 1) << 1) + (x_ & 1)) * VRAM_SIZE);
     }
   else
     {
@@ -2764,7 +2767,7 @@ writePIX(int32_t  x_,
   if(HIRESMODE)
     {
       src += XY2OFF(x_ >> 1,y_ >> 1,MADAM.wmod);
-      src += ((((y_ & 1) << 1) + (x_ & 1)) * 1024 * 1024);
+      src += ((((y_ & 1) << 1) + (x_ & 1)) * VRAM_SIZE);
     }
   else
     {
