@@ -447,10 +447,10 @@ retro_load_game(const struct retro_game_info *info_)
   if(rv == -1)
     return false;
 
+  cdimage_set_sector(0);
   opera_3do_init(libopera_callback);
   video_init();
   process_opts();
-  cdimage_set_sector(0);
   load_rom1();
   load_rom2();
 

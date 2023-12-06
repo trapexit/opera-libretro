@@ -2,7 +2,35 @@
 #define OPERA_LR_OPTS_H_INCLUDED
 
 #include "libopera/opera_bios.h"
+#include "libopera/opera_mem.h"
 #include "libopera/opera_vdlp.h"
+
+typedef struct opera_lr_opts_t opera_lr_opts_t;
+struct opera_lr_opts_t
+{
+  opera_bios_t const *bios;
+  opera_bios_t const *font;
+  char const *nvram_storage;
+  unsigned nvram_version;
+  char const *region;
+  float cpu_overclock;
+  vdlp_pixel_format_e vdlp_pixel_format;
+  bool high_resolution;
+  bool vdlp_bypass_clut;
+  unsigned video_width;
+  unsigned video_height;
+  unsigned video_pitch_shift;
+  unsigned active_devices;
+  opera_mem_cfg_t mem_cfg;
+  bool hide_lightgun_crosshairs;
+  char const *madam_matrix_engine;
+  bool kprint;
+  bool dsp_threaded;
+  bool swi_hle;
+  uint32_t fixflags;
+};
+
+extern opera_lr_opts_t g_OPTS;
 
 extern const opera_bios_t *g_OPT_BIOS;
 extern const opera_bios_t *g_OPT_FONT;

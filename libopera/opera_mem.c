@@ -155,48 +155,34 @@ opera_mem_madam_red_sysbits(uint32_t const v_)
 bool
 opera_mem_init(opera_mem_cfg_t const cfg_)
 {
-  uint8_t *new_ram;
-  uint8_t *new_rom1;
-  uint8_t *new_rom2;
-  uint8_t *new_nvram;
   opera_mem_cfg_t cfg;
+
+  if(gl_MEM_CFG)
+    return false;
 
   cfg = cfg_;
   if(cfg == DRAM_VRAM_STOCK)
     cfg = DRAM_2MB_VRAM_1MB;
-  if(cfg == gl_MEM_CFG)
-    return true;
 
   opera_mem_set(cfg);
 
-  new_ram   = realloc(DRAM,HIRES_RAM_SIZE);
-  new_rom1  = realloc(ROM1,ROM1_SIZE);
-  new_rom2  = realloc(ROM2,ROM2_SIZE);
-  new_nvram = realloc(NVRAM,NVRAM_SIZE);
+  DRAM  = calloc(HIRES_RAM_SIZE,1);
+  ROM1  = calloc(ROM1_SIZE,1);
+  ROM2  = calloc(ROM2_SIZE,1);
+  NVRAM = calloc(NVRAM_SIZE,1);
 
-  if((new_ram   == NULL) ||
-     (new_rom1  == NULL) ||
-     (new_rom2  == NULL) ||
-     (new_nvram == NULL))
+  if((DRAM  == NULL)  ||
+     (ROM1  == NULL)  ||
+     (ROM2  == NULL)  ||
+     (NVRAM == NULL))
     {
-      if(new_ram && (new_ram != DRAM))
-        free(new_ram);
-      if(new_rom1 && (new_rom1 != ROM1))
-        free(new_rom1);
-      if(new_rom2 && (new_rom2 != ROM2))
-        free(new_rom1);
-      if(new_nvram && (new_nvram != NVRAM))
-        free(new_nvram);
+      opera_mem_destroy();
       return false;
     }
 
   // VRAM is always at the top of DRAM
-  DRAM  = new_ram;
   VRAM  = &DRAM[DRAM_SIZE];
-  ROM1  = new_rom1;
-  ROM2  = new_rom2;
   ROM   = ROM1;
-  NVRAM = new_nvram;
 
   return true;
 }

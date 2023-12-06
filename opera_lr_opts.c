@@ -16,6 +16,8 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include "opera_lr_opts.h"
+
 #include "opera_lr_callbacks.h"
 #include "opera_lr_dsp.h"
 #include "lr_input.h"
@@ -34,6 +36,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+opera_lr_opts_t g_OPTS;
 
 const opera_bios_t *g_OPT_BIOS = NULL;
 const opera_bios_t *g_OPT_FONT = NULL;
