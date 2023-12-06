@@ -194,6 +194,26 @@ opera_lr_opts_process_region(void)
     opera_region_set_PAL2();
 }
 
+opera_region_e
+opera_lr_opts_region(void)
+{
+  const char *val;
+
+  val = getval("region");
+  if(val == NULL)
+    return OPERA_REGION_NTSC;
+
+  if(!strcmp(val,"ntsc"))
+    return OPERA_REGION_NTSC;
+  else if(!strcmp(val,"pal1"))
+    return OPERA_REGION_PAL1;
+  else if(!strcmp(val,"pal2"))
+    return OPERA_REGION_PAL2;
+
+  return OPERA_REGION_NTSC;
+}
+
+
 void
 opera_lr_opts_process_cpu_overlock(void)
 {
@@ -422,4 +442,10 @@ opera_lr_opts_process(void)
   opera_lr_opts_process_swi_hle();
   opera_lr_opts_process_hacks();
   opera_lr_opts_process_memory();
+
+  g_OPTS.bios          = opera_lr_opts_get_bios();
+  g_OPTS.font          = opera_lr_opts_get_font();
+  g_OPTS.nvram_shared  = opera_lr_opts_is_nvram_shared();
+  g_OPTS.nvram_version = opera_lr_opts_nvram_version();
+  g_OPTS.region        = opera_lr_opts_region();
 }
