@@ -39,17 +39,6 @@
 
 opera_lr_opts_t g_OPTS;
 
-const opera_bios_t *g_OPT_BIOS = NULL;
-const opera_bios_t *g_OPT_FONT = NULL;
-uint32_t g_OPT_VIDEO_WIDTH              = 0;
-uint32_t g_OPT_VIDEO_HEIGHT             = 0;
-uint32_t g_OPT_VIDEO_PITCH_SHIFT        = 0;
-uint32_t g_OPT_VDLP_FLAGS               = 0;
-uint32_t g_OPT_VDLP_PIXEL_FORMAT        = 0;
-uint32_t g_OPT_ACTIVE_DEVICES           = 0;
-uint32_t g_OPT_HIDE_LIGHTGUN_CROSSHAIRS = 0;
-opera_mem_cfg_t g_MEM_CFG = DRAM_VRAM_STOCK;
-
 static
 int
 getvar(struct retro_variable *var_)
@@ -180,18 +169,19 @@ opera_lr_opts_process_font(void)
 void
 opera_lr_opts_process_region(void)
 {
-  const char *val;
-
-  val = getval("region");
-  if(val == NULL)
-    return;
-
-  if(!strcmp(val,"ntsc"))
-    opera_region_set_NTSC();
-  else if(!strcmp(val,"pal1"))
-    opera_region_set_PAL1();
-  else if(!strcmp(val,"pal2"))
-    opera_region_set_PAL2();
+  switch(g_OPTS.region)
+    {
+    default:
+    case OPERA_REGION_NTSC:
+      opera_region_set_NTSC();
+      break;
+    case OPERA_REGION_PAL1:
+      opera_region_set_PAL1();
+      break;
+    case OPERA_REGION_PAL2:
+      opera_region_set_PAL2();
+      break;
+    }
 }
 
 opera_region_e
@@ -213,9 +203,8 @@ opera_lr_opts_region(void)
   return OPERA_REGION_NTSC;
 }
 
-
-void
-opera_lr_opts_process_cpu_overlock(void)
+float
+opera_lr_opts_cpu_overclock(void)
 {
   float mul;
   const char *val;
@@ -225,11 +214,12 @@ opera_lr_opts_process_cpu_overlock(void)
     return;
 
   mul = atof(val);
-  opera_clock_cpu_set_freq_mul(mul);
+
+  return mul;
 }
 
 vdlp_pixel_format_e
-opera_lr_opts_get_vdlp_pixel_format(void)
+opera_lr_opts_vdlp_pixel_format(void)
 {
   const char *val;
 
@@ -268,26 +258,6 @@ opera_lr_opts_process_vdlp_flags(void)
 }
 
 void
-opera_lr_opts_process_high_resolution(void)
-{
-  bool rv;
-
-  rv = opera_lr_opts_is_enabled("high_resolution");
-  if(rv)
-    {
-      HIRESMODE          = 1;
-      g_OPT_VIDEO_WIDTH  = (opera_region_width()  << 1);
-      g_OPT_VIDEO_HEIGHT = (opera_region_height() << 1);
-    }
-  else
-    {
-      HIRESMODE          = 0;
-      g_OPT_VIDEO_WIDTH  = opera_region_width();
-      g_OPT_VIDEO_HEIGHT = opera_region_height();
-    }
-}
-
-void
 opera_lr_opts_process_vdlp_pixel_format(void)
 {
   static bool set = false;
@@ -295,7 +265,7 @@ opera_lr_opts_process_vdlp_pixel_format(void)
   if(set == true)
     return;
 
-  g_OPT_VDLP_PIXEL_FORMAT = opera_lr_opts_get_vdlp_pixel_format();
+  g_OPT_VDLP_PIXEL_FORMAT = opera_lr_opts_vdlp_pixel_format();
   switch(g_OPT_VDLP_PIXEL_FORMAT)
     {
     default:
@@ -311,34 +281,22 @@ opera_lr_opts_process_vdlp_pixel_format(void)
   set = true;
 }
 
-void
-opera_lr_opts_process_active_devices(void)
+unsigned
+opera_lr_opts_active_devices(void)
 {
+  unsigned rv;
   const char *val;
 
-  g_OPT_ACTIVE_DEVICES = 1;
+  rv = 1;
 
   val = getval("active_devices");
   if(val)
-    g_OPT_ACTIVE_DEVICES = atoi(val);
+    rv = atoi(val);
 
-  if(g_OPT_ACTIVE_DEVICES > LR_INPUT_MAX_DEVICES)
-    g_OPT_ACTIVE_DEVICES = 1;
-}
+  if(rv > LR_INPUT_MAX_DEVICES)
+    rv = 1;
 
-void
-opera_lr_opts_process_hide_lightgun_crosshairs(void)
-{
-  bool rv;
-
-  rv = opera_lr_opts_is_enabled("hide_lightgun_crosshairs");
-
-  g_OPT_HIDE_LIGHTGUN_CROSSHAIRS = 0;
-
-  if(rv)
-    g_OPT_HIDE_LIGHTGUN_CROSSHAIRS = 1;
-  else
-    g_OPT_HIDE_LIGHTGUN_CROSSHAIRS = 0;
+  return rv;
 }
 
 void
@@ -357,35 +315,9 @@ opera_lr_opts_process_madam_matrix_engine(void)
 }
 
 void
-opera_lr_opts_process_debug(void)
-{
-  bool rv;
-
-  rv = opera_lr_opts_is_enabled("kprint");
-  if(rv)
-    opera_madam_kprint_enable();
-  else
-    opera_madam_kprint_disable();
-}
-
-void
-opera_lr_opts_process_dsp_threaded(void)
-{
-  bool rv;
-
-  rv = opera_lr_opts_is_enabled("dsp_threaded");
-
-  opera_lr_dsp_init(rv);
-}
-
-void
 opera_lr_opts_process_swi_hle(void)
 {
-  bool rv;
-
-  rv = getval("swi_hle");
-
-  opera_arm_swi_hle_set(rv);
+  opera_arm_swi_hle_set(g_OPTS.swi_hle);
 }
 
 static
@@ -399,53 +331,115 @@ set_reset_bits(const char *key_,
           (input_ & ~bitmask_));
 }
 
-void
-opera_lr_opts_process_hacks(void)
+uint32_t
+opera_lr_opts_hacks(void)
 {
-  FIXMODE = set_reset_bits("hack_timing_1",FIXMODE,FIX_BIT_TIMING_1);
-  FIXMODE = set_reset_bits("hack_timing_3",FIXMODE,FIX_BIT_TIMING_3);
-  FIXMODE = set_reset_bits("hack_timing_5",FIXMODE,FIX_BIT_TIMING_5);
-  FIXMODE = set_reset_bits("hack_timing_6",FIXMODE,FIX_BIT_TIMING_6);
-  FIXMODE = set_reset_bits("hack_graphics_step_y",FIXMODE,FIX_BIT_GRAPHICS_STEP_Y);
+  uint32_t rv;
+
+  rv = 0;
+  rv = set_reset_bits("hack_timing_1",rv,FIX_BIT_TIMING_1);
+  rv = set_reset_bits("hack_timing_3",rv,FIX_BIT_TIMING_3);
+  rv = set_reset_bits("hack_timing_5",rv,FIX_BIT_TIMING_5);
+  rv = set_reset_bits("hack_timing_6",rv,FIX_BIT_TIMING_6);
+  rv = set_reset_bits("hack_graphics_step_y",rv,FIX_BIT_GRAPHICS_STEP_Y);
+
+  return rv;
 }
 
 void
-opera_lr_opts_process_memory(void)
+opera_lr_opts_mem_cfg(void)
 {
+  unsigned    x;
   const char *val;
 
   val = getval("mem_capacity");
   if(val == NULL)
     return;
 
-  unsigned v;
-  sscanf(val,"%x",&v);
+  sscanf(val,"%x",&x);
 
-  //  opera_mem_init((opera_mem_cfg_t)v);
+  return (opera_mem_cfg_t)x;
 }
 
 void
-opera_lr_opts_process(void)
+opera_lr_opts_get_values(void)
 {
-  opera_lr_opts_process_bios();
-  opera_lr_opts_process_font();
-  opera_lr_opts_process_region();
-  opera_lr_opts_process_vdlp_pixel_format();
-  opera_lr_opts_process_high_resolution();
-  opera_lr_opts_process_vdlp_flags();
+  g_OPTS.bios                     = opera_lr_opts_get_bios();
+  g_OPTS.font                     = opera_lr_opts_get_font();
+  g_OPTS.nvram_shared             = opera_lr_opts_is_nvram_shared();
+  g_OPTS.nvram_version            = opera_lr_opts_nvram_version();
+  g_OPTS.region                   = opera_lr_opts_region();
+  g_OPTS.cpu_overclock            = opera_lr_opts_cpu_overclock();
+  g_OPTS.vdlp_pixel_format        = opera_lr_opts_vdlp_pixel_format();
+  g_OPTS.high_resolution          = opera_lr_opts_is_enabled("high_resolution");
+  g_OPTS.vdlp_bypass_clut         = opera_lr_opts_is_enabled("vdlp_bypass_clut");
+  g_OPTS.video_width;
+  g_OPTS.video_height;
+  g_OPTS.video_pitch_shift;
+  g_OPTS.active_devices           = opera_lr_opts_active_devices();
+  g_OPTS.mem_cfg                  = opera_lr_opts_mem_cfg();
+  g_OPTS.hide_lightgun_crosshairs = opera_lr_opts_is_enabled("hide_lightgun_crosshairs");
+  g_OPTS.madam_matrix_engine;
+  g_OPTS.kprint                   = opera_lr_opts_is_enabled("kprint");
+  g_OPTS.dsp_threaded             = opera_lr_opts_is_enabled("dsp_threaded");
+  g_OPTS.swi_hle                  = opera_lr_opts_is_enabled("swi_hle");
+  g_OPTS.hack_flags               = opera_lr_opts_hacks();
+}
+
+void
+opera_lr_opts_process_cpu_overlock(void)
+{
+  opera_clock_cpu_set_freq_mul(g_OPTS.cpu_overclock);
+}
+
+void
+opera_lr_opts_process_dsp_threaded(void)
+{
+  opera_lr_dsp_init(g_OPTS.dsp_threaded);
+}
+
+void
+opera_lr_opts_process_hack_flags()
+{
+  FIXMODE = g_OPTS.hack_flags;
+}
+
+void
+opera_lr_opts_process_high_resolution(void)
+{
+  if(g_OPTS.high_resolution)
+    {
+      HIRESMODE           = 1;
+      g_OPTS.video_width  = (opera_region_width()  << 1);
+      g_OPTS.video_height = (opera_region_height() << 1);
+    }
+  else
+    {
+      HIRESMODE           = 0;
+      g_OPTS.video_width  = opera_region_width();
+      g_OPTS.video_height = opera_region_height();
+    }
+}
+
+void
+opera_lr_opts_process_kprint(void)
+{
+  if(g_OPTS.kprint)
+    opera_madam_kprint_enable();
+  else
+    opera_madam_kprint_disable();
+}
+
+void
+opera_lr_opts_process()
+{
   opera_lr_opts_process_cpu_overlock();
   opera_lr_opts_process_dsp_threaded();
-  opera_lr_opts_process_active_devices();
-  opera_lr_opts_process_hide_lightgun_crosshairs();
-  opera_lr_opts_process_debug();
-  opera_lr_opts_process_madam_matrix_engine();
+  opera_lr_opts_process_hack_flags();
+  opera_lr_opts_process_high_resolution();
+  opera_lr_opts_process_kprint();
+  opera_lr_opts_process_peripherals();
+  opera_lr_opts_process_region();
   opera_lr_opts_process_swi_hle();
-  opera_lr_opts_process_hacks();
-  opera_lr_opts_process_memory();
-
-  g_OPTS.bios          = opera_lr_opts_get_bios();
-  g_OPTS.font          = opera_lr_opts_get_font();
-  g_OPTS.nvram_shared  = opera_lr_opts_is_nvram_shared();
-  g_OPTS.nvram_version = opera_lr_opts_nvram_version();
-  g_OPTS.region        = opera_lr_opts_region();
+  opera_lr_opts_process_vdlp();
 }
