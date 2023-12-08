@@ -250,9 +250,11 @@ static
 void
 process_opts(void)
 {
-  opera_lr_opts_process();
+  opera_lr_opts_get_values(&g_OPTS);
 
-  opera_vdlp_configure(g_VIDEO_BUFFER,g_OPT_VDLP_PIXEL_FORMAT,g_OPT_VDLP_FLAGS);
+  opera_vdlp_configure(g_VIDEO_BUFFER,
+                       g_OPTS.vdlp_pixel_format,
+                       opera_lr_opts_vdlp_flags());
 }
 
 void
@@ -297,17 +299,17 @@ load_rom1(void)
 {
   int64_t rv;
 
-  if(g_OPT_BIOS == NULL)
+  if(g_OPTS.bios == NULL)
     {
       retro_log_printf_cb(RETRO_LOG_ERROR,"[Opera]: no BIOS ROM found\n");
       return -1;
     }
 
-  if((rv = read_file_from_system_directory(g_OPT_BIOS->filename,ROM1,ROM1_SIZE)) < 0)
+  if((rv = read_file_from_system_directory(g_OPTS.bios->filename,ROM1,ROM1_SIZE)) < 0)
     {
       retro_log_printf_cb(RETRO_LOG_ERROR,
                           "[Opera]: unable to find or load BIOS ROM - %s\n",
-                          g_OPT_BIOS->filename);
+                          g_OPTS.bios->filename);
       return -1;
     }
 
@@ -322,17 +324,17 @@ load_rom2(void)
 {
   int64_t  rv;
 
-  if(g_OPT_FONT == NULL)
+  if(g_OPTS.font == NULL)
     {
-      memset(ROM2,0,ROM2_SIZE);
+      opera_mem_rom2_clear();
       return 0;
     }
 
-  if((rv = read_file_from_system_directory(g_OPT_FONT->filename,ROM2,ROM2_SIZE)) < 0)
+  if((rv = read_file_from_system_directory(g_OPTS.font->filename,ROM2,ROM2_SIZE)) < 0)
     {
       retro_log_printf_cb(RETRO_LOG_ERROR,
                           "[Opera]: unable to find or load FONT ROM - %s\n",
-                          g_OPT_FONT->filename);
+                          g_OPTS.font->filename);
       return -1;
     }
 
@@ -365,7 +367,7 @@ set_pixel_format(void)
   int rv;
   enum retro_pixel_format fmt;
 
-  fmt = vdlp_pixel_format_to_libretro(g_OPT_VDLP_PIXEL_FORMAT);
+  fmt = vdlp_pixel_format_to_libretro(g_OPTS.vdlp_pixel_format);
   rv  = retro_environment_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,&fmt);
   if(rv == 0)
     {
@@ -492,8 +494,8 @@ retro_get_system_av_info(struct retro_system_av_info *info_)
 
   info_->timing.fps            = opera_region_field_rate();
   info_->timing.sample_rate    = 44100;
-  info_->geometry.base_width   = g_OPT_VIDEO_WIDTH;
-  info_->geometry.base_height  = g_OPT_VIDEO_HEIGHT;
+  info_->geometry.base_width   = g_OPTS.video_width;
+  info_->geometry.base_height  = g_OPTS.video_height;
   info_->geometry.max_width    = (opera_region_max_width()  << 1);
   info_->geometry.max_height   = (opera_region_max_height() << 1);
   info_->geometry.aspect_ratio = 4.0 / 3.0;
@@ -601,16 +603,18 @@ retro_run(void)
   if(retro_environment_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,&updated) && updated)
     process_opts();
 
-  lr_input_update(g_OPT_ACTIVE_DEVICES);
+  lr_input_update(g_OPTS.active_devices);
 
   opera_3do_process_frame();
 
-  lr_input_crosshairs_draw(g_VIDEO_BUFFER,g_OPT_VIDEO_WIDTH,g_OPT_VIDEO_HEIGHT);
+  lr_input_crosshairs_draw(g_VIDEO_BUFFER,
+                           g_OPTS.video_width,
+                           g_OPTS.video_height);
 
   opera_lr_dsp_upload();
 
   retro_video_refresh_cb(g_VIDEO_BUFFER,
-                         g_OPT_VIDEO_WIDTH,
-                         g_OPT_VIDEO_HEIGHT,
-                         g_OPT_VIDEO_WIDTH << g_OPT_VIDEO_PITCH_SHIFT);
+                         g_OPTS.video_width,
+                         g_OPTS.video_height,
+                         g_OPTS.video_width << g_OPTS.video_pitch_shift);
 }

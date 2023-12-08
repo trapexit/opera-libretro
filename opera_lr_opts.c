@@ -362,28 +362,28 @@ opera_lr_opts_mem_cfg(void)
 }
 
 void
-opera_lr_opts_get_values(void)
+opera_lr_opts_get_values(opera_lr_opts_t &opts_)
 {
-  g_OPTS.bios                     = opera_lr_opts_get_bios();
-  g_OPTS.font                     = opera_lr_opts_get_font();
-  g_OPTS.nvram_shared             = opera_lr_opts_is_nvram_shared();
-  g_OPTS.nvram_version            = opera_lr_opts_nvram_version();
-  g_OPTS.region                   = opera_lr_opts_region();
-  g_OPTS.cpu_overclock            = opera_lr_opts_cpu_overclock();
-  g_OPTS.vdlp_pixel_format        = opera_lr_opts_vdlp_pixel_format();
-  g_OPTS.high_resolution          = opera_lr_opts_is_enabled("high_resolution");
-  g_OPTS.vdlp_bypass_clut         = opera_lr_opts_is_enabled("vdlp_bypass_clut");
-  g_OPTS.video_width;
-  g_OPTS.video_height;
-  g_OPTS.video_pitch_shift;
-  g_OPTS.active_devices           = opera_lr_opts_active_devices();
-  g_OPTS.mem_cfg                  = opera_lr_opts_mem_cfg();
-  g_OPTS.hide_lightgun_crosshairs = opera_lr_opts_is_enabled("hide_lightgun_crosshairs");
-  g_OPTS.madam_matrix_engine;
-  g_OPTS.kprint                   = opera_lr_opts_is_enabled("kprint");
-  g_OPTS.dsp_threaded             = opera_lr_opts_is_enabled("dsp_threaded");
-  g_OPTS.swi_hle                  = opera_lr_opts_is_enabled("swi_hle");
-  g_OPTS.hack_flags               = opera_lr_opts_hacks();
+  opts_.bios                     = opera_lr_opts_get_bios();
+  opts_.font                     = opera_lr_opts_get_font();
+  opts_.nvram_shared             = opera_lr_opts_is_nvram_shared();
+  opts_.nvram_version            = opera_lr_opts_nvram_version();
+  opts_.region                   = opera_lr_opts_region();
+  opts_.cpu_overclock            = opera_lr_opts_cpu_overclock();
+  opts_.vdlp_pixel_format        = opera_lr_opts_vdlp_pixel_format();
+  opts_.high_resolution          = opera_lr_opts_is_enabled("high_resolution");
+  opts_.vdlp_bypass_clut         = opera_lr_opts_is_enabled("vdlp_bypass_clut");
+  opts_.video_width;
+  opts_.video_height;
+  opts_.video_pitch_shift;
+  opts_.active_devices           = opera_lr_opts_active_devices();
+  opts_.mem_cfg                  = opera_lr_opts_mem_cfg();
+  opts_.hide_lightgun_crosshairs = opera_lr_opts_is_enabled("hide_lightgun_crosshairs");
+  opts_.madam_matrix_engine;
+  opts_.kprint                   = opera_lr_opts_is_enabled("kprint");
+  opts_.dsp_threaded             = opera_lr_opts_is_enabled("dsp_threaded");
+  opts_.swi_hle                  = opera_lr_opts_is_enabled("swi_hle");
+  opts_.hack_flags               = opera_lr_opts_hacks();
 }
 
 void

@@ -33,7 +33,7 @@ struct opera_lr_opts_t
 
 extern opera_lr_opts_t g_OPTS;
 
-void opera_lr_opts_get_values(void);
+void opera_lr_opts_get_values(opera_lr_opts_t *opts);
 void opera_lr_opts_process(void);
 
 bool                 opera_lr_opts_is_enabled(const char *key);

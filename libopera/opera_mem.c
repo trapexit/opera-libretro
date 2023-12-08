@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define ONE_MB (1024 * 1024)
 
@@ -208,4 +209,16 @@ opera_mem_destroy()
   VRAM = NULL;
 
   gl_MEM_CFG = DRAM_VRAM_UNSET;
+}
+
+void
+opera_mem_rom1_clear()
+{
+  memset(ROM1,0,ROM1_SIZE);
+}
+
+void
+opera_mem_rom2_clear()
+{
+  memset(ROM2,0,ROM2_SIZE);
 }
