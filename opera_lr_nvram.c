@@ -353,49 +353,51 @@ opera_lr_nvram_load_shared(uint8_t       *nvram_buf_,
 */
 
 void
-opera_lr_nvram_save(const char *gamepath_)
+opera_lr_nvram_save(const char    *gamepath_,
+                    const bool     shared_,
+                    const uint8_t  version_)
 {
-  uint8_t version;
-
-  version = opera_lr_opts_nvram_version();
-  if(opera_lr_opts_is_nvram_shared() || (gamepath_ == NULL))
+  if(shared_ || (gamepath_ == NULL))
     {
-      opera_lr_nvram_save_shared(NVRAM,NVRAM_SIZE,version);
+      opera_lr_nvram_save_shared(NVRAM,NVRAM_SIZE,version_);
     }
   else
     {
-      char filename[256];
-      const char *ptr = path_basename(gamepath_);
-      if (ptr)
-         strlcpy(filename, ptr, sizeof(filename));
+      const char *ptr;      
+      char filename[PATH_MAX_LENGTH];
+
+      ptr = path_basename(gamepath_);
+      if(ptr)
+        strlcpy(filename,ptr,sizeof(filename));
       else
-	 strlcpy(filename, gamepath_, sizeof(filename));
+        strlcpy(filename,gamepath_,sizeof(filename));
       path_remove_extension(filename);
 
-      opera_lr_nvram_save_pergame(NVRAM,NVRAM_SIZE,filename,version);
+      opera_lr_nvram_save_pergame(NVRAM,NVRAM_SIZE,filename,version_);
     }
 }
 
 void
-opera_lr_nvram_load(const char *gamepath_)
+opera_lr_nvram_load(const char    *gamepath_,
+                    const bool     shared_,
+                    const uint8_t  version_)
 {
-  uint8_t version;
-
-  version = opera_lr_opts_nvram_version();
-  if(opera_lr_opts_is_nvram_shared() || (gamepath_ == NULL))
+  if(shared_ || (gamepath_ == NULL))
     {
-      opera_lr_nvram_load_shared(NVRAM,NVRAM_SIZE,version);
+      opera_lr_nvram_load_shared(NVRAM,NVRAM_SIZE,version_);
     }
   else
     {
-      char filename[256];
-      const char *ptr = path_basename(gamepath_);
-      if (ptr)
-         strlcpy(filename, ptr, sizeof(filename));
+      const char *ptr;      
+      char filename[PATH_MAX_LENGTH];
+
+      ptr = path_basename(gamepath_);
+      if(ptr)
+        strlcpy(filename,ptr,sizeof(filename));
       else
-	 strlcpy(filename, gamepath_, sizeof(filename));
+        strlcpy(filename,gamepath_,sizeof(filename));
       path_remove_extension(filename);
 
-      opera_lr_nvram_load_pergame(NVRAM,NVRAM_SIZE,filename,version);
+      opera_lr_nvram_load_pergame(NVRAM,NVRAM_SIZE,filename,version_);
     }
 }

@@ -89,7 +89,6 @@ lr_input_crosshairs_draw(uint32_t       *buf_,
       if(CROSSHAIRS[i].c == 0)
         continue;
 
-      if(g_OPT_HIDE_LIGHTGUN_CROSSHAIRS == 0)
-        lr_input_crosshair_draw(&CROSSHAIRS[i],buf_,width_,height_);
+      lr_input_crosshair_draw(&CROSSHAIRS[i],buf_,width_,height_);
     }
 }
