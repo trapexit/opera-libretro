@@ -26,8 +26,16 @@ struct opera_clock_s
   int32_t  cycles_per_timer;
 };
 
-static opera_clock_t g_CLOCK;
-
+static opera_clock_t g_CLOCK =
+  {
+    .cpu_freq    = DEFAULT_CPU_FREQ, 
+    .dsp_acc     = 0,
+    .vdl_acc     = 0,
+    .timer_acc   = 0,
+    .timer_delay = 0x150,
+    .field_size  = NTSC_FIELD_SIZE,
+    .field_rate  = NTSC_FIELD_RATE_1616
+  };
 
 static
 uint32_t
