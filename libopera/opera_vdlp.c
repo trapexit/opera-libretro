@@ -771,7 +771,7 @@ opera_vdlp_init()
 {
   uint32_t i;
   static const uint32_t StartupVDL[]=
-    { /* Startup VDL at address 0x2B0000 */
+    { /* Startup VDL at address 0xB0000 */
       0x00004410, 0x002C0000, 0x002C0000, 0x002B0098,
       0x00000000, 0x01080808, 0x02101010, 0x03191919,
       0x04212121, 0x05292929, 0x06313131, 0x073A3A3A,
