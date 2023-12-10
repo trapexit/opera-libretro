@@ -41,7 +41,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-opera_lr_opts_t g_OPTS;
+opera_lr_opts_t g_OPTS = {0};
 
 static
 int

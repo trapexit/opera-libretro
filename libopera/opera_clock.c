@@ -3,6 +3,7 @@
 #include "opera_core.h"
 #include "opera_vdlp.h"
 
+#define DEFAULT_TIMER_DELAY  0x150
 #define DEFAULT_CPU_FREQ     12500000UL
 #define MIN_CPU_FREQ         1000000UL
 #define SND_FREQ             44100UL
@@ -10,6 +11,14 @@
 #define PAL_FIELD_SIZE       312UL
 #define NTSC_FIELD_RATE_1616 3928227UL
 #define PAL_FIELD_RATE_1616  3276800UL
+
+#define CYCLES_PER_SND(FQ,FS) ((((uint64_t)FQ) << 16) / ((uint64_t)FS))
+#define CYCLES_PER_SCANLINE(FQ,FR,FS) ((((uint64_t)FQ)<<32)/((uint64_t)FR)*((uint64_t)FS))
+#define CYCLES_PER_TIMER(FQ,TD) ((((uint64_t)FQ)<<32)/((21000000ULL)<<16)/((uint64_t)TD))
+
+#define DEFAULT_CPS CYCLES_PER_SCANLINE(DEFAULT_CPU_FREQ, \
+                                        NTSC_FIELD_RATE_1616, \
+                                        NTSC_FIELD_SIZE)
 
 typedef struct opera_clock_s opera_clock_t;
 struct opera_clock_s
@@ -28,13 +37,16 @@ struct opera_clock_s
 
 static opera_clock_t g_CLOCK =
   {
-    .cpu_freq    = DEFAULT_CPU_FREQ, 
+    .cpu_freq    = DEFAULT_CPU_FREQ,
     .dsp_acc     = 0,
     .vdl_acc     = 0,
     .timer_acc   = 0,
     .timer_delay = 0x150,
     .field_size  = NTSC_FIELD_SIZE,
-    .field_rate  = NTSC_FIELD_RATE_1616
+    .field_rate  = NTSC_FIELD_RATE_1616,
+    .cycles_per_snd = CYCLES_PER_SND(DEFAULT_CPU_FREQ,SND_FREQ),
+    .cycles_per_scanline = DEFAULT_CPS,
+    .cycles_per_timer = CYCLES_PER_TIMER(DEFAULT_CPU_FREQ,DEFAULT_TIMER_DELAY)
   };
 
 static
@@ -43,8 +55,7 @@ calc_cycles_per_snd(void)
 {
   uint64_t rv;
 
-  rv  = ((uint64_t)g_CLOCK.cpu_freq << 16);
-  rv /= ((uint64_t)SND_FREQ);
+  rv = CYCLES_PER_SND(g_CLOCK.cpu_freq,SND_FREQ);
 
   return rv;
 }
@@ -59,8 +70,9 @@ calc_cycles_per_scanline(void)
 {
   uint64_t rv;
 
-  rv  = ((uint64_t)g_CLOCK.cpu_freq << 32);
-  rv /= ((uint64_t)g_CLOCK.field_rate * (uint64_t)g_CLOCK.field_size);
+  rv = CYCLES_PER_SCANLINE(g_CLOCK.cpu_freq,
+                           g_CLOCK.field_rate,
+                           g_CLOCK.field_size);
 
   return rv;
 }
@@ -76,8 +88,8 @@ calc_cycles_per_timer(void)
 {
   uint64_t rv;
 
-  rv  = ((uint64_t)g_CLOCK.cpu_freq << 32);
-  rv /= (((uint64_t)21000000 << 16) / (uint64_t)g_CLOCK.timer_delay);
+  rv = CYCLES_PER_TIMER(g_CLOCK.cpu_freq,
+                        g_CLOCK.timer_delay);
 
   return rv;
 }
