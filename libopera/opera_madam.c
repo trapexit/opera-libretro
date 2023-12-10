@@ -26,7 +26,7 @@
   *  Allen Wright
   *  John Sammons
   *  Felix Lazarev
-*/
+  */
 
 #include "bool.h"
 #include "endianness.h"
@@ -638,7 +638,7 @@ static int64_t tmpMO1;
 static int64_t tmpMO2;
 static int64_t tmpMO3;
 
-#define Nfrac16 (((int64_t)MADAM.mregs[0x680]<<32) | \
+#define Nfrac16 (((int64_t)MADAM.mregs[0x680]<<32) |    \
                  (uint32_t)MADAM.mregs[0x684])
 
 static
@@ -738,91 +738,91 @@ madam_matrix_mul4x4(void)
 
 void
 opera_madam_poke(uint32_t addr_,
-                  uint32_t val_)
+                 uint32_t val_)
 {
-   if((addr_ >= 0x400) && (addr_ <= 0x53F))
-   {
+  if((addr_ >= 0x400) && (addr_ <= 0x53F))
+    {
       opera_clio_fifo_write(addr_,val_);
       return;
-   }
+    }
 
-   switch(addr_)
-   {
-      case 0x00:
-         if(KPRINT)
-            fputc(val_,stderr);
-         return;
-      case 0x04:
-         /* readonly */
-         break;
-      case 0x08:
-         MADAM.mregs[0x08] = val_;
-         HandleDMA8();
-         break;
-      case 0x580:
-        opera_vdlp_set_vdl_head(val_);
-        return;
-      case SPRSTRT:
-         if(MADAM.FSM == FSM_IDLE)
-            MADAM.FSM = FSM_INPROCESS;
-         return;
-      case SPRSTOP:
-         MADAM.FSM = FSM_IDLE;
-         NEXTCCB = 0;
-         return;
-      case SPRCNTU:
-         if(MADAM.FSM == FSM_SUSPENDED)
-            MADAM.FSM = FSM_INPROCESS;
-         return;
-      case SPRPAUS:
-         if(MADAM.FSM == FSM_INPROCESS)
-            MADAM.FSM = FSM_SUSPENDED;
-         return;
+  switch(addr_)
+    {
+    case 0x00:
+      if(KPRINT)
+        fputc(val_,stderr);
+      return;
+    case 0x04:
+      /* readonly */
+      break;
+    case 0x08:
+      MADAM.mregs[0x08] = val_;
+      HandleDMA8();
+      break;
+    case 0x580:
+      opera_vdlp_set_vdl_head(val_);
+      return;
+    case SPRSTRT:
+      if(MADAM.FSM == FSM_IDLE)
+        MADAM.FSM = FSM_INPROCESS;
+      return;
+    case SPRSTOP:
+      MADAM.FSM = FSM_IDLE;
+      NEXTCCB = 0;
+      return;
+    case SPRCNTU:
+      if(MADAM.FSM == FSM_SUSPENDED)
+        MADAM.FSM = FSM_INPROCESS;
+      return;
+    case SPRPAUS:
+      if(MADAM.FSM == FSM_INPROCESS)
+        MADAM.FSM = FSM_SUSPENDED;
+      return;
 
-         /* Matrix engine */
-      case 0x7FC:
-         switch(val_)
-         {
-            case 0:
-               madam_matrix_copy();
-               return;
-            case 1:
-               madam_matrix_mul4x4();
-               return;
-            case 2:
-               madam_matrix_mul3x3();
-               return;
-            case 3:
-               madam_matrix_mul3x3_nz();
-               return;
-            default:
-               return;
-         }
-         break;
+      /* Matrix engine */
+    case 0x7FC:
+      switch(val_)
+        {
+        case 0:
+          madam_matrix_copy();
+          return;
+        case 1:
+          madam_matrix_mul4x4();
+          return;
+        case 2:
+          madam_matrix_mul3x3();
+          return;
+        case 3:
+          madam_matrix_mul3x3_nz();
+          return;
+        default:
+          return;
+        }
+      break;
 
-         /* REGCTL0 */
-      case 0x130:
-         MADAM.mregs[0x130] = val_;
-         MADAM.rmod = (((val_ & 0x01) << 7) +
-               ((val_ & 0x0C) << 8) +
-               ((val_ & 0x70) << 4));
-         val_ >>= 8;
-         MADAM.wmod = (((val_ & 0x01) << 7) +
-               ((val_ & 0x0C) << 8) +
-               ((val_ & 0x70) << 4));
-         break;
+      /* REGCTL0 */
+    case 0x130:
+      MADAM.mregs[0x130] = val_;
+      MADAM.rmod = (((val_ & 0x01) << 7) +
+                    ((val_ & 0x0C) << 8) +
+                    ((val_ & 0x70) << 4));
+      val_ >>= 8;
+      MADAM.wmod = (((val_ & 0x01) << 7) +
+                    ((val_ & 0x0C) << 8) +
+                    ((val_ & 0x70) << 4));
+      break;
 
-         /* REGCTL1 */
-      case 0x134:
-         MADAM.mregs[0x134] = val_;
-         MADAM.clipx = (val_ & 0x3FF);
-         MADAM.clipy = ((val_ >> 16) & 0x3FF);
-         break;
+      /* REGCTL1 */
+    case 0x134:
+      MADAM.mregs[0x134] = val_;
+      MADAM.clipx = (val_ & 0x3FF);
+      MADAM.clipy = ((val_ >> 16) & 0x3FF);
+      break;
 
-      default:
-         MADAM.mregs[addr_] = val_;
-         break;
-   }
+    default:
+      MADAM.mregs[addr_] = val_;
+      break;
+    }
 }
 
 static uint32_t Flag;
@@ -940,7 +940,7 @@ opera_madam_cel_handle(void)
           PLUTDATA = mread32(CURRENTCCB) & 0xFFFFFFFC;
           /*
             if((PLUTDATA == 0))
-              PLUTF=1;
+            PLUTF=1;
           */
           if(!(CCBFLAGS & CCB_PPABS))
             {
@@ -1139,7 +1139,7 @@ DMAPBus(void)
   while(((int32_t)MADAM.mregs[0x574] > 0) && (pbus_size > 0))
     {
       opera_io_write(MADAM.mregs[0x570],
-                      swap32_if_little_endian(*pbus_buf));
+                     swap32_if_little_endian(*pbus_buf));
       pbus_buf++;
       pbus_size          -= 4;
       MADAM.mregs[0x574] -= 4;
@@ -1325,10 +1325,10 @@ PDEC(const uint32_t  pixel_,
     They'll be done before using the PROCESSOR.
 
     if(!(PRE1&PRE1_NOSWAP) && (CCBCTL0&(1<<27)))
-      pres = (pres&0x7ffe)|((pres&0x8000)>>15)|((pres&1)<<15);
+    pres = (pres&0x7ffe)|((pres&0x8000)>>15)|((pres&1)<<15);
 
     if(!(CCBCTL0 & 0x80000000))
-      pres = (pres&0x7fff)|((CCBCTL0>>15)&0x8000);
+    pres = (pres&0x7fff)|((CCBCTL0>>15)&0x8000);
 
     pres=(pres|pdec.pmodeORmask)&pdec.pmodeANDmask;
   */
@@ -2351,9 +2351,9 @@ opera_madam_reset(void)
 
 static INLINE uint32_t TexelCCWTest(int64_t hdx, int64_t hdy, int64_t vdx, int64_t vdy)
 {
-	if (((hdx + vdx) * (hdy - vdy) + vdx * vdy - hdx * hdy) < 0)
-		return CCB_ACCW;
-	return CCB_ACW;
+  if (((hdx + vdx) * (hdy - vdy) + vdx * vdy - hdx * hdy) < 0)
+    return CCB_ACCW;
+  return CCB_ACW;
 }
 
 static
