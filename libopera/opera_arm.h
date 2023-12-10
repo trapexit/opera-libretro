@@ -56,11 +56,6 @@ uint32_t opera_arm_state_size(void);
 void     opera_arm_state_save(void *buf_);
 void     opera_arm_state_load(const void *buf_);
 
-void     opera_arm_rom_select(int n_);
-
-void     opera_arm_rom1_byteswap_if_necessary(void);
-void     opera_arm_rom2_byteswap_if_necessary(void);
-
 void     opera_arm_swi_hle_set(const int hle);
 int      opera_arm_swi_hle_get(void);
 

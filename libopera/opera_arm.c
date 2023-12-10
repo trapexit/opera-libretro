@@ -47,7 +47,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ARM_INITIAL_PC  0x03000000
+#define ARM_INITIAL_PC  0x00000000
 
 #define ARM_MUL_MASK    0x0fc000f0
 #define ARM_MUL_SIGN    0x00000090
@@ -108,9 +108,9 @@ const static uint16_t cond_flags_cross[]=
     0x0000  //never
   };
 
-static int        g_SWI_HLE;
-static arm_core_t CPU;
-static int        CYCLES;	//cycle counter
+static int        g_SWI_HLE = 0;
+static arm_core_t CPU       = {0};
+static int        CYCLES    = 0;
 
 static uint32_t readusr(uint32_t rn);
 static void     loadusr(uint32_t rn, uint32_t val);
@@ -118,30 +118,6 @@ static uint32_t mreadb(uint32_t addr);
 static void     mwriteb(uint32_t addr, uint8_t val);
 static uint32_t mreadw(uint32_t addr);
 static void     mwritew(uint32_t addr,uint32_t val);
-
-void
-opera_arm_rom1_byteswap_if_necessary(void)
-{
-  uint8_t *rom;
-  int64_t  size;
-
-  rom  = ROM1;
-  size = ROM1_SIZE;
-
-  swap32_array_if_little_endian((uint32_t*)rom,(size / sizeof(uint32_t)));
-}
-
-void
-opera_arm_rom2_byteswap_if_necessary(void)
-{
-  uint8_t *rom;
-  int64_t  size;
-
-  rom  = ROM2;
-  size = ROM2_SIZE;
-
-  swap32_array_if_little_endian((uint32_t*)rom,(size / sizeof(uint32_t)));
-}
 
 uint32_t
 opera_arm_state_size(void)
@@ -471,12 +447,6 @@ ARM_Change_ModeSafe(uint32_t mode_)
     }
 }
 
-void
-opera_arm_rom_select(int n_)
-{
-  ROM = ((n_ == 0) ? ROM1 : ROM2);
-}
-
 static
 INLINE
 void
@@ -570,25 +540,8 @@ opera_arm_init(void)
 {
   int i;
 
-  g_SWI_HLE = 0;
-
   CYCLES = 0;
-  for(i = 0; i < 16; i++)
-    CPU.USER[i] = 0;
-
-  for(i = 0; i < 2; i++)
-    {
-      CPU.SVC[i] = 0;
-      CPU.ABT[i] = 0;
-      CPU.IRQ[i] = 0;
-      CPU.UND[i] = 0;
-    }
-
-  for(i = 0;i < 7; i++)
-    CPU.CASH[i] = CPU.FIQ[i] = 0;
-
-  CPU.nFIQ = FALSE;
-  CPU.MAS_Access_Exept = FALSE;
+  memset(&CPU,0,sizeof(CPU));
 
   CPU.USER[15] = ARM_INITIAL_PC;
   arm_cpsr_set(0x13);

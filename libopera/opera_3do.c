@@ -75,7 +75,6 @@ opera_3do_init(opera_ext_interface_t callback_)
   uint8_t *vram;
 
   opera_mem_init(DRAM_VRAM_STOCK);
-  opera_nvram_init();
 
   io_interface = callback_;
 

@@ -227,8 +227,14 @@ opera_lr_opts_set_bios(void)
       return;
     }
 
-  opera_arm_rom1_byteswap_if_necessary();
+  opera_mem_rom1_byteswap32_if_le();
+
+  // On real hardware the ROM is mapped to the beginning of memory and
+  // once written to maps in RAM. Copying the ROM into RAM works for
+  // our purposes.
+  memcpy(DRAM,ROM1,ROM1_SIZE);
 }
+
 
 void
 opera_lr_opts_get_font(void)
@@ -274,7 +280,7 @@ opera_lr_opts_set_font(void)
       return;
     }
 
-  opera_arm_rom2_byteswap_if_necessary();
+  opera_mem_rom2_byteswap32_if_le();
 }
 
 void
@@ -655,6 +661,6 @@ opera_lr_opts_destroy()
   g_OPTS.video_buffer = NULL;
 
   opera_lr_dsp_destroy();
-  
+
   opera_mem_destroy();
 }

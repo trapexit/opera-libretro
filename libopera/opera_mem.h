@@ -48,4 +48,8 @@ opera_mem_cfg_t opera_mem_cfg();
 uint32_t opera_mem_madam_red_sysbits(uint32_t const);
 
 void opera_mem_rom1_clear();
+void opera_mem_rom1_byteswap32_if_le();
 void opera_mem_rom2_clear();
+void opera_mem_rom2_byteswap32_if_le();
+
+void opera_mem_rom_select(int);

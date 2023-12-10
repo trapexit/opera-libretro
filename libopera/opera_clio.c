@@ -33,6 +33,7 @@
 #include "opera_clock.h"
 #include "opera_dsp.h"
 #include "opera_madam.h"
+#include "opera_mem.h"
 #include "opera_xbus.h"
 
 #include "boolean.h"
@@ -366,7 +367,7 @@ opera_clio_poke(uint32_t addr_,
       if_set_set_reset(&CLIO.regs[0x84],val_,0x40,0x04);
       if_set_set_reset(&CLIO.regs[0x84],val_,0x80,0x08);
 
-      opera_arm_rom_select(!!(val_ & 0x4));
+      opera_mem_rom_select(!!(val_ & 0x4));
 
       return 0;
     }

@@ -1,5 +1,7 @@
 #include "opera_mem.h"
 
+#include "endianness.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -219,7 +221,37 @@ opera_mem_rom1_clear()
 }
 
 void
+opera_mem_rom1_byteswap32_if_le()
+{
+  uint32_t *mem;
+  uint64_t  size;
+
+  mem  = (uint32_t*)ROM1;
+  size = (ROM1_SIZE / sizeof(uint32_t));
+
+  swap32_array_if_little_endian(mem,size);
+}
+
+void
 opera_mem_rom2_clear()
 {
   memset(ROM2,0,ROM2_SIZE);
+}
+
+void
+opera_mem_rom2_byteswap32_if_le()
+{
+  uint32_t *mem;
+  uint64_t  size;
+
+  mem  = (uint32_t*)ROM2;
+  size = (ROM2_SIZE / sizeof(uint32_t));
+
+  swap32_array_if_little_endian(mem,size);
+}
+
+void
+opera_mem_rom_select(int n_)
+{
+  ROM = ((n_ == 0) ? ROM1 : ROM2);
 }
