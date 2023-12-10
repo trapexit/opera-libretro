@@ -91,10 +91,11 @@ opera_mem_set(opera_mem_cfg_t const cfg_)
   gl_MEM_CFG = cfg;
 }
 
+#define MADAM_RAM_MASK     0x0000007F
 #define DRAMSIZE_SHIFT     3	/* RED ONLY */
 #define VRAMSIZE_SHIFT     0	/* RED ONLY */
-#define VRAMSIZE_1MB 0x00000001 /* RED ONLY */
-#define VRAMSIZE_2MB 0x00000002 /* RED ONLY */
+#define VRAMSIZE_1MB       0x00000001 /* RED ONLY */
+#define VRAMSIZE_2MB       0x00000002 /* RED ONLY */
 #define DRAMSIZE_SETMASK   3	/* RED ONLY */
 #define DRAMSIZE_1MB	   0x000000001 /* RED ONLY */
 #define DRAMSIZE_4MB	   0x000000002 /* RED ONLY */
@@ -107,7 +108,7 @@ opera_mem_madam_red_sysbits(uint32_t const v_)
 {
   uint32_t v = v_;
 
-  v &= 0xFFFFFF80;
+  v &= ~MADAM_RAM_MASK;
 
   switch(gl_MEM_CFG)
     {
