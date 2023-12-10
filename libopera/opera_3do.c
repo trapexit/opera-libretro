@@ -81,8 +81,6 @@ opera_3do_init(opera_ext_interface_t callback_)
 
   CNBFIX = 0;
 
-  opera_clock_init();
-
   opera_arm_init();
 
   opera_vdlp_init();

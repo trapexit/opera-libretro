@@ -156,20 +156,6 @@ opera_clock_state_load(const void *buf_)
   /* memcpy(&g_CLOCK,buf_,sizeof(opera_clock_t)); */
 }
 
-void
-opera_clock_init(void)
-{
-  g_CLOCK.cpu_freq    = DEFAULT_CPU_FREQ;
-  g_CLOCK.dsp_acc     = 0;
-  g_CLOCK.vdl_acc     = 0;
-  g_CLOCK.timer_acc   = 0;
-  g_CLOCK.timer_delay = 0x150;  /* same as the OS will set */
-  g_CLOCK.field_size  = NTSC_FIELD_SIZE;
-  g_CLOCK.field_rate  = NTSC_FIELD_RATE_1616;
-
-  recalculate_cycles_per();
-}
-
 int
 opera_clock_vdl_queued(void)
 {

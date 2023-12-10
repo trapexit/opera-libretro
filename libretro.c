@@ -340,6 +340,7 @@ retro_load_game(const struct retro_game_info *info_)
   opera_lr_opts_get();
   opera_lr_opts_set();
   opera_3do_init(libopera_callback);
+  opera_lr_opts_set();  
   cdimage_set_sector(0);
 
   rv = set_pixel_format();
