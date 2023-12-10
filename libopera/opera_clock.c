@@ -13,10 +13,10 @@
 #define PAL_FIELD_RATE_1616  3276800UL
 
 #define CYCLES_PER_SND(FQ,FS) ((((uint64_t)FQ) << 16) / ((uint64_t)FS))
-#define CYCLES_PER_SCANLINE(FQ,FR,FS) ((((uint64_t)FQ)<<32)/((uint64_t)FR)*((uint64_t)FS))
-#define CYCLES_PER_TIMER(FQ,TD) ((((uint64_t)FQ)<<32)/((21000000ULL)<<16)/((uint64_t)TD))
+#define CYCLES_PER_SCANLINE(FQ,FR,FS) ((((uint64_t)FQ)<<32)/(((uint64_t)FR)*((uint64_t)FS)))
+#define CYCLES_PER_TIMER(FQ,TD) ((((uint64_t)FQ)<<32)/((((uint64_t)21000000ULL)<<16)/((uint64_t)TD)))
 
-#define DEFAULT_CPSl CYCLES_PER_SCANLINE(DEFAULT_CPU_FREQ, \
+#define DEFAULT_CPSL CYCLES_PER_SCANLINE(DEFAULT_CPU_FREQ, \
                                          NTSC_FIELD_RATE_1616,  \
                                          NTSC_FIELD_SIZE)
 
@@ -45,7 +45,7 @@ static opera_clock_t g_CLOCK =
     .field_size  = NTSC_FIELD_SIZE,
     .field_rate  = NTSC_FIELD_RATE_1616,
     .cycles_per_snd = CYCLES_PER_SND(DEFAULT_CPU_FREQ,SND_FREQ),
-    .cycles_per_scanline = DEFAULT_CPSl,
+    .cycles_per_scanline = DEFAULT_CPSL,
     .cycles_per_timer = CYCLES_PER_TIMER(DEFAULT_CPU_FREQ,DEFAULT_TIMER_DELAY)
   };
 
