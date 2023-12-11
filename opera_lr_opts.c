@@ -659,4 +659,6 @@ opera_lr_opts_destroy()
   opera_lr_dsp_destroy();
 
   opera_mem_destroy();
+
+  memset(&g_OPTS,0,sizeof(g_OPTS));
 }
