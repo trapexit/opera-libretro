@@ -83,7 +83,6 @@ opera_3do_init(opera_ext_interface_t callback_)
   opera_arm_init();
 
   opera_vdlp_init();
-  opera_sport_init();
   opera_madam_init();
   opera_xbus_init(xbus_cdrom_plugin);
 

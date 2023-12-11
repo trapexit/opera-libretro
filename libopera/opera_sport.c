@@ -52,12 +52,6 @@ typedef struct sport_s sport_t;
 static sport_t SPORT = {0};
 
 void
-opera_sport_init()
-{
-
-}
-
-void
 opera_sport_set_source(const uint32_t rawidx_)
 {
   SPORT.source = ((rawidx_ & SPORT_IDX_MASK) << SPORT_IDX_SHIFT);

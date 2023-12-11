@@ -689,9 +689,7 @@ opera_clio_timer_get_delay(void)
 
 void opera_clio_init(int reason_)
 {
-  unsigned i;
-  for(i = 0; i < 32768; i++)
-    CLIO.regs[i] = 0;
+  memset(&CLIO,0,sizeof(CLIO));
 
   //CLIO.regs[8]=240;
 

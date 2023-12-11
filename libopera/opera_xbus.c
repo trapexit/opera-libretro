@@ -57,8 +57,8 @@ struct xbus_datum_s
 
 typedef struct xbus_datum_s xbus_datum_t;
 
-static xbus_datum_t      XBUS;
-static opera_xbus_device xdev[16];
+static xbus_datum_t XBUS          = {0};
+static opera_xbus_device xdev[16] = {0};
 
 void
 xbus_execute_command_f(void)
@@ -214,10 +214,10 @@ opera_xbus_init(opera_xbus_device zero_dev_)
 {
   int i;
 
+  memset(&XBUS,0,sizeof(XBUS));
   XBUS.polf = 0x0F;
 
-  for(i = 0; i < 15; i++)
-    xdev[i] = NULL;
+  memset(xdev,0,sizeof(xdev));
 
   opera_xbus_attach(zero_dev_);
 }
