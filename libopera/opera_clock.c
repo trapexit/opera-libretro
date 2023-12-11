@@ -16,6 +16,7 @@
 #define CYCLES_PER_SCANLINE(FQ,FR,FS) ((((uint64_t)FQ)<<32)/(((uint64_t)FR)*((uint64_t)FS)))
 #define CYCLES_PER_TIMER(FQ,TD) ((((uint64_t)FQ)<<32)/((((uint64_t)21000000ULL)<<16)/((uint64_t)TD)))
 
+#define DEFAULT_TIMER_DELAY 0x150
 #define DEFAULT_CPSL CYCLES_PER_SCANLINE(DEFAULT_CPU_FREQ, \
                                          NTSC_FIELD_RATE_1616,  \
                                          NTSC_FIELD_SIZE)
@@ -41,7 +42,7 @@ static opera_clock_t g_CLOCK =
     .dsp_acc             = 0,
     .vdl_acc             = 0,
     .timer_acc           = 0,
-    .timer_delay         = 0x150,
+    .timer_delay         = DEFAULT_TIMER_DELAY,
     .field_size          = NTSC_FIELD_SIZE,
     .field_rate          = NTSC_FIELD_RATE_1616,
     .cycles_per_snd      = CYCLES_PER_SND(DEFAULT_CPU_FREQ,SND_FREQ),
