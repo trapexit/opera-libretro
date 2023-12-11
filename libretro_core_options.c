@@ -30,7 +30,8 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_bios",
       "BIOS (rom1)",
-      "Select which official system BIOS (hardware revision) to use when performing emulation. Only files present in RetroArch's system directory are listed.",
+      "Select system BIOS. Only ROMs present in the system directory are listed."
+      " Changes take affect at core start/restart.",
       {
         { NULL, NULL }, /* This is set dynamically */
       },
@@ -39,7 +40,8 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_font",
       "Font (rom2)",
-      "Select which official 'font rom' to use when performing emulation. Required by some Japanese games, otherwise optional. Only files present in RetroArch's system directory are listed.",
+      "Select 'font rom'. Required by some Japanese games, otherwise optional. Only ROMs present in the system directory are listed."
+      " Changes take affect at core start/restart.",
       {
         { NULL, NULL }, /* This is set dynamically */
       },
@@ -48,7 +50,7 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_cpu_overclock",
       "CPU Overclock",
-      "Increase clock speed of the emulated 3DO's 12.5MHz ARM60 CPU. Dramatically improves frame rates in many games (e.g. The Need For Speed), but increases performance requirements and in some cases has no effect (or may cause glitches).",
+      "Increase clock speed of the emulated 3DO's 12.5MHz ARM60 CPU. Dramatically improves frame rates in many games, but increases performance requirements and in some cases has no effect (or may cause glitches).",
       {
         { "1.0x (12.50Mhz)", NULL },
         { "1.1x (13.75Mhz)", NULL },
@@ -64,7 +66,8 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_mem_capacity",
       "Memory Capacity",
-      "Select the amount of DRAM and VRAM the system has. Only useful for homebrew.",
+      "Select the amount of DRAM and VRAM the system has. Only useful for homebrew and non-stock values may cause issues with some software."
+      " Changes take affect at core start/restart.",
       {
         { "21", "2MB DRAM; 1MB VRAM" },
         { "22", "2MB DRAM; 2MB VRAM" },
@@ -80,8 +83,8 @@ static struct retro_core_option_definition option_defs_us[] =
     },
     {
       "opera_region",
-      "Mode",
-      "Select the resolution and field rate. NOTE: some EU games require a EU ROM.",
+      "Region / Mode",
+      "Select the resolution and field rate. NOTE: some EU games require an EU ROM.",
       {
         { "ntsc", "NTSC 320x240@60" },
         { "pal1", "PAL1 320x288@50" },
@@ -93,7 +96,8 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_vdlp_pixel_format",
       "VDLP Pixel Format",
-      "Select the pixel format to request from the runtime and convert to from the internal 16bpp format.",
+      "Select the pixel format to request from the runtime and convert to from the internal 16bpp format."
+      " Changes take affect at core start/restart.",
       {
         { "0RGB1555", NULL },
         { "RGB565",   NULL },
@@ -126,7 +130,8 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_madam_matrix_engine",
       "MADAM Matrix Engine",
-      "'MADAM' is the 3DO's graphics accelerator. It contains a custom maths co-processor, used by the 3DO's CPU to offload matrix operations. This corresponds to running in 'Hardware' - but the 3DO could also utilise a built-in ARM 'Software' version of the MADAM matrix engine. 'Hardware' mode is the default, but it has been observed that some games run faster when forcing 'Software' mode (e.g. The Need For Speed).",
+      "'MADAM' is the 3DO's graphics accelerator. It contains a custom maths co-processor, used by the 3DO's CPU to offload matrix operations. This corresponds to running in 'Hardware' - but the 3DO could also utilise a built-in ARM 'Software' version of the MADAM matrix engine. 'Hardware' mode is the default, but it has been observed that some games run faster when forcing 'Software' mode."
+      " Changes take affect at core start/restart.",
       {
         { "hardware", "Hardware" },
         { "software", "Software" },
