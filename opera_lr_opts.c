@@ -434,23 +434,13 @@ opera_lr_opts_get_high_resolution(void)
 void
 opera_lr_opts_set_high_resolution(void)
 {
-  uint32_t flags;
-
-  flags = VDLP_FLAG_NONE;
-  if(g_OPTS.high_resolution)
-    flags |= VDLP_FLAG_HIRES_CEL;
-  if(g_OPTS.vdlp_bypass_clut)
-    flags |= VDLP_FLAG_CLUT_BYPASS;
-
-  opera_vdlp_configure(g_OPTS.video_buffer,
-                       g_OPTS.vdlp_pixel_format,
-                       flags);
+  opera_lr_opts_set_vdlp_bypass_clut();
 
   if(g_OPTS.high_resolution)
     {
       HIRESMODE           = 1;
-      g_OPTS.video_width  = (opera_region_width()  << 1);
-      g_OPTS.video_height = (opera_region_height() << 1);
+      g_OPTS.video_width  = (opera_region_width()  * 2);
+      g_OPTS.video_height = (opera_region_height() * 2);
     }
   else
     {
