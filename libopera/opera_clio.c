@@ -703,10 +703,7 @@ void opera_clio_init(int reason_)
 void
 opera_clio_reset(void)
 {
-  int i;
-
-  for(i = 0;i < 65536; i++)
-    CLIO.regs[i] = 0;
+  memset(CLIO.regs,0,sizeof(CLIO.regs));
 }
 
 uint16_t
