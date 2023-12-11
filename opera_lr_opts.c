@@ -623,24 +623,30 @@ opera_lr_opts_get()
 void
 opera_lr_opts_set()
 {
-  opera_lr_opts_set_video_buffer();
-  opera_lr_opts_set_bios();
-  opera_lr_opts_set_font();
+  if(g_OPTS.set_once == false)
+    {
+      opera_lr_opts_set_mem_cfg();      
+      opera_lr_opts_set_video_buffer();
+      opera_lr_opts_set_bios();
+      opera_lr_opts_set_font();
+      opera_lr_opts_set_vdlp_pixel_format();
+      opera_lr_opts_set_madam_matrix_engine();
+    }
+
   opera_lr_opts_set_nvram_shared();
   opera_lr_opts_set_nvram_version();
   opera_lr_opts_set_region();
   opera_lr_opts_set_cpu_overclock();
-  opera_lr_opts_set_vdlp_pixel_format();
   opera_lr_opts_set_vdlp_bypass_clut();
   opera_lr_opts_set_high_resolution();
   opera_lr_opts_set_active_devices();
-  opera_lr_opts_set_mem_cfg();
   opera_lr_opts_set_hide_lightgun_crosshairs();
-  opera_lr_opts_set_madam_matrix_engine();
   opera_lr_opts_set_kprint();
   opera_lr_opts_set_dsp_threaded();
   opera_lr_opts_set_swi_hle();
   opera_lr_opts_set_hacks();
+
+  g_OPTS.set_once = true;
 }
 
 void

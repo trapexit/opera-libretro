@@ -37,16 +37,16 @@ struct opera_clock_s
 
 static opera_clock_t g_CLOCK =
   {
-    .cpu_freq    = DEFAULT_CPU_FREQ,
-    .dsp_acc     = 0,
-    .vdl_acc     = 0,
-    .timer_acc   = 0,
-    .timer_delay = 0x150,
-    .field_size  = NTSC_FIELD_SIZE,
-    .field_rate  = NTSC_FIELD_RATE_1616,
-    .cycles_per_snd = CYCLES_PER_SND(DEFAULT_CPU_FREQ,SND_FREQ),
+    .cpu_freq            = DEFAULT_CPU_FREQ,
+    .dsp_acc             = 0,
+    .vdl_acc             = 0,
+    .timer_acc           = 0,
+    .timer_delay         = 0x150,
+    .field_size          = NTSC_FIELD_SIZE,
+    .field_rate          = NTSC_FIELD_RATE_1616,
+    .cycles_per_snd      = CYCLES_PER_SND(DEFAULT_CPU_FREQ,SND_FREQ),
     .cycles_per_scanline = DEFAULT_CPSL,
-    .cycles_per_timer = CYCLES_PER_TIMER(DEFAULT_CPU_FREQ,DEFAULT_TIMER_DELAY)
+    .cycles_per_timer    = CYCLES_PER_TIMER(DEFAULT_CPU_FREQ,DEFAULT_TIMER_DELAY)
   };
 
 static

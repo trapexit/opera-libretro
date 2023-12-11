@@ -9,6 +9,7 @@
 typedef struct opera_lr_opts_t opera_lr_opts_t;
 struct opera_lr_opts_t
 {
+  bool set_once;
   opera_bios_t const *bios;
   opera_bios_t const *font;
   bool nvram_shared;
