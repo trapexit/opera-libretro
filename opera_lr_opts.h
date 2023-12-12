@@ -35,60 +35,60 @@ struct opera_lr_opts_t
 
 extern opera_lr_opts_t g_OPTS;
 
-void opera_lr_opts_get();
-void opera_lr_opts_set();
+void opera_lr_opts_get(opera_lr_opts_t *opts);
+void opera_lr_opts_set(opera_lr_opts_t const *opts);
 void opera_lr_opts_process();
 void opera_lr_opts_destroy();
 
-void opera_lr_opts_get_bios();
-void opera_lr_opts_set_bios();
+void opera_lr_opts_get_bios(opera_lr_opts_t *opts);
+void opera_lr_opts_set_bios(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_font();
-void opera_lr_opts_set_font();
+void opera_lr_opts_get_font(opera_lr_opts_t *opts);
+void opera_lr_opts_set_font(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_nvram_shared();
-void opera_lr_opts_set_nvram_shared();
+void opera_lr_opts_get_nvram_shared(opera_lr_opts_t *opts);
+void opera_lr_opts_set_nvram_shared(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_nvram_version();
-void opera_lr_opts_set_nvram_version();
+void opera_lr_opts_get_nvram_version(opera_lr_opts_t *opts);
+void opera_lr_opts_set_nvram_version(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_region();
-void opera_lr_opts_set_region();
+void opera_lr_opts_get_region(opera_lr_opts_t *opts);
+void opera_lr_opts_set_region(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_cpu_overclock();
-void opera_lr_opts_set_cpu_overclock();
+void opera_lr_opts_get_cpu_overclock(opera_lr_opts_t *opts);
+void opera_lr_opts_set_cpu_overclock(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_vdlp_pixel_format();
-void opera_lr_opts_set_vdlp_pixel_format();
+void opera_lr_opts_get_vdlp_pixel_format(opera_lr_opts_t *opts);
+void opera_lr_opts_set_vdlp_pixel_format(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_vdlp_bypass_clut();
-void opera_lr_opts_set_vdlp_bypass_clut();
+void opera_lr_opts_get_vdlp_bypass_clut(opera_lr_opts_t *opts);
+void opera_lr_opts_set_vdlp_bypass_clut(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_high_resolution();
-void opera_lr_opts_set_high_resolution();
+void opera_lr_opts_get_high_resolution(opera_lr_opts_t *opts);
+void opera_lr_opts_set_high_resolution(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_active_devices();
-void opera_lr_opts_set_active_devices();
+void opera_lr_opts_get_active_devices(opera_lr_opts_t *opts);
+void opera_lr_opts_set_active_devices(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_mem_cfg();
-void opera_lr_opts_set_mem_cfg();
+void opera_lr_opts_get_mem_cfg(opera_lr_opts_t *opts);
+void opera_lr_opts_set_mem_cfg(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_hide_lightgun_crosshairs();
-void opera_lr_opts_set_hide_lightgun_crosshairs();
+void opera_lr_opts_get_hide_lightgun_crosshairs(opera_lr_opts_t *opts);
+void opera_lr_opts_set_hide_lightgun_crosshairs(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_madam_matrix_engine();
-void opera_lr_opts_set_madam_matrix_engine();
+void opera_lr_opts_get_madam_matrix_engine(opera_lr_opts_t *opts);
+void opera_lr_opts_set_madam_matrix_engine(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_kprint();
-void opera_lr_opts_set_kprint();
+void opera_lr_opts_get_kprint(opera_lr_opts_t *opts);
+void opera_lr_opts_set_kprint(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_dsp_threaded();
-void opera_lr_opts_set_dsp_threaded();
+void opera_lr_opts_get_dsp_threaded(opera_lr_opts_t *opts);
+void opera_lr_opts_set_dsp_threaded(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_get_swi_hle();
-void opera_lr_opts_set_swi_hle();
+void opera_lr_opts_get_swi_hle(opera_lr_opts_t *opts);
+void opera_lr_opts_set_swi_hle(opera_lr_opts_t const *opts);
 
-void opera_lr_opts_set_hack_flags();
-void opera_lr_opts_set_hack_flags();
+void opera_lr_opts_get_hack_flags(opera_lr_opts_t *opts);
+void opera_lr_opts_set_hack_flags(opera_lr_opts_t const *opts);
 
 #endif

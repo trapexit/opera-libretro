@@ -143,7 +143,7 @@ opera_lr_nvram_save_pergame(const uint8_t *nvram_buf_,
     return -1;
 
   fill_pathname_join(filepath,filepath,"per_game",sizeof(filepath));
-  snprintf(filename,PATH_MAX_LENGTH,"%s.%d.srm",name_,version_);
+  snprintf(filename,PATH_MAX_LENGTH,"%s.%u.srm",name_,version_);
   fill_pathname_join(filepath,filepath,filename,sizeof(filepath));
 
   rv = nvram_save(nvram_buf_,nvram_size_,filepath);
@@ -166,7 +166,7 @@ opera_lr_nvram_save_shared(const uint8_t *nvram_buf_,
     return -1;
 
   fill_pathname_join(filepath,filepath,"shared",sizeof(filepath));
-  snprintf(filename,PATH_MAX_LENGTH,"nvram.%d.srm",version_);
+  snprintf(filename,PATH_MAX_LENGTH,"nvram.%u.srm",version_);
   fill_pathname_join(filepath,filepath,filename,sizeof(filepath));
 
   rv = nvram_save(nvram_buf_,nvram_size_,filepath);
@@ -231,7 +231,7 @@ opera_lr_nvram_load_pergame_operadir(uint8_t       *nvram_buf_,
   if(rv < 0)
     return -1;
 
-  snprintf(filename,sizeof(filename),"%s.%d.srm",name_,version_);
+  snprintf(filename,sizeof(filename),"%s.%u.srm",name_,version_);
   fill_pathname_join(filepath,filepath,"per_game",sizeof(filepath));
   fill_pathname_join(filepath,filepath,filename,sizeof(filepath));
 
@@ -363,7 +363,7 @@ opera_lr_nvram_save(const char    *gamepath_,
     }
   else
     {
-      const char *ptr;      
+      const char *ptr;
       char filename[PATH_MAX_LENGTH];
 
       ptr = path_basename(gamepath_);
@@ -388,7 +388,7 @@ opera_lr_nvram_load(const char    *gamepath_,
     }
   else
     {
-      const char *ptr;      
+      const char *ptr;
       char filename[PATH_MAX_LENGTH];
 
       ptr = path_basename(gamepath_);
