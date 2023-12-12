@@ -1,3 +1,8 @@
+/*
+  documentation: https://3dodev.com/documentation/hardware/opera/memory_configurations
+
+*/
+
 #include "opera_mem.h"
 
 #include "endianness.h"
@@ -6,7 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ONE_MB (1024 * 1024)
+#define ONE_KB 1024
+#define ONE_MB (ONE_KB * 1024)
 
 static opera_mem_cfg_t gl_MEM_CFG = DRAM_VRAM_UNSET;
 
@@ -21,8 +27,8 @@ uint8_t        *VRAM                = NULL;
 uint32_t        VRAM_SIZE           = 0;
 uint32_t        VRAM_SIZE_MASK      = 0;
 uint8_t        *NVRAM               = NULL;
-uint32_t const  NVRAM_SIZE          = (32 * 1024);
-uint32_t const  NVRAM_SIZE_MASK     = ((32 * 1024) - 1);
+uint32_t const  NVRAM_SIZE          = (ONE_KB * 32);
+uint32_t const  NVRAM_SIZE_MASK     = ((ONE_KB * 32) - 1);
 uint8_t        *ROM                 = NULL;
 uint8_t        *ROM1                = NULL;
 uint32_t const  ROM1_SIZE           = ONE_MB;
@@ -45,6 +51,7 @@ opera_mem_set(opera_mem_cfg_t const cfg_)
 
   switch(cfg)
     {
+    default:
     case DRAM_VRAM_UNSET:
       cfg = DRAM_2MB_VRAM_1MB;
     case DRAM_2MB_VRAM_1MB:
@@ -85,10 +92,10 @@ opera_mem_set(opera_mem_cfg_t const cfg_)
   VRAM_SIZE_MASK = (VRAM_SIZE - 1);
 
   RAM_SIZE            = (DRAM_SIZE + VRAM_SIZE);
-  RAM_SIZE_MASK       = RAM_SIZE - 1;
+  RAM_SIZE_MASK       = (RAM_SIZE - 1);
   // 4X the VRAM for "hires" mode
   HIRES_RAM_SIZE      = (DRAM_SIZE + (VRAM_SIZE * 4));
-  HIRES_RAM_SIZE_MASK = HIRES_RAM_SIZE - 1;
+  HIRES_RAM_SIZE_MASK = (HIRES_RAM_SIZE - 1);
 
   gl_MEM_CFG = cfg;
 }
@@ -161,11 +168,11 @@ opera_mem_init(opera_mem_cfg_t const cfg_)
 {
   opera_mem_cfg_t cfg;
 
-  if(gl_MEM_CFG)
+  if(gl_MEM_CFG != DRAM_VRAM_UNSET)
     return false;
 
   cfg = cfg_;
-  if(cfg == DRAM_VRAM_STOCK)
+  if(cfg == DRAM_VRAM_UNSET)
     cfg = DRAM_2MB_VRAM_1MB;
 
   opera_mem_set(cfg);

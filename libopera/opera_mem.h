@@ -7,7 +7,7 @@
 enum opera_mem_cfg_t
   {
     DRAM_VRAM_UNSET    = 0x00,
-    DRAM_VRAM_STOCK    = 0x00,
+    DRAM_VRAM_STOCK    = 0x21,
     DRAM_2MB_VRAM_1MB  = 0x21,
     DRAM_2MB_VRAM_2MB  = 0x22,
     DRAM_4MB_VRAM_1MB  = 0x41,

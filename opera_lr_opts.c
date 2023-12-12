@@ -148,7 +148,6 @@ opera_lr_opts_set_video_buffer()
    * 4 bytes per pixel will handle any format
    * Wastes some memory but simplifies things
   */
-
   size = (opera_region_max_width() * opera_region_max_height() * 4);
 
   g_OPTS.video_buffer = (uint32_t*)calloc(size,sizeof(uint32_t));
@@ -625,7 +624,7 @@ opera_lr_opts_set()
 {
   if(g_OPTS.set_once == false)
     {
-      opera_lr_opts_set_mem_cfg();      
+      opera_lr_opts_set_mem_cfg();
       opera_lr_opts_set_video_buffer();
       opera_lr_opts_set_bios();
       opera_lr_opts_set_font();
@@ -647,6 +646,13 @@ opera_lr_opts_set()
   opera_lr_opts_set_hacks();
 
   g_OPTS.set_once = true;
+}
+
+void
+opera_lr_opts_process()
+{
+  opera_lr_opts_get();
+  opera_lr_opts_set();
 }
 
 void

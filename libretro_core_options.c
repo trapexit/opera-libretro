@@ -69,7 +69,7 @@ static struct retro_core_option_definition option_defs_us[] =
       "Select the amount of DRAM and VRAM the system has. Only useful for homebrew and non-stock values may cause issues with some software."
       " Changes take affect at core start/restart.",
       {
-        { "21", "2MB DRAM; 1MB VRAM" },
+        { "21", "2MB DRAM; 1MB VRAM (stock)" },
         { "22", "2MB DRAM; 2MB VRAM" },
         { "41", "4MB DRAM; 1MB VRAM" },
         { "42", "4MB DRAM; 2MB VRAM" },

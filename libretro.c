@@ -337,8 +337,7 @@ retro_load_game(const struct retro_game_info *info_)
   if(rv == -1)
     return false;
 
-  opera_lr_opts_get();
-  opera_lr_opts_set();
+  opera_lr_opts_process();
   opera_3do_init(libopera_callback);
   cdimage_set_sector(0);
 
@@ -477,8 +476,7 @@ retro_reset(void)
   opera_3do_destroy();
   opera_lr_opts_destroy();
 
-  opera_lr_opts_get();
-  opera_lr_opts_set();
+  opera_lr_opts_process();
   opera_3do_init(libopera_callback);
   cdimage_set_sector(0);
 
@@ -503,10 +501,7 @@ void
 retro_run(void)
 {
   if(variable_updated())
-    {
-      opera_lr_opts_get();
-      opera_lr_opts_set();
-    }
+    opera_lr_opts_process();
 
   lr_input_update(g_OPTS.active_devices);
 

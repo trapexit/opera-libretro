@@ -37,6 +37,7 @@ extern opera_lr_opts_t g_OPTS;
 
 void opera_lr_opts_get();
 void opera_lr_opts_set();
+void opera_lr_opts_process();
 void opera_lr_opts_destroy();
 
 void opera_lr_opts_get_bios();
