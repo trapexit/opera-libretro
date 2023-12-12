@@ -140,6 +140,8 @@ opera_lr_opts_set_video_buffer(opera_lr_opts_t const *opts_)
 {
   uint32_t size;
 
+  if(g_OPTS.set_once)
+    return;
   if(g_OPTS.video_buffer != NULL)
     return;
 
