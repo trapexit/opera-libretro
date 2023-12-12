@@ -1,7 +1,9 @@
 /*
-  documentation: https://3dodev.com/documentation/hardware/opera/memory_configurations
-
-*/
+  documentation:
+  * https://3dodev.com/documentation/hardware/opera/memory_configurations
+  * About Memory: https://3dodev.com/documentation/development/opera/pf25/ppgfldr/pgsfldr/spg/05spg001
+  * Manageing Memory: https://3dodev.com/documentation/development/opera/pf25/ppgfldr/pgsfldr/spg/01spg003
+  */
 
 #include "opera_mem.h"
 
