@@ -631,9 +631,9 @@ opera_lr_opts_get(opera_lr_opts_t *opts_)
 {
   opera_lr_opts_get_mem_cfg(opts_);
   opera_lr_opts_get_video_buffer(opts_);
+  opera_lr_opts_get_vdlp_pixel_format(opts_);
   opera_lr_opts_get_bios(opts_);
   opera_lr_opts_get_font(opts_);
-  opera_lr_opts_get_vdlp_pixel_format(opts_);
   opera_lr_opts_get_madam_matrix_engine(opts_);
 
   opera_lr_opts_get_active_devices(opts_);
@@ -656,9 +656,9 @@ opera_lr_opts_set(opera_lr_opts_t const *opts_)
   // Can only be set at start/restart
   opera_lr_opts_set_mem_cfg(opts_);
   opera_lr_opts_set_video_buffer(opts_);
+  opera_lr_opts_set_vdlp_pixel_format(opts_);
   opera_lr_opts_set_bios(opts_);
   opera_lr_opts_set_font(opts_);
-  opera_lr_opts_set_vdlp_pixel_format(opts_);
   opera_lr_opts_set_madam_matrix_engine(opts_);
 
   // Can be updated at any time

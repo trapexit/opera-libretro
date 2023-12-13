@@ -16,10 +16,10 @@
 #include "libopera/opera_core.h"
 #include "libopera/opera_madam.h"
 #include "libopera/opera_mem.h"
+#include "libopera/opera_nvram.h"
 #include "libopera/opera_pbus.h"
 #include "libopera/opera_region.h"
 #include "libopera/opera_vdlp.h"
-#include "libopera/opera_nvram.h"
 
 #include "opera_lr_dsp.h"
 #include "lr_input.h"
@@ -177,7 +177,7 @@ retro_get_system_info(struct retro_system_info *info_)
   memset(info_,0,sizeof(*info_));
 
   info_->library_name     = "Opera";
-  info_->library_version  = "1.0.0" GIT_VERSION;
+  info_->library_version  = "1.1.0" GIT_VERSION;
   info_->need_fullpath    = true;
   info_->valid_extensions = "iso|bin|chd|cue";
 }
@@ -297,11 +297,11 @@ static
 void
 game_info_path_free(void)
 {
-  if(g_GAME_INFO_PATH != NULL)
-    {
-      free(g_GAME_INFO_PATH);
-      g_GAME_INFO_PATH = NULL;
-    }
+  if(g_GAME_INFO_PATH == NULL)
+    return;
+
+  free(g_GAME_INFO_PATH);
+  g_GAME_INFO_PATH = NULL;
 }
 
 static
