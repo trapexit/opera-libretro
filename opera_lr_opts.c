@@ -435,9 +435,9 @@ opera_lr_opts_set_vdlp_bypass_clut(opera_lr_opts_t const *opts_)
   uint32_t flags;
 
   flags = VDLP_FLAG_NONE;
-  if(g_OPTS.high_resolution)
+  if(opts_->high_resolution)
     flags |= VDLP_FLAG_HIRES_CEL;
-  if(g_OPTS.vdlp_bypass_clut)
+  if(opts_->vdlp_bypass_clut)
     flags |= VDLP_FLAG_CLUT_BYPASS;
 
   opera_vdlp_configure(g_OPTS.video_buffer,
