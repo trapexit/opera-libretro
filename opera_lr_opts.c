@@ -648,8 +648,8 @@ opera_lr_opts_get(opera_lr_opts_t *opts_)
   opera_lr_opts_get_region(opts_);
   opera_lr_opts_get_cpu_overclock(opts_);
   opera_lr_opts_get_vdlp_pixel_format(opts_);
-  opera_lr_opts_get_vdlp_bypass_clut(opts_);
   opera_lr_opts_get_high_resolution(opts_);
+  opera_lr_opts_get_vdlp_bypass_clut(opts_);
   opera_lr_opts_get_active_devices(opts_);
   opera_lr_opts_get_mem_cfg(opts_);
   opera_lr_opts_get_hide_lightgun_crosshairs(opts_);
@@ -676,8 +676,8 @@ opera_lr_opts_set(opera_lr_opts_t const *opts_)
   opera_lr_opts_set_nvram_version(opts_);
   opera_lr_opts_set_region(opts_);
   opera_lr_opts_set_cpu_overclock(opts_);
-  opera_lr_opts_set_vdlp_bypass_clut(opts_);
   opera_lr_opts_set_high_resolution(opts_);
+  opera_lr_opts_set_vdlp_bypass_clut(opts_);
   opera_lr_opts_set_active_devices(opts_);
   opera_lr_opts_set_hide_lightgun_crosshairs(opts_);
   opera_lr_opts_set_kprint(opts_);
