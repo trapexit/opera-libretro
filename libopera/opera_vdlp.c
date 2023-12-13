@@ -18,11 +18,14 @@
   - interpolation
   - add pseudo random 3bit pattern for second clut bypass mode
 */
+typedef void(*vdlp_renderer_t)();
 
-static vdlp_t   g_VDLP          = {0};
-static void    *g_BUF           = NULL;
-static void    *g_CURBUF        = NULL;
-static void (*g_RENDERER)(void) = NULL;
+static vdlp_t               g_VDLP         = {0};
+static void                *g_BUF          = NULL;
+static void                *g_CURBUF       = NULL;
+static vdlp_renderer_t      g_RENDERER     = NULL;
+static uint32_t             g_FLAGS        = 0;
+static vdlp_pixel_format_e  g_PIXEL_FORMAT = 0;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
@@ -833,11 +836,11 @@ get_renderer(vdlp_pixel_format_e pf_,
         {
         case VDLP_FLAG_NONE:
           return vdlp_render_line_0RGB1555;
-        case VDLP_FLAG_CLUT_BYPASS:
+        case VDLP_FLAG_BYPASS_CLUT:
           return vdlp_render_line_0RGB1555_bypass_clut;
         case VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_0RGB1555_hires;
-        case VDLP_FLAG_CLUT_BYPASS|VDLP_FLAG_HIRES_CEL:
+        case VDLP_FLAG_BYPASS_CLUT|VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_0RGB1555_hires_bypass_clut;
         }
       break;
@@ -846,11 +849,11 @@ get_renderer(vdlp_pixel_format_e pf_,
         {
         case VDLP_FLAG_NONE:
           return vdlp_render_line_RGB565;
-        case VDLP_FLAG_CLUT_BYPASS:
+        case VDLP_FLAG_BYPASS_CLUT:
           return vdlp_render_line_RGB565_bypass_clut;
         case VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_RGB565_hires;
-        case VDLP_FLAG_CLUT_BYPASS|VDLP_FLAG_HIRES_CEL:
+        case VDLP_FLAG_BYPASS_CLUT|VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_RGB565_hires_bypass_clut;
         }
       break;
@@ -859,11 +862,11 @@ get_renderer(vdlp_pixel_format_e pf_,
         {
         case VDLP_FLAG_NONE:
           return vdlp_render_line_XRGB8888;
-        case VDLP_FLAG_CLUT_BYPASS:
+        case VDLP_FLAG_BYPASS_CLUT:
           return vdlp_render_line_XRGB8888_bypass_clut;
         case VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_XRGB8888_hires;
-        case VDLP_FLAG_CLUT_BYPASS|VDLP_FLAG_HIRES_CEL:
+        case VDLP_FLAG_BYPASS_CLUT|VDLP_FLAG_HIRES_CEL:
           return vdlp_render_line_XRGB8888_hires_bypass_clut;
         }
       break;
@@ -873,15 +876,62 @@ get_renderer(vdlp_pixel_format_e pf_,
 }
 
 int
-opera_vdlp_configure(void                *buf_,
-                     vdlp_pixel_format_e  pf_,
-                     uint32_t             flags_)
+opera_vdlp_set_video_buffer(void *buf_)
 {
   g_BUF = buf_;
+}
 
-  g_RENDERER = get_renderer(pf_,flags_);
-  if(g_RENDERER)
+int
+opera_vdlp_set_hires(bool v_)
+{
+  uint32_t flags;
+  vdlp_renderer_t new_renderer;
+
+  if(v_)
+    flags = (g_FLAGS |  VDLP_FLAG_HIRES_CEL);
+  else
+    flags = (g_FLAGS & ~VDLP_FLAG_HIRES_CEL);
+  new_renderer = get_renderer(g_PIXEL_FORMAT,flags);
+  if(new_renderer == NULL)
     return -1;
+
+  g_RENDERER = new_renderer;
+  g_FLAGS    = flags;
+
+  return 0;
+}
+
+int
+opera_vdlp_set_bypass_clut(bool v_)
+{
+  uint32_t flags;
+  vdlp_renderer_t new_renderer;
+
+  if(v_)
+    flags = (g_FLAGS |  VDLP_FLAG_BYPASS_CLUT);
+  else
+    flags = (g_FLAGS & ~VDLP_FLAG_BYPASS_CLUT);
+  new_renderer = get_renderer(g_PIXEL_FORMAT,flags);
+  if(new_renderer == NULL)
+    return -1;
+
+  g_RENDERER = new_renderer;
+  g_FLAGS    = flags;
+
+  return 0;
+}
+
+int
+opera_vdlp_set_pixel_format(vdlp_pixel_format_e v_)
+{
+  vdlp_renderer_t new_renderer;
+
+  new_renderer = get_renderer(v_,g_FLAGS);
+  if(new_renderer == NULL)
+    return -1;
+
+  g_RENDERER     = new_renderer;
+  g_PIXEL_FORMAT = v_;
 
   return 0;
 }

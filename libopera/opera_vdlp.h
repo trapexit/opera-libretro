@@ -2,14 +2,15 @@
 #define LIBOPERA_VDLP_H_INCLUDED
 
 #include "extern_c.h"
+#include "boolean.h"
 
 #include <stdint.h>
 
 #define VDLP_FLAG_NONE          0
-#define VDLP_FLAG_CLUT_BYPASS   (1<<0)
+#define VDLP_FLAG_BYPASS_CLUT   (1<<0)
 #define VDLP_FLAG_HIRES_CEL     (1<<1)
 #define VDLP_FLAG_INTERPOLATION (1<<2)
-#define VDLP_FLAGS              (VDLP_FLAG_CLUT_BYPASS|VDLP_FLAG_HIRES_CEL|VDLP_FLAG_INTERPOLATION)
+#define VDLP_FLAGS              (VDLP_FLAG_BYPASS_CLUT|VDLP_FLAG_HIRES_CEL|VDLP_FLAG_INTERPOLATION)
 
 enum vdlp_pixel_format_e
   {
@@ -31,9 +32,10 @@ uint32_t opera_vdlp_state_size(void);
 void     opera_vdlp_state_save(void *buf);
 void     opera_vdlp_state_load(const void *buf);
 
-int      opera_vdlp_configure(void *buf,
-                              vdlp_pixel_format_e pf,
-                              uint32_t flags);
+int      opera_vdlp_set_video_buffer(void*);
+int      opera_vdlp_set_hires(bool);
+int      opera_vdlp_set_bypass_clut(bool);
+int      opera_vdlp_set_pixel_format(vdlp_pixel_format_e);
 
 EXTERN_C_END
 

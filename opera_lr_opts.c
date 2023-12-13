@@ -153,6 +153,8 @@ opera_lr_opts_set_video_buffer(opera_lr_opts_t const *opts_)
   size = (opera_region_max_width() * opera_region_max_height() * 4);
 
   g_OPTS.video_buffer = (uint32_t*)calloc(size,sizeof(uint32_t));
+
+  opera_vdlp_set_video_buffer(g_OPTS.video_buffer);
 }
 
 void
@@ -409,15 +411,7 @@ opera_lr_opts_set_vdlp_pixel_format(opera_lr_opts_t const *opts_)
   if(g_OPTS.set_once)
     return;
 
-  flags = VDLP_FLAG_NONE;
-  if(opts_->high_resolution)
-    flags |= VDLP_FLAG_HIRES_CEL;
-  if(opts_->vdlp_bypass_clut)
-    flags |= VDLP_FLAG_CLUT_BYPASS;
-
-  opera_vdlp_configure(g_OPTS.video_buffer,
-                       opts_->vdlp_pixel_format,
-                       flags);
+  opera_vdlp_set_pixel_format(opts_->vdlp_pixel_format);
 
   g_OPTS.vdlp_pixel_format = opts_->vdlp_pixel_format;
   g_OPTS.video_pitch_shift = opts_->video_pitch_shift;
@@ -432,17 +426,11 @@ opera_lr_opts_get_vdlp_bypass_clut(opera_lr_opts_t *opts_)
 void
 opera_lr_opts_set_vdlp_bypass_clut(opera_lr_opts_t const *opts_)
 {
-  uint32_t flags;
+  int rv;
 
-  flags = VDLP_FLAG_NONE;
-  if(opts_->high_resolution)
-    flags |= VDLP_FLAG_HIRES_CEL;
-  if(opts_->vdlp_bypass_clut)
-    flags |= VDLP_FLAG_CLUT_BYPASS;
-
-  opera_vdlp_configure(g_OPTS.video_buffer,
-                       g_OPTS.vdlp_pixel_format,
-                       flags);
+  rv = opera_vdlp_set_bypass_clut(opts_->vdlp_bypass_clut);
+  if(rv != 0)
+    return;
 
   g_OPTS.vdlp_bypass_clut = opts_->vdlp_bypass_clut;
 }
@@ -456,9 +444,10 @@ opera_lr_opts_get_high_resolution(opera_lr_opts_t *opts_)
 void
 opera_lr_opts_set_high_resolution(opera_lr_opts_t const *opts_)
 {
-  opera_lr_opts_set_vdlp_bypass_clut(opts_);
+  opera_vdlp_set_hires(opts_->high_resolution);
 
   g_OPTS.high_resolution = opts_->high_resolution;
+
   if(g_OPTS.high_resolution)
     {
       HIRESMODE           = 1;
@@ -703,7 +692,6 @@ opera_lr_opts_destroy()
 {
   if(g_OPTS.video_buffer)
     free(g_OPTS.video_buffer);
-  g_OPTS.video_buffer = NULL;
 
   opera_lr_dsp_destroy();
 
