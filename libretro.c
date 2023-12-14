@@ -177,7 +177,7 @@ retro_get_system_info(struct retro_system_info *info_)
   memset(info_,0,sizeof(*info_));
 
   info_->library_name     = "Opera";
-  info_->library_version  = "1.1.0" GIT_VERSION;
+  info_->library_version  = "1.0.0" GIT_VERSION;
   info_->need_fullpath    = true;
   info_->valid_extensions = "iso|bin|chd|cue";
 }
@@ -372,7 +372,7 @@ retro_unload_game(void)
 
   retro_cdimage_close(&CDIMAGE);
 
-  opera_lr_opts_destroy();
+  opera_lr_opts_reset();
 }
 
 void
@@ -382,10 +382,11 @@ retro_get_system_av_info(struct retro_system_av_info *info_)
 
   info_->timing.fps            = opera_region_field_rate();
   info_->timing.sample_rate    = 44100;
-  info_->geometry.base_width   = g_OPTS.video_width;
-  info_->geometry.base_height  = g_OPTS.video_height;
-  info_->geometry.max_width    = (opera_region_max_width()  << 1);
-  info_->geometry.max_height   = (opera_region_max_height() << 1);
+  info_->geometry.base_width   = opera_region_min_width();
+  info_->geometry.base_height  = opera_region_min_height();
+  // multiply by 2 to accomidate for hires mode
+  info_->geometry.max_width    = (opera_region_max_width()  * 2);
+  info_->geometry.max_height   = (opera_region_max_height() * 2);
   info_->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
@@ -474,7 +475,7 @@ retro_reset(void)
                       g_OPTS.nvram_version);
 
   opera_3do_destroy();
-  opera_lr_opts_destroy();
+  opera_lr_opts_reset();
 
   opera_lr_opts_process();
   opera_3do_init(libopera_callback);

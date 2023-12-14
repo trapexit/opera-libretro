@@ -9,7 +9,8 @@
 typedef struct opera_lr_opts_t opera_lr_opts_t;
 struct opera_lr_opts_t
 {
-  bool set_once;
+  bool initialized_libretro;
+  bool initialized_opera;
   opera_bios_t const *bios;
   opera_bios_t const *font;
   bool nvram_shared;
@@ -38,6 +39,7 @@ extern opera_lr_opts_t g_OPTS;
 void opera_lr_opts_get(opera_lr_opts_t *opts);
 void opera_lr_opts_set(opera_lr_opts_t const *opts);
 void opera_lr_opts_process();
+void opera_lr_opts_reset();
 void opera_lr_opts_destroy();
 
 void opera_lr_opts_get_bios(opera_lr_opts_t *opts);

@@ -140,7 +140,7 @@ opera_lr_opts_set_video_buffer(opera_lr_opts_t const *opts_)
 {
   uint32_t size;
 
-  if(g_OPTS.set_once)
+  if(g_OPTS.initialized_opera)
     return;
   if(g_OPTS.video_buffer != NULL)
     return;
@@ -213,7 +213,7 @@ opera_lr_opts_set_bios(opera_lr_opts_t const *opts_)
 {
   int64_t rv;
 
-  if(g_OPTS.set_once)
+  if(g_OPTS.initialized_opera)
     return;
 
   opera_lr_opts_set_mem_cfg(opts_);
@@ -271,7 +271,7 @@ opera_lr_opts_set_font(opera_lr_opts_t const *opts_)
 {
   int64_t rv;
 
-  if(g_OPTS.set_once)
+  if(g_OPTS.initialized_opera)
     return;
 
   opera_lr_opts_set_mem_cfg(opts_);
@@ -358,7 +358,9 @@ opera_lr_opts_set_region(opera_lr_opts_t const *opts_)
       break;
     }
 
-  g_OPTS.region = opts_->region;
+  g_OPTS.region       = opts_->region;
+  g_OPTS.video_width  = (opera_region_width()  << g_OPTS.high_resolution);
+  g_OPTS.video_height = (opera_region_height() << g_OPTS.high_resolution);
 }
 
 void
@@ -408,7 +410,7 @@ opera_lr_opts_set_vdlp_pixel_format(opera_lr_opts_t const *opts_)
 {
   uint32_t flags;
 
-  if(g_OPTS.set_once)
+  if(g_OPTS.initialized_libretro)
     return;
 
   opera_vdlp_set_pixel_format(opts_->vdlp_pixel_format);
@@ -448,18 +450,10 @@ opera_lr_opts_set_high_resolution(opera_lr_opts_t const *opts_)
 
   g_OPTS.high_resolution = opts_->high_resolution;
 
-  if(g_OPTS.high_resolution)
-    {
-      HIRESMODE           = 1;
-      g_OPTS.video_width  = (opera_region_width()  * 2);
-      g_OPTS.video_height = (opera_region_height() * 2);
-    }
-  else
-    {
-      HIRESMODE           = 0;
-      g_OPTS.video_width  = opera_region_width();
-      g_OPTS.video_height = opera_region_height();
-    }
+  HIRESMODE = g_OPTS.high_resolution;
+
+  g_OPTS.video_width  = (opera_region_width()  << g_OPTS.high_resolution);
+  g_OPTS.video_height = (opera_region_height() << g_OPTS.high_resolution);
 }
 
 void
@@ -499,7 +493,7 @@ opera_lr_opts_get_mem_cfg(opera_lr_opts_t *opts_)
 void
 opera_lr_opts_set_mem_cfg(opera_lr_opts_t const *opts_)
 {
-  if(g_OPTS.set_once)
+  if(g_OPTS.initialized_opera)
     return;
 
   opera_mem_init(opts_->mem_cfg);
@@ -539,7 +533,7 @@ opera_lr_opts_get_madam_matrix_engine(opera_lr_opts_t *opts_)
 void
 opera_lr_opts_set_madam_matrix_engine(opera_lr_opts_t const *opts_)
 {
-  if(g_OPTS.set_once)
+  if(g_OPTS.initialized_opera)
     return;
 
   if(!strcmp(opts_->madam_matrix_engine,"software"))
@@ -675,7 +669,8 @@ opera_lr_opts_set(opera_lr_opts_t const *opts_)
   opera_lr_opts_set_swi_hle(opts_);
   opera_lr_opts_set_vdlp_bypass_clut(opts_);
 
-  g_OPTS.set_once = true;
+  g_OPTS.initialized_libretro = true;
+  g_OPTS.initialized_opera    = true;
 }
 
 void
@@ -688,8 +683,12 @@ opera_lr_opts_process()
 }
 
 void
-opera_lr_opts_destroy()
+opera_lr_opts_reset()
 {
+  opera_lr_opts_t opts;
+
+  opts = g_OPTS;
+
   if(g_OPTS.video_buffer)
     free(g_OPTS.video_buffer);
 
@@ -698,4 +697,14 @@ opera_lr_opts_destroy()
   opera_mem_destroy();
 
   memset(&g_OPTS,0,sizeof(g_OPTS));
+
+  g_OPTS.initialized_libretro = opts.initialized_libretro;
+  g_OPTS.vdlp_pixel_format    = opts.vdlp_pixel_format;
+  g_OPTS.video_pitch_shift    = opts.video_pitch_shift;
+}
+
+void
+opera_lr_opts_destroy()
+{
+  opera_lr_opts_reset();
 }
