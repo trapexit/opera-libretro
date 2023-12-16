@@ -39,7 +39,9 @@
 #include "opera_diag_port.h"
 #include "opera_fixedpoint_math.h"
 #include "opera_madam.h"
+#include "opera_mem.h"
 #include "opera_sport.h"
+#include "opera_state.h"
 #include "opera_swi_hle_0x5XXXX.h"
 
 #include <stdint.h>
@@ -107,13 +109,6 @@ const static uint16_t cond_flags_cross[]=
     0x0000  //never
   };
 
-#define DRAM_SIZE  ( 2 * 1024 * 1024)
-#define VRAM_SIZE  ( 1 * 1024 * 1024)
-#define RAM_SIZE   ( 3 * 1024 * 1024)
-#define ROM1_SIZE  ( 1 * 1024 * 1024)
-#define ROM2_SIZE  ( 1 * 1024 * 1024)
-#define NVRAM_SIZE (32 * 1024)
-
 static int        g_SWI_HLE;
 static arm_core_t CPU;
 static int        CYCLES;	//cycle counter
@@ -128,7 +123,7 @@ static void     mwritew(uint32_t addr,uint32_t val);
 uint8_t*
 opera_arm_nvram_get(void)
 {
-  return CPU.nvram;
+  return NVRAM;
 }
 
 uint64_t
@@ -140,7 +135,7 @@ opera_arm_nvram_size(void)
 uint8_t*
 opera_arm_rom1_get(void)
 {
-  return CPU.rom1;
+  return ROM1;
 }
 
 uint64_t
@@ -164,7 +159,7 @@ opera_arm_rom1_byteswap_if_necessary(void)
 uint8_t*
 opera_arm_rom2_get(void)
 {
-  return CPU.rom2;
+  return ROM2;
 }
 
 uint64_t
@@ -188,7 +183,7 @@ opera_arm_rom2_byteswap_if_necessary(void)
 uint8_t*
 opera_arm_ram_get(void)
 {
-  return CPU.ram;
+  return DRAM;
 }
 
 uint64_t
@@ -200,7 +195,7 @@ opera_arm_ram_size(void)
 uint8_t*
 opera_arm_vram_get(void)
 {
-  return (CPU.ram + DRAM_SIZE);
+  return VRAM;
 }
 
 uint64_t
@@ -212,41 +207,19 @@ opera_arm_vram_size(void)
 uint32_t
 opera_arm_state_size(void)
 {
-  return (sizeof(arm_core_t) + RAM_SIZE + ROM1_SIZE + NVRAM_SIZE);
+  return opera_state_save_size(sizeof(CPU));
 }
 
-void
-opera_arm_state_save(void *buf_)
+uint32_t
+opera_arm_state_save(void *data_)
 {
-  memcpy(buf_,&CPU,sizeof(arm_core_t));
-  memcpy(((uint8_t*)buf_)+sizeof(arm_core_t),CPU.ram,RAM_SIZE);
-  memcpy(((uint8_t*)buf_)+sizeof(arm_core_t)+RAM_SIZE,CPU.rom1,ROM1_SIZE);
-  memcpy(((uint8_t*)buf_)+sizeof(arm_core_t)+RAM_SIZE+ROM1_SIZE,CPU.nvram,NVRAM_SIZE);
+  return opera_state_save(data_,"ARM",&CPU,sizeof(CPU));
 }
 
-void
-opera_arm_state_load(const void *buf_)
+uint32_t
+opera_arm_state_load(void const *data_)
 {
-  uint8_t i;
-  uint8_t *ram   = CPU.ram;
-  uint8_t *rom1  = CPU.rom1;
-  uint8_t *rom2  = CPU.rom2;
-  uint8_t *nvram = CPU.nvram;
-
-  memcpy(&CPU,buf_,sizeof(arm_core_t));
-  memcpy(ram,((uint8_t*)buf_)+sizeof(arm_core_t),RAM_SIZE);
-  memcpy(rom1,((uint8_t*)buf_)+sizeof(arm_core_t)+RAM_SIZE,ROM1_SIZE);
-  memcpy(nvram,((uint8_t*)buf_)+sizeof(arm_core_t)+RAM_SIZE+ROM1_SIZE,NVRAM_SIZE);
-
-  for(i = 3; i < 18; i++)
-    memcpy(ram + (i * 1024 * 1024),
-           ram + (2 * 1024 * 1024),
-           1024 * 1024);
-
-  CPU.ram   = ram;
-  CPU.rom1  = rom1;
-  CPU.rom2  = rom2;
-  CPU.nvram = nvram;
+  return opera_state_load(&CPU,"ARM",data_,sizeof(CPU));
 }
 
 static
@@ -518,12 +491,6 @@ ARM_Change_ModeSafe(uint32_t mode_)
     }
 }
 
-void
-opera_arm_rom_select(int n_)
-{
-  CPU.rom = ((n_ == 0) ? CPU.rom1 : CPU.rom2);
-}
-
 static
 INLINE
 void
@@ -634,11 +601,12 @@ opera_arm_init(void)
   for(i = 0;i < 7; i++)
     CPU.CASH[i] = CPU.FIQ[i] = 0;
 
-  CPU.ram   = calloc(RAM_SIZE + 1024*1024*16,1);
-  CPU.rom1  = calloc(ROM1_SIZE,1);
-  CPU.rom2  = calloc(ROM2_SIZE,1);
-  CPU.rom   = CPU.rom1;
-  CPU.nvram = calloc(NVRAM_SIZE,1);
+  DRAM  = calloc(MAX_RAM_SIZE,1);
+  VRAM  = &DRAM[DRAM_SIZE];
+  ROM1  = calloc(ROM1_SIZE,1);
+  ROM2  = calloc(ROM2_SIZE,1);
+  ROM   = ROM1;
+  NVRAM = calloc(NVRAM_SIZE,1);
 
   CPU.nFIQ = FALSE;
   CPU.MAS_Access_Exept = FALSE;
@@ -650,21 +618,21 @@ opera_arm_init(void)
 void
 opera_arm_destroy(void)
 {
-  if(CPU.nvram)
-    free(CPU.nvram);
-  CPU.nvram = NULL;
+  if(NVRAM)
+    free(NVRAM);
+  NVRAM = NULL;
 
-  if(CPU.rom1)
-    free(CPU.rom1);
-  CPU.rom1 = NULL;
+  if(ROM1)
+    free(ROM1);
+  ROM1 = NULL;
 
-  if(CPU.rom2)
-    free(CPU.rom2);
-  CPU.rom2 = NULL;
+  if(ROM2)
+    free(ROM2);
+  ROM2 = NULL;
 
-  if(CPU.ram)
-    free(CPU.ram);
-  CPU.ram = NULL;
+  if(DRAM)
+    free(DRAM);
+  DRAM = NULL;
 }
 
 void
@@ -673,7 +641,7 @@ opera_arm_reset(void)
   int i;
 
   CYCLES = 0;
-  CPU.rom = CPU.rom1;
+  ROM = ROM1;
 
   for(i = 0; i < 16; i++)
     CPU.USER[i] = 0;
@@ -975,54 +943,54 @@ static void decode_swi_hle(const uint32_t op_)
   switch(op_ & 0x000FFFFF)
     {
     case 0x50000:
-      opera_swi_hle_0x50000(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_swi_hle_0x50000(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
       return;
     case 0x50001:
-      opera_swi_hle_0x50001(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_swi_hle_0x50001(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
       return;
     case 0x50002:
-      opera_swi_hle_0x50002(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_swi_hle_0x50002(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
       return;
     case 0x50003:
       break;
     case 0x50004:
       break;
     case 0x50005:
-      opera_swi_hle_0x50005(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_swi_hle_0x50005(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
       return;
     case 0x50006:
-      opera_swi_hle_0x50006(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_swi_hle_0x50006(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
       return;
     case 0x50007:
-      opera_swi_hle_0x50007(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_swi_hle_0x50007(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
       return;
     case 0x50008:
-      opera_swi_hle_0x50008(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_swi_hle_0x50008(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
       return;
     case 0x50009:
-      opera_swi_hle_0x50009(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_swi_hle_0x50009(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
       return;
     case 0x5000A:
       break;
     case 0x5000B:
       break;
     case 0x5000C:
-      CPU.USER[0] = opera_swi_hle_0x5000C(CPU.ram,CPU.USER[0],CPU.USER[1]);
+      CPU.USER[0] = opera_swi_hle_0x5000C(DRAM,CPU.USER[0],CPU.USER[1]);
       return;
     case 0x5000E:
-      opera_swi_hle_0x5000E(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_swi_hle_0x5000E(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
       return;
     case 0x5000F:
-      CPU.USER[0] = opera_swi_hle_0x5000F(CPU.ram,CPU.USER[0]);
+      CPU.USER[0] = opera_swi_hle_0x5000F(DRAM,CPU.USER[0]);
       return;
     case 0x50010:
-      CPU.USER[0] = opera_swi_hle_0x50010(CPU.ram,CPU.USER[0]);
+      CPU.USER[0] = opera_swi_hle_0x50010(DRAM,CPU.USER[0]);
       return;
     case 0x50011:
-      opera_swi_hle_0x50011(CPU.ram,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_swi_hle_0x50011(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
       return;
     case 0x50012:
-      opera_swi_hle_0x50012(CPU.ram,CPU.USER[0]);
+      opera_swi_hle_0x50012(DRAM,CPU.USER[0]);
       return;
     }
 
@@ -1863,54 +1831,54 @@ void
 opera_mem_write8(uint32_t addr_,
                  uint8_t  val_)
 {
-  CPU.ram[addr_] = val_;
+  DRAM[addr_] = val_;
   if(!HIRESMODE || (addr_ < 0x200000))
     return;
-  CPU.ram[addr_ + 1*1024*1024] = val_;
-  CPU.ram[addr_ + 2*1024*1024] = val_;
-  CPU.ram[addr_ + 3*1024*1024] = val_;
+  DRAM[addr_ + 1*1024*1024] = val_;
+  DRAM[addr_ + 2*1024*1024] = val_;
+  DRAM[addr_ + 3*1024*1024] = val_;
 }
 
 void
 opera_mem_write16(uint32_t addr_,
                   uint16_t val_)
 {
-  *((uint16_t*)&CPU.ram[addr_]) = val_;
+  *((uint16_t*)&DRAM[addr_]) = val_;
   if(!HIRESMODE || (addr_ < 0x200000))
     return;
-  *((uint16_t*)&CPU.ram[addr_ + 1*1024*1024]) = val_;
-  *((uint16_t*)&CPU.ram[addr_ + 2*1024*1024]) = val_;
-  *((uint16_t*)&CPU.ram[addr_ + 3*1024*1024]) = val_;
+  *((uint16_t*)&DRAM[addr_ + 1*1024*1024]) = val_;
+  *((uint16_t*)&DRAM[addr_ + 2*1024*1024]) = val_;
+  *((uint16_t*)&DRAM[addr_ + 3*1024*1024]) = val_;
 }
 
 void
 opera_mem_write32(uint32_t addr_,
                   uint32_t val_)
 {
-  *((uint32_t*)&CPU.ram[addr_]) = val_;
+  *((uint32_t*)&DRAM[addr_]) = val_;
   if(!HIRESMODE || (addr_ < 0x200000))
     return;
-  *((uint32_t*)&CPU.ram[addr_ + 1*1024*1024]) = val_;
-  *((uint32_t*)&CPU.ram[addr_ + 2*1024*1024]) = val_;
-  *((uint32_t*)&CPU.ram[addr_ + 3*1024*1024]) = val_;
+  *((uint32_t*)&DRAM[addr_ + 1*1024*1024]) = val_;
+  *((uint32_t*)&DRAM[addr_ + 2*1024*1024]) = val_;
+  *((uint32_t*)&DRAM[addr_ + 3*1024*1024]) = val_;
 }
 
 uint16_t
 opera_mem_read16(uint32_t addr_)
 {
-  return *((uint16_t*)&CPU.ram[addr_]);
+  return *((uint16_t*)&DRAM[addr_]);
 }
 
 uint32_t
 opera_mem_read32(uint32_t addr_)
 {
-  return *((uint32_t*)&CPU.ram[addr_]);
+  return *((uint32_t*)&DRAM[addr_]);
 }
 
 uint8_t
 opera_mem_read8(uint32_t addr_)
 {
-  return CPU.ram[addr_];
+  return DRAM[addr_];
 }
 
 static void mwritew(uint32_t addr_, uint32_t val_)
@@ -1953,7 +1921,7 @@ static void mwritew(uint32_t addr_, uint32_t val_)
       if(index & 0x80000)
          opera_diag_port_send(val_);
       else if(index & 0x40000)
-         CPU.nvram[(index >> 2) & 0x7FFF] = (uint8_t)val_;
+         NVRAM[(index >> 2) & 0x7FFF] = (uint8_t)val_;
    }
 }
 
@@ -1987,12 +1955,12 @@ mreadw(uint32_t addr_)
   /* Standard ROM */
   index = (addr_ ^ 0x03000000);
   if(!(index & ~0xFFFFF))
-    return *(uint32_t*)&CPU.rom[index];
+    return *(uint32_t*)&ROM[index];
 
   /* ANVIL ROM */
   index = (addr_ ^ 0x06000000);
   if(!(index & ~0xFFFFF))
-    return *(uint32_t*)&CPU.rom[index];
+    return *(uint32_t*)&ROM[index];
 
   index = (addr_ ^ 0x03100000);
   if(!(index & ~0xFFFFF))
@@ -2000,7 +1968,7 @@ mreadw(uint32_t addr_)
       if(index & 0x80000)
         return opera_diag_port_get();
       else if(index & 0x40000)
-        return CPU.nvram[(index >> 2) & 0x7FFF];
+        return NVRAM[(index >> 2) & 0x7FFF];
     }
 
   /* MAS_Access_Exept = TRUE; */
@@ -2023,7 +1991,7 @@ static void mwriteb(uint32_t addr_, uint8_t  val_)
   {
      if((index & 0x40000) == 0x40000)
      {
-        CPU.nvram[(index >> 2) & 0x7FFF] = val_;
+        NVRAM[(index >> 2) & 0x7FFF] = val_;
         return;
      }
   }
@@ -2041,18 +2009,18 @@ mreadb(uint32_t addr_)
   /* Standard ROM */
   index = (addr_ ^ 0x03000003);
   if(!(index & ~0xFFFFF))
-    return CPU.rom[index];
+    return ROM[index];
 
   /* ANVIL ROM */
   index = (addr_ ^ 0x06000003);
   if(!(index & ~0xFFFFF))
-    return CPU.rom[index];
+    return ROM[index];
 
   index = (addr_ ^ 0x03100003);
   if(!(index & ~0xFFFFF))
     {
       if((index & 0x40000) == 0x40000)
-        return CPU.nvram[(index >> 2) & 0x7FFF];
+        return NVRAM[(index >> 2) & 0x7FFF];
     }
 
   /* MAS_Access_Exept = TRUE; */

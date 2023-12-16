@@ -38,6 +38,7 @@
 #include "opera_core.h"
 #include "opera_madam.h"
 #include "opera_pbus.h"
+#include "opera_state.h"
 #include "opera_vdlp.h"
 
 #include <math.h>
@@ -437,19 +438,19 @@ opera_madam_fsm_set(uint32_t val_)
 uint32_t
 opera_madam_state_size(void)
 {
-  return sizeof(madam_t);
+  return opera_state_save_size(sizeof(madam_t));
 }
 
-void
+uint32_t
 opera_madam_state_save(void *buf_)
 {
-  memcpy(buf_,&MADAM,sizeof(madam_t));
+  return opera_state_save(buf_,"MDAM",&MADAM,sizeof(MADAM));
 }
 
-void
+uint32_t
 opera_madam_state_load(const void *buf_)
 {
-  memcpy(&MADAM,buf_,sizeof(madam_t));
+  return opera_state_load(&MADAM,"MDAM",buf_,sizeof(MADAM));
 }
 
 static uint32_t mread32(uint32_t addr);

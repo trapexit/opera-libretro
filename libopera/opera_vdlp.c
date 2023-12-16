@@ -4,6 +4,7 @@
 #include "opera_arm.h"
 #include "opera_core.h"
 #include "opera_region.h"
+#include "opera_state.h"
 #include "opera_vdl.h"
 #include "opera_vdlp.h"
 #include "opera_vdlp_i.h"
@@ -803,19 +804,19 @@ opera_vdlp_set_vdl_head(const uint32_t addr_)
 uint32_t
 opera_vdlp_state_size(void)
 {
-  return sizeof(vdlp_t);
+  return opera_state_save_size(sizeof(g_VDLP));
 }
 
-void
+uint32_t
 opera_vdlp_state_save(void *buf_)
 {
-  //memcpy(buf_,&vdl,sizeof(vdlp_datum_t));
+  return opera_state_save(buf_,"VDLP",&g_VDLP,sizeof(g_VDLP));
 }
 
-void
+uint32_t
 opera_vdlp_state_load(const void *buf_)
 {
-  //memcpy(&vdl,buf_,sizeof(vdlp_datum_t));
+  return opera_state_load(&g_VDLP,"VDLP",buf_,sizeof(g_VDLP));
 }
 
 /*

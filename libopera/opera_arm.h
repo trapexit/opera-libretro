@@ -53,8 +53,8 @@ void     opera_io_write(const uint32_t addr_, const uint32_t val_);
 uint32_t opera_io_read(const uint32_t addr_);
 
 uint32_t opera_arm_state_size(void);
-void     opera_arm_state_save(void *buf_);
-void     opera_arm_state_load(const void *buf_);
+uint32_t opera_arm_state_save(void *buf_);
+uint32_t opera_arm_state_load(const void *buf_);
 
 uint8_t* opera_arm_nvram_get(void);
 uint64_t opera_arm_nvram_size(void);

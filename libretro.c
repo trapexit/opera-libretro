@@ -16,11 +16,12 @@
 #include "libopera/opera_cdrom.h"
 #include "libopera/opera_clock.h"
 #include "libopera/opera_core.h"
+#include "libopera/opera_log.h"
 #include "libopera/opera_madam.h"
+#include "libopera/opera_nvram.h"
 #include "libopera/opera_pbus.h"
 #include "libopera/opera_region.h"
 #include "libopera/opera_vdlp.h"
-#include "libopera/opera_nvram.h"
 
 #include "opera_lr_dsp.h"
 #include "lr_input.h"
@@ -213,24 +214,22 @@ bool
 retro_serialize(void   *data_,
                 size_t  size_)
 {
-  if(size_ != opera_3do_state_size())
-    return false;
+  uint32_t size;
 
-  opera_3do_state_save(data_);
+  size = opera_3do_state_save(data_,size_);
 
-  return true;
+  return (size == size_);
 }
 
 bool
-retro_unserialize(const void *data_,
+retro_unserialize(void const *data_,
                   size_t      size_)
 {
-  if(size_ != opera_3do_state_size())
-    return false;
+  uint32_t size;
 
-  opera_3do_state_load(data_);
+  size = opera_3do_state_load(data_,size_);
 
-  return true;
+  return (size == size_);
 }
 
 void
@@ -565,11 +564,18 @@ void
 retro_init(void)
 {
   struct retro_log_callback log;
-  unsigned level                = 5;
-  uint64_t serialization_quirks = RETRO_SERIALIZATION_QUIRK_SINGLE_SESSION;
+  unsigned level;
+  uint64_t serialization_quirks;
+
+  level = 5;
+  serialization_quirks = (RETRO_SERIALIZATION_QUIRK_ENDIAN_DEPENDENT |
+                          RETRO_SERIALIZATION_QUIRK_PLATFORM_DEPENDENT);
 
   if(retro_environment_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE,&log))
-    opera_lr_callbacks_set_log_printf(log.log);
+    {
+      opera_lr_callbacks_set_log_printf(log.log);
+      opera_log_set_func(log.log);
+    }
 
   retro_environment_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL,&level);
   retro_environment_cb(RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS,&serialization_quirks);

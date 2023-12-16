@@ -1,6 +1,7 @@
 #include "bool.h"
 
 #include "opera_cdrom.h"
+#include "opera_state.h"
 #include "opera_xbus.h"
 
 #include <string.h>
@@ -36,13 +37,11 @@ xbus_cdrom_plugin(int   proc_,
     case XBP_GET_POLL:
       return (void*)(uintptr_t)g_CDROM_DEVICE.poll;
     case XBP_GET_SAVESIZE:
-      return (void*)(uintptr_t)sizeof(cdrom_device_t);
+      return (void*)(uintptr_t)opera_state_save_size(sizeof(cdrom_device_t));
     case XBP_GET_SAVEDATA:
-      memcpy(data_,&g_CDROM_DEVICE,sizeof(cdrom_device_t));
-      break;
+      return (void*)(uintptr_t)opera_state_save(data_,"CDRM",&g_CDROM_DEVICE,sizeof(g_CDROM_DEVICE));
     case XBP_SET_SAVEDATA:
-      memcpy(&g_CDROM_DEVICE,data_,sizeof(cdrom_device_t));
-      return (void*)TRUE;
+      return (void*)(uintptr_t)opera_state_load(&g_CDROM_DEVICE,"CDRM",data_,sizeof(g_CDROM_DEVICE));
     };
 
   return NULL;

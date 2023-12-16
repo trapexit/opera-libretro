@@ -59,14 +59,6 @@ getval(const char *key_)
   char key[64];
   struct retro_variable var;
 
-  strncpy(key,"4do_",(sizeof(key)-1));
-  strncat(key,key_,(sizeof(key)-1));
-  var.key = key;
-  var.value = NULL;
-  rv = getvar(&var);
-  if(rv && (var.value != NULL))
-    return var.value;
-
   strncpy(key,"opera_",(sizeof(key)-1));
   strncat(key,key_,(sizeof(key)-1));
   var.key = key;

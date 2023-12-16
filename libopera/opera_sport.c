@@ -30,6 +30,7 @@
 
 #include "inline.h"
 #include "opera_core.h"
+#include "opera_state.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -206,17 +207,17 @@ opera_sport_write_access(const uint32_t idx_,
 uint32_t
 opera_sport_state_size(void)
 {
-  return sizeof(sport_t);
+  return opera_state_save_size(sizeof(SPORT));
 }
 
-void
+uint32_t
 opera_sport_state_save(void *buf_)
 {
-  memcpy(buf_,&SPORT,sizeof(sport_t));
+  return opera_state_save(buf_,"SPRT",&SPORT,sizeof(SPORT));
 }
 
-void
-opera_sport_state_load(const void *buf_)
+uint32_t
+opera_sport_state_load(void const *buf_)
 {
-  memcpy(&SPORT,buf_,sizeof(sport_t));
+  return opera_state_load(&SPORT,"SPRT",buf_,sizeof(SPORT));
 }

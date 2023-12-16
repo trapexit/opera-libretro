@@ -33,6 +33,8 @@
 #include "opera_clock.h"
 #include "opera_dsp.h"
 #include "opera_madam.h"
+#include "opera_mem.h"
+#include "opera_state.h"
 #include "opera_xbus.h"
 
 #include "boolean.h"
@@ -80,26 +82,26 @@ int flagtime;
 int TIMER_VAL = 0; //0x415
 
 static uint32_t *MADAM_REGS;
-static clio_t    CLIO;
+static clio_t    CLIO = {0};
 
 uint32_t
 opera_clio_state_size(void)
 {
-  return sizeof(clio_t);
+  return opera_state_save_size(sizeof(clio_t));
 }
 
-void
+uint32_t
 opera_clio_state_save(void *buf_)
 {
-  memcpy(buf_,&CLIO,sizeof(clio_t));
+  return opera_state_save(buf_,"CLIO",&CLIO,sizeof(CLIO));
 }
 
-void
+uint32_t
 opera_clio_state_load(const void *buf_)
 {
   TIMER_VAL = 0;
 
-  memcpy(&CLIO,buf_,sizeof(clio_t));
+  return opera_state_load(&CLIO,"CLIO",buf_,sizeof(CLIO));
 }
 
 #define CURADR MADAM_REGS[base+0x00]
@@ -366,7 +368,7 @@ opera_clio_poke(uint32_t addr_,
       if_set_set_reset(&CLIO.regs[0x84],val_,0x40,0x04);
       if_set_set_reset(&CLIO.regs[0x84],val_,0x80,0x08);
 
-      opera_arm_rom_select(!!(val_ & 0x4));
+      opera_mem_rom_select(!!(val_ & 0x4));
 
       return 0;
     }

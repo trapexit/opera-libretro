@@ -33,6 +33,7 @@
 #include "opera_clio.h"
 #include "opera_core.h"
 #include "opera_dsp.h"
+#include "opera_state.h"
 
 #include <string.h>
 
@@ -464,19 +465,19 @@ dsp_write(uint32_t addr_,
 uint32_t
 opera_dsp_state_size(void)
 {
-  return sizeof(dsp_t);
+  return opera_state_save_size(sizeof(DSP));
 }
 
-void
+uint32_t
 opera_dsp_state_save(void *buf_)
 {
-  memcpy(buf_,&DSP,sizeof(dsp_t));
+  return opera_state_save(buf_,"DSPP",&DSP,sizeof(DSP));
 }
 
-void
+uint32_t
 opera_dsp_state_load(const void *buf_)
 {
-  memcpy(&DSP,buf_,sizeof(dsp_t));
+  return opera_state_load(&DSP,"DSPP",buf_,sizeof(DSP));
 }
 
 static

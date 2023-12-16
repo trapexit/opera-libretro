@@ -28,8 +28,8 @@ void     opera_vdlp_set_vdl_head(const uint32_t addr);
 void     opera_vdlp_process_line(int line);
 
 uint32_t opera_vdlp_state_size(void);
-void     opera_vdlp_state_save(void *buf);
-void     opera_vdlp_state_load(const void *buf);
+uint32_t opera_vdlp_state_save(void *buf);
+uint32_t opera_vdlp_state_load(void const *buf);
 
 int      opera_vdlp_configure(void *buf,
                               vdlp_pixel_format_e pf,
