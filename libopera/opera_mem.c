@@ -15,6 +15,7 @@ uint32_t HIRES_RAM_SIZE      = (ONE_MB * 6);
 uint32_t HIRES_RAM_SIZE_MASK = ((ONE_MB * 6)-1);
 uint32_t MAX_RAM_SIZE        = (ONE_MB * 6);
 
+uint8_t  *RAM             = NULL;
 uint8_t  *DRAM            = NULL;
 uint32_t  DRAM_SIZE       = (ONE_MB * 2);
 uint32_t  DRAM_SIZE_MASK  = ((ONE_MB * 2) - 1);
@@ -32,17 +33,24 @@ uint8_t  *ROM2            = NULL;
 uint32_t  ROM2_SIZE       = (ONE_MB * 1);
 uint32_t  ROM2_SIZE_MASK  = ((ONE_MB * 1) - 1);
 
+typedef struct opera_mem_state_t opera_mem_state_t;
+struct opera_mem_state_t
+{
+
+};
+
 
 int
 opera_mem_init()
 {
-  DRAM  = calloc(MAX_RAM_SIZE,1);
+  RAM   = calloc(MAX_RAM_SIZE,1);
   ROM1  = calloc(ROM1_SIZE,1);
   ROM2  = calloc(ROM2_SIZE,1);
   NVRAM = calloc(NVRAM_SIZE,1);
 
   /* VRAM is always at the top of DRAM */
-  VRAM = &DRAM[DRAM_SIZE];
+  DRAM = RAM;
+  VRAM = &RAM[DRAM_SIZE];
   ROM  = ROM1;
 
   return 0;
@@ -51,10 +59,10 @@ opera_mem_init()
 void
 opera_mem_destroy()
 {
-  if(DRAM)
-    free(DRAM);
+  if(RAM)
+    free(RAM);
+  RAM  = NULL;
   DRAM = NULL;
-
   VRAM = NULL;
 
   if(ROM1)
@@ -150,8 +158,8 @@ opera_mem_state_load(void const *data_)
   opera_state_chunk_t *chunk;
 
   chunk = (opera_state_chunk_t*)data;
-  
-  
+
+
   data += opera_state_load(DRAM,"DRAM",data,DRAM_SIZE);
   data += opera_state_load(VRAM,"VRAM",data,VRAM_SIZE);
   data += opera_state_load(ROM1,"ROM1",data,ROM1_SIZE);
