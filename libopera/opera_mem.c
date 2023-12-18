@@ -40,14 +40,31 @@ struct opera_mem_state_t
 };
 
 
+uint32_t
+opera_mem_dram_size(opera_mem_cfg_t cfg_)
+{
+  return (((cfg_ & 0xF0) >> 4) * ONE_MB);
+}
+
+uint32_t
+opera_mem_vram_size(opera_mem_cfg_t cfg_)
+{
+  return (((cfg_ & 0x0F) >> 0) * ONE_MB);
+}
+
 int
 opera_mem_init()
 {
+  opera_mem_cfg_t cfg = DRAM_2MB_VRAM_1MB;
+  
   RAM   = calloc(MAX_RAM_SIZE,1);
   ROM1  = calloc(ROM1_SIZE,1);
   ROM2  = calloc(ROM2_SIZE,1);
   NVRAM = calloc(NVRAM_SIZE,1);
 
+  DRAM_SIZE = opera_mem_dram_size(cfg);
+  VRAM_SIZE = opera_mem_vram_size(cfg);
+  
   /* VRAM is always at the top of DRAM */
   DRAM = RAM;
   VRAM = &RAM[DRAM_SIZE];
@@ -140,7 +157,11 @@ opera_mem_state_save(void *data_)
 {
   uint8_t *start = (uint8_t*)data_;
   uint8_t *data  = (uint8_t*)data_;
+  opera_mem_state_t memstate;
 
+  memstate.mem_cfg = DRAM_2MB_VRAM_1MB;
+
+  data += opera_state_save(data,"MCFG",&memstate,sizeof(memstate));
   data += opera_state_save(data,"DRAM",DRAM,DRAM_SIZE);
   data += opera_state_save(data,"VRAM",VRAM,VRAM_SIZE);
   data += opera_state_save(data,"ROM1",ROM1,ROM1_SIZE);
@@ -155,11 +176,11 @@ opera_mem_state_load(void const *data_)
 {
   uint8_t const *start = (uint8_t const*)data_;
   uint8_t const *data  = (uint8_t const*)data_;
-  opera_state_chunk_t *chunk;
+  opera_mem_state_t memstate;
 
-  chunk = (opera_state_chunk_t*)data;
+  memstate.mem_cfg = DRAM_2MB_VRAM_1MB;
 
-
+  data += opera_state_load(&memstate,"MCFG",data,sizeof(memstate));
   data += opera_state_load(DRAM,"DRAM",data,DRAM_SIZE);
   data += opera_state_load(VRAM,"VRAM",data,VRAM_SIZE);
   data += opera_state_load(ROM1,"ROM1",data,ROM1_SIZE);
