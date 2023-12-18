@@ -143,6 +143,7 @@ opera_mem_state_size()
   uint32_t size;
 
   size = 0;
+  size += opera_state_save_size(sizeof(opera_mem_state_t));
   size += opera_state_save_size(DRAM_SIZE);
   size += opera_state_save_size(VRAM_SIZE);
   size += opera_state_save_size(ROM1_SIZE);
@@ -177,8 +178,6 @@ opera_mem_state_load(void const *data_)
   uint8_t const *start = (uint8_t const*)data_;
   uint8_t const *data  = (uint8_t const*)data_;
   opera_mem_state_t memstate;
-
-  memstate.mem_cfg = DRAM_2MB_VRAM_1MB;
 
   data += opera_state_load(&memstate,"MCFG",data,sizeof(memstate));
   data += opera_state_load(DRAM,"DRAM",data,DRAM_SIZE);
