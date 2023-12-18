@@ -36,7 +36,7 @@ uint32_t  ROM2_SIZE_MASK  = ((ONE_MB * 1) - 1);
 typedef struct opera_mem_state_t opera_mem_state_t;
 struct opera_mem_state_t
 {
-
+  uint8_t mem_cfg;
 };
 
 
