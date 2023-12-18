@@ -1,4 +1,5 @@
 #include "opera_state.h"
+
 #include "opera_log.h"
 
 #include <stdint.h>

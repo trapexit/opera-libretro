@@ -23,6 +23,14 @@ union opera_state_hdr_t
   opera_state_hdr_v1_t v1;
 };
 
+typedef struct opera_state_chunk_t opera_state_chunk_t;
+struct opera_state_chunk_t
+{
+  char     name[4];
+  uint32_t size;
+  uint8_t  data[1];
+};
+
 uint32_t opera_state_get_version(void const     *src,
                                  uint32_t const  src_size);
 

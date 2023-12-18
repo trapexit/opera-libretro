@@ -147,7 +147,11 @@ opera_mem_state_load(void const *data_)
 {
   uint8_t const *start = (uint8_t const*)data_;
   uint8_t const *data  = (uint8_t const*)data_;
+  opera_state_chunk_t *chunk;
 
+  chunk = (opera_state_chunk_t*)data;
+  
+  
   data += opera_state_load(DRAM,"DRAM",data,DRAM_SIZE);
   data += opera_state_load(VRAM,"VRAM",data,VRAM_SIZE);
   data += opera_state_load(ROM1,"ROM1",data,ROM1_SIZE);
