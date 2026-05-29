@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2018 The RetroArch team
+/* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (chd_stream.h).
@@ -38,6 +38,8 @@ typedef struct chdstream chdstream_t;
 #define CHDSTREAM_TRACK_LAST (-2)
 /* Primary (largest) data track, used for CRC identification purposes */
 #define CHDSTREAM_TRACK_PRIMARY (-3)
+/* Opera extension: full disc with all tracks concatenated in metadata order */
+#define CHDSTREAM_TRACK_FULL_DISC (-4)
 
 chdstream_t *chdstream_open(const char *path, int32_t track);
 
@@ -56,6 +58,12 @@ void chdstream_rewind(chdstream_t *stream);
 int64_t chdstream_seek(chdstream_t *stream, int64_t offset, int whence);
 
 ssize_t chdstream_get_size(chdstream_t *stream);
+
+uint32_t chdstream_get_track_start(chdstream_t* stream);
+
+uint32_t chdstream_get_frame_size(chdstream_t* stream);
+
+uint32_t chdstream_get_first_track_sector(chdstream_t* stream);
 
 RETRO_END_DECLS
 

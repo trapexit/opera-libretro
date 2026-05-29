@@ -38,9 +38,36 @@
 
 #define CDIMAGE_SECTOR_SIZE 2048
 
+typedef enum retro_reset_flags_t
+  {
+    RETRO_RESET_FLAG_NONE       = 0,
+    RETRO_RESET_FLAG_SAVE_NVRAM = (1 << 0)
+  } retro_reset_flags_t;
+
 static cdimage_t  CDIMAGE;
 static uint32_t   CDIMAGE_SECTOR;
 static char      *g_GAME_INFO_PATH = NULL;
+
+/* CD-DA audio state */
+#define CDDA_BUF_SIZE      65536
+#define CDDA_BUF_SIZE_MASK (CDDA_BUF_SIZE - 1)
+#define CDDA_SAMPLES_PER_SECTOR 588
+#define CDDA_PREFILL_FRAMES 4096
+
+static int        g_CDDA_ACTIVE      = 0;
+static uint32_t   g_CDDA_CURRENT_LBA = 0;
+static uint32_t   g_CDDA_END_LBA     = 0;
+static int16_t    g_CDDA_BUF[CDDA_BUF_SIZE * 2];
+static uint32_t   g_CDDA_BUF_RD      = 0;
+static uint32_t   g_CDDA_BUF_WR      = 0;
+
+static
+void
+cdimage_audio_reset_buffer(void)
+{
+  g_CDDA_BUF_RD = 0;
+  g_CDDA_BUF_WR = 0;
+}
 
 static
 void
@@ -152,9 +179,126 @@ cdimage_set_sector(const uint32_t sector_)
 
 static
 void
-cdimage_read_sector(void *buf_)
+cdimage_audio_buffer_samples(const uint8_t *sector_,
+                             ssize_t        bytes_read_)
 {
-  retro_cdimage_read(&CDIMAGE,CDIMAGE_SECTOR,buf_,CDIMAGE_SECTOR_SIZE);
+  int i;
+  int samples_read;
+
+  if(bytes_read_ <= 0)
+    return;
+
+  samples_read = (int)(bytes_read_ / 4);
+  for(i = 0; i < samples_read; i++)
+    {
+      if((g_CDDA_BUF_WR - g_CDDA_BUF_RD) >= CDDA_BUF_SIZE)
+        break;
+
+      uint32_t wr = (g_CDDA_BUF_WR & CDDA_BUF_SIZE_MASK);
+      g_CDDA_BUF[wr * 2 + 0] = ((int16_t*)sector_)[i * 2 + 0];
+      g_CDDA_BUF[wr * 2 + 1] = ((int16_t*)sector_)[i * 2 + 1];
+      g_CDDA_BUF_WR++;
+    }
+}
+
+static
+void
+cdimage_read_sector(void  *buf_,
+                    size_t len_)
+{
+  retro_cdimage_read_sector(&CDIMAGE,CDIMAGE_SECTOR,buf_,len_);
+}
+
+static
+void
+cdimage_get_toc(uint8_t  *track_first_,
+                uint8_t  *track_last_,
+                uint8_t  *disc_id_,
+                void     *disc_toc_,
+                uint32_t  disc_toc_size_)
+{
+  retro_cdimage_get_toc(&CDIMAGE,
+                        track_first_,
+                        track_last_,
+                        disc_id_,
+                        disc_toc_,
+                        disc_toc_size_);
+}
+
+static
+void
+cdimage_audio_play(const uint32_t start_lba_,
+                     const uint32_t end_lba_)
+{
+  g_CDDA_ACTIVE      = 1;
+  g_CDDA_CURRENT_LBA = start_lba_;
+  g_CDDA_END_LBA     = end_lba_;
+  cdimage_audio_reset_buffer();
+}
+
+static
+void
+cdimage_audio_stop(void)
+{
+  g_CDDA_ACTIVE = 0;
+  cdimage_audio_reset_buffer();
+}
+
+static
+void
+content_runtime_reset(void)
+{
+  cdimage_audio_stop();
+  cdimage_set_sector(0);
+  opera_cdrom_ode_set_root(NULL);
+}
+
+static
+void
+cdimage_audio_process(void)
+{
+  if(!g_CDDA_ACTIVE)
+    return;
+
+  while(((g_CDDA_BUF_WR - g_CDDA_BUF_RD) < CDDA_PREFILL_FRAMES) &&
+        (g_CDDA_CURRENT_LBA < g_CDDA_END_LBA))
+    {
+      uint8_t sector[2352];
+      ssize_t bytes_read;
+
+      bytes_read = retro_cdimage_read_sector(&CDIMAGE,g_CDDA_CURRENT_LBA,sector,2352);
+      if(bytes_read <= 0)
+        break;
+
+      cdimage_audio_buffer_samples(sector,bytes_read);
+
+      g_CDDA_CURRENT_LBA++;
+    }
+
+  if(g_CDDA_CURRENT_LBA >= g_CDDA_END_LBA)
+    g_CDDA_ACTIVE = 0;
+}
+
+void
+opera_lr_cdda_mix(int16_t *dsp_buf_,
+                  size_t   frames_)
+{
+  size_t i;
+
+  for(i = 0; i < frames_; i++)
+    {
+      if(g_CDDA_BUF_RD < g_CDDA_BUF_WR)
+        {
+          uint32_t rd = (g_CDDA_BUF_RD & CDDA_BUF_SIZE_MASK);
+          int left  = dsp_buf_[i * 2 + 0] + g_CDDA_BUF[rd * 2 + 0];
+          int right = dsp_buf_[i * 2 + 1] + g_CDDA_BUF[rd * 2 + 1];
+
+          dsp_buf_[i * 2 + 0] = (left  > 32767) ? 32767 : (left  < -32768) ? -32768 : left;
+          dsp_buf_[i * 2 + 1] = (right > 32767) ? 32767 : (right < -32768) ? -32768 : right;
+
+          g_CDDA_BUF_RD++;
+        }
+    }
 }
 
 static
@@ -200,6 +344,9 @@ retro_serialize(void   *data_,
 {
   uint32_t size;
 
+  if(size_ == 0)
+    return false;
+
   size = opera_3do_state_save(data_,size_);
 
   return (size == size_);
@@ -210,17 +357,26 @@ retro_unserialize(void const *data_,
                   size_t      size_)
 {
   uint32_t size;
+  uint32_t backup_size;
+  uint32_t restore_size;
   void *backup_state;
 
   backup_state = malloc(retro_serialize_size());
   if(backup_state == NULL)
     return false;
-  size = retro_serialize(backup_state,retro_serialize_size());
+  backup_size = retro_serialize_size();
+  size = retro_serialize(backup_state,backup_size);
   if(size)
     {
       size = opera_3do_state_load(data_,size_);
       if(size != size_)
-        opera_3do_state_load(backup_state,retro_serialize_size());
+        {
+          restore_size = opera_3do_state_load(backup_state,backup_size);
+          if(restore_size != backup_size)
+            opera_log_printf(OPERA_LOG_ERROR,
+                             "[Opera]: failed to restore previous state after unsuccessful state load\n");
+          size = 0;
+        }
     }
 
   free(backup_state);
@@ -335,6 +491,18 @@ game_info_path_save(const struct retro_game_info *info_)
 }
 
 static
+void
+game_info_path_save_path(const char *path_)
+{
+  game_info_path_free();
+
+  if(path_ == NULL)
+    return;
+
+  g_GAME_INFO_PATH = strdup(path_);
+}
+
+static
 const
 char*
 game_info_path_get(void)
@@ -342,17 +510,70 @@ game_info_path_get(void)
   return g_GAME_INFO_PATH;
 }
 
+static
+int
+cdimage_ode_launch(const char *path_)
+{
+  cdimage_t next;
+  int rv;
+
+  memset(&next,0,sizeof(next));
+  rv = retro_cdimage_open(path_,&next);
+  if(rv == -1)
+    {
+      retro_log_printf_cb(RETRO_LOG_ERROR,
+                          "[Opera]: ODE launch failed opening image - %s\n",
+                          path_);
+      return -1;
+    }
+
+  opera_lr_nvram_save(game_info_path_get(),
+                      g_OPTS.nvram_shared,
+                      g_OPTS.nvram_version);
+
+  retro_cdimage_close(&CDIMAGE);
+  CDIMAGE = next;
+  cdimage_set_sector(0);
+  game_info_path_save_path(path_);
+
+  retro_log_printf_cb(RETRO_LOG_INFO,
+                      "[Opera]: ODE launched image - %s\n",
+                      path_);
+  return 0;
+}
+
+static
+void
+ode_root_set_for_content(const struct retro_game_info *info_)
+{
+  char root[PATH_MAX_LENGTH];
+
+  if((info_ == NULL) || (info_->path == NULL))
+    {
+      opera_cdrom_ode_set_root(NULL);
+      return;
+    }
+
+  strncpy(root,info_->path,sizeof(root) - 1);
+  root[sizeof(root) - 1] = 0;
+  path_basedir(root);
+
+  opera_cdrom_ode_set_root(root);
+}
+
 bool
 retro_load_game(const struct retro_game_info *info_)
 {
   int rv;
 
+  content_runtime_reset();
   game_info_path_save(info_);
 
   rv = open_cdimage_if_needed(info_);
   if(rv == -1)
     return false;
 
+  ode_root_set_for_content(info_);
   opera_lr_opts_process();
   opera_3do_init(libopera_callback);
   cdimage_set_sector(0);
@@ -385,7 +606,9 @@ retro_unload_game(void)
   game_info_path_free();
 
   opera_3do_destroy();
+  opera_mem_destroy();
 
+  content_runtime_reset();
   retro_cdimage_close(&CDIMAGE);
 
   opera_lr_opts_reset();
@@ -515,7 +738,11 @@ retro_init(void)
 
   opera_cdrom_set_callbacks(cdimage_get_size,
                             cdimage_set_sector,
-                            cdimage_read_sector);
+                            cdimage_read_sector,
+                            cdimage_get_toc,
+                            cdimage_audio_play,
+                            cdimage_audio_stop);
+  opera_cdrom_ode_set_launch_callback(cdimage_ode_launch);
 
   srand(time(NULL));
   prng16_seed(time(NULL));
@@ -528,13 +755,14 @@ retro_deinit(void)
 
 }
 
+static
 void
-retro_reset(void)
+retro_reset_core(retro_reset_flags_t flags_)
 {
-  opera_lr_nvram_save(game_info_path_get(),
-                      g_OPTS.nvram_shared,
-                      g_OPTS.nvram_version);
-
+  if(flags_ & RETRO_RESET_FLAG_SAVE_NVRAM)
+    opera_lr_nvram_save(game_info_path_get(),
+                        g_OPTS.nvram_shared,
+                        g_OPTS.nvram_version);
 
   opera_3do_destroy();
   opera_lr_opts_reset();
@@ -546,6 +774,26 @@ retro_reset(void)
   opera_lr_nvram_load(game_info_path_get(),
                       g_OPTS.nvram_shared,
                       g_OPTS.nvram_version);
+}
+
+void
+retro_reset(void)
+{
+  retro_reset_core(RETRO_RESET_FLAG_SAVE_NVRAM);
+}
+
+static
+bool
+ode_reset_if_requested(void)
+{
+  if(!opera_cdrom_ode_consume_restart_request())
+    return false;
+
+  retro_log_printf_cb(RETRO_LOG_INFO,
+                      "[Opera]: ODE media launch requested core reset\n");
+  /* cdimage_ode_launch already saved NVRAM before switching game paths. */
+  retro_reset_core(RETRO_RESET_FLAG_NONE);
+  return true;
 }
 
 static
@@ -592,11 +840,18 @@ draw_crosshairs_if_enabled()
 void
 retro_run(void)
 {
+  if(ode_reset_if_requested())
+    return;
+
   process_opts_if_updated();
 
   lr_input_update(g_OPTS.active_devices);
 
   opera_3do_process_frame();
+  if(ode_reset_if_requested())
+    return;
+
+  cdimage_audio_process();
 
   draw_crosshairs_if_enabled();
 

@@ -116,6 +116,27 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       "21"
     },
     {
+      "opera_cd_speed",
+      "CD Speed",
+      NULL,
+      "Select the effective CD-ROM read speed."
+      " Warning: can expose timing issues in some titles. Particularly above 16x.",
+      NULL,
+      "system",
+      {
+        { "unbounded", NULL },
+        { "1x",  " 1x - ~150KB/s" },
+        { "2x",  " 2x - ~300KB/s (stock)" },
+        { "4x",  " 4x - ~600KB/s" },
+        { "8x",  " 8x - ~1200KB/s" },
+        { "16x", "16x - 2400KB/s" },
+        { "24x", "24x - 3600KB/s" },
+        { "32x", "32x - 4800KB/s" },
+        { NULL, NULL },
+      },
+      "unbounded"
+    },
+    {
       "opera_region",
       "Region / Mode",
       NULL,
@@ -260,7 +281,7 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       "opera_active_devices",
       "Active Input Devices",
       NULL,
-      "There exists a bug (perhaps in Opera itself, but possibly in certain games) where having more than 1 emulated controller causes content to ignore gamepad input. Setting 'Active Input Devices' to 1 provides a workaround for this issue.",
+      "Sets the maximum number of emulated input devices. Certain games, particularly when using >16x CDROM speed and have more than 1 emulated controller, causes content to ignore gamepad input or crash. Setting 'Active Input Devices' to 1 can be workaround for this issue on some titles.",
       NULL,
       "input",
       {
@@ -452,6 +473,24 @@ static struct retro_core_option_definition option_defs_us[] =
       "21"
     },
     {
+      "opera_cd_speed",
+      "CD Speed",
+      "Select the effective CD-ROM read speed used by streamed sector reads."
+      " Higher values can help avoid audio starvation, but may expose timing issues in some software.",
+      {
+        { "unbounded", "Unbounded" },
+        { "1x", NULL },
+        { "2x", NULL },
+        { "4x", NULL },
+        { "8x", NULL },
+        { "16x", NULL },
+        { "24x", NULL },
+        { "32x", NULL },
+        { NULL, NULL },
+      },
+      "unbounded"
+    },
+    {
       "opera_region",
       "Region / Mode",
       "Select the resolution and field rate. NOTE: some EU games require a EU ROM.",
@@ -568,7 +607,7 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_active_devices",
       "Active Input Devices",
-      "There exists a bug (perhaps in Opera itself, but possibly in certain games) where having more than 1 emulated controller causes content to ignore gamepad input. Setting 'Active Input Devices' to 1 provides a workaround for this issue.",
+      "Sets the maximum number of emulated input devices. There exists a bug (perhaps in Opera itself, but possibly in certain games) where having more than 1 emulated controller causes content to ignore gamepad input. Setting 'Active Input Devices' to 1 provides a workaround for this issue.",
       {
         { "0", NULL },
         { "1", NULL },

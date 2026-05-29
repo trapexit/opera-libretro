@@ -1,6 +1,8 @@
 #include "libopera/opera_dsp.h"
+#include "libopera/opera_clock.h"
 
 #include "opera_lr_callbacks.h"
+#include "opera_lr_dsp.h"
 
 #include <stdint.h>
 
@@ -24,6 +26,7 @@ opera_lr_dsp_process(void)
 void
 opera_lr_dsp_upload(void)
 {
+  opera_lr_cdda_mix((int16_t*)g_DSP_BUF,g_DSP_BUF_IDX);
   retro_audio_sample_batch_cb((int16_t*)g_DSP_BUF,g_DSP_BUF_IDX);
   g_DSP_BUF_IDX = 0;
 }
@@ -35,7 +38,7 @@ opera_lr_dsp_destroy(void)
 }
 
 void
-opera_lr_dsp_init(const int threaded_)
+opera_lr_dsp_init(const bool threaded_)
 {
 
 }

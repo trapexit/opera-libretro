@@ -1,6 +1,8 @@
 #include "libopera/opera_dsp.h"
+#include "libopera/opera_clock.h"
 
 #include "opera_lr_callbacks.h"
+#include "opera_lr_dsp.h"
 
 #include "boolean.h"
 
@@ -24,14 +26,12 @@ static uint32_t g_DSP_BUF_PENDING = 0;
 static int32_t  g_DSP_BUF[DSP_BUF_SIZE];
 
 static scond_t *g_DSP_COND         = NULL;
-static slock_t *g_DSP_COND_MUTEX   = NULL;
 static sthread_t *g_DSP_THREAD     = NULL;
 static bool g_DSP_THREAD_RUNNING   = false;
 static slock_t *g_DSP_THREAD_MUTEX = NULL;
 
 static void (*g_DSP_UPLOAD)(void)  = dsp_upload_unlocked;
 static void (*g_DSP_PROCESS)(void) = dsp_process;
-
 
 /* PRIVATE FUNCTIONS */
 
@@ -46,13 +46,13 @@ dsp_thread_loop(void *handle_)
   while(running)
     {
       slock_lock(g_DSP_THREAD_MUTEX);
-      running           = g_DSP_THREAD_RUNNING;
-      pending           = g_DSP_BUF_PENDING;
+      while(g_DSP_THREAD_RUNNING && (g_DSP_BUF_PENDING == 0))
+        scond_wait(g_DSP_COND,g_DSP_THREAD_MUTEX);
+
+      running = g_DSP_THREAD_RUNNING;
+      pending = g_DSP_BUF_PENDING;
       g_DSP_BUF_PENDING = 0;
       slock_unlock(g_DSP_THREAD_MUTEX);
-
-      if (running)
-        scond_wait(g_DSP_COND, g_DSP_COND_MUTEX);
 
       while (pending > 0)
         {
@@ -74,6 +74,7 @@ static
 void
 dsp_upload_unlocked(void)
 {
+  opera_lr_cdda_mix((int16_t*)g_DSP_BUF,g_DSP_BUF_IDX);
   retro_audio_sample_batch_cb((int16_t*)g_DSP_BUF,g_DSP_BUF_IDX);
   g_DSP_BUF_IDX = 0;
 }
@@ -136,12 +137,10 @@ opera_lr_dsp_destroy(void)
       sthread_join(g_DSP_THREAD);
 
       scond_free(g_DSP_COND);
-      slock_free(g_DSP_COND_MUTEX);
       slock_free(g_DSP_THREAD_MUTEX);
 
       g_DSP_THREAD       = NULL;
       g_DSP_COND         = NULL;
-      g_DSP_COND_MUTEX   = NULL;
       g_DSP_THREAD_MUTEX = NULL;
       g_DSP_THREADED     = false;
     }
@@ -161,7 +160,6 @@ opera_lr_dsp_init(const bool threaded_)
   if(g_DSP_THREADED)
     {
       g_DSP_COND           = scond_new();
-      g_DSP_COND_MUTEX     = slock_new();
       g_DSP_THREAD_MUTEX   = slock_new();
       g_DSP_THREAD_RUNNING = true;
       g_DSP_THREAD         = sthread_create(dsp_thread_loop, NULL);

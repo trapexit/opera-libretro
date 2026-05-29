@@ -35,12 +35,14 @@
 
 #include "opera_arm.h"
 #include "opera_arm_core.h"
+#include "opera_3do.h"
 #include "opera_clio.h"
 #include "opera_core.h"
 #include "opera_diag_port.h"
 #include "opera_fixedpoint_math.h"
 #include "opera_madam.h"
 #include "opera_mem.h"
+#include "opera_xbus.h"
 #include "opera_sport.h"
 #include "opera_state.h"
 #include "opera_swi_hle_0x5XXXX.h"
@@ -50,6 +52,7 @@
 #include <string.h>
 
 #define ARM_INITIAL_PC  0x03000000
+#define ARM_ARRAY_COUNT(A_) ((uint32_t)(sizeof(A_) / sizeof((A_)[0])))
 
 #define ARM_MUL_MASK    0x0fc000f0
 #define ARM_MUL_SIGN    0x00000090
@@ -113,6 +116,11 @@ const static uint16_t cond_flags_cross[]=
 static int        g_SWI_HLE;
 static arm_core_t CPU;
 static int        CYCLES;	//cycle counter
+static int32_t    addrr = 0;
+static int32_t    vall  = 0;
+static int32_t    inuse = 0;
+static int        g_SOFT_RESET_PENDING = 0;
+static uint32_t   carry_out = 0;
 
 static uint32_t readusr(uint32_t const rn);
 static void     loadusr(uint32_t const rn, uint32_t const val);
@@ -121,22 +129,117 @@ static void     mwriteb(uint32_t const addr, uint8_t const val);
 static uint32_t mreadw(uint32_t const addr);
 static void     mwritew(uint32_t const addr,uint32_t const val);
 
+static
+int
+clio_xbus_access_aborts(uint32_t const index_)
+{
+  if((index_ < 0x540) || (index_ >= 0x600))
+    return 0;
+
+  if(!opera_xbus_selected_device_absent())
+    return 0;
+
+  return 1;
+}
+
+uint32_t
+opera_arm_state_size_v1(void)
+{
+  return opera_state_save_size(sizeof(CPU));
+}
+
+static
+bool
+opera_arm_state_write_payload(opera_state_writer_t *writer_,
+                              arm_core_t const     *state_)
+{
+  return (opera_state_write_u32_array(writer_,state_->USER,ARM_ARRAY_COUNT(state_->USER)) &&
+          opera_state_write_u32_array(writer_,state_->CASH,ARM_ARRAY_COUNT(state_->CASH)) &&
+          opera_state_write_u32_array(writer_,state_->SVC,ARM_ARRAY_COUNT(state_->SVC)) &&
+          opera_state_write_u32_array(writer_,state_->ABT,ARM_ARRAY_COUNT(state_->ABT)) &&
+          opera_state_write_u32_array(writer_,state_->FIQ,ARM_ARRAY_COUNT(state_->FIQ)) &&
+          opera_state_write_u32_array(writer_,state_->IRQ,ARM_ARRAY_COUNT(state_->IRQ)) &&
+          opera_state_write_u32_array(writer_,state_->UND,ARM_ARRAY_COUNT(state_->UND)) &&
+          opera_state_write_u32_array(writer_,state_->SPSR,ARM_ARRAY_COUNT(state_->SPSR)) &&
+          opera_state_write_u32(writer_,state_->CPSR) &&
+          opera_state_write_u8(writer_,state_->nFIQ) &&
+          opera_state_write_u8(writer_,state_->MAS_Access_Exept));
+}
+
+static
+uint32_t
+opera_arm_state_payload_size(void)
+{
+  opera_state_writer_t writer;
+
+  opera_state_writer_init(&writer,NULL,UINT32_MAX);
+  opera_arm_state_write_payload(&writer,&CPU);
+
+  return opera_state_writer_used(&writer);
+}
+
 uint32_t
 opera_arm_state_size(void)
 {
-  return opera_state_save_size(sizeof(CPU));
+  return opera_state_chunk_size(opera_arm_state_payload_size());
 }
 
 uint32_t
 opera_arm_state_save(void *data_)
 {
-  return opera_state_save(data_,"ARM",&CPU,sizeof(CPU));
+  uint32_t payload_size;
+  opera_state_writer_t writer;
+
+  payload_size = opera_arm_state_payload_size();
+  opera_state_writer_init(&writer,data_,opera_state_chunk_size(payload_size));
+  opera_state_write_chunk_header(&writer,"ARM",payload_size);
+  opera_arm_state_write_payload(&writer,&CPU);
+
+  return opera_state_writer_ok(&writer) ? opera_state_writer_used(&writer) : 0;
 }
 
 uint32_t
-opera_arm_state_load(void const *data_)
+opera_arm_state_load_v1(void const     *data_,
+                        uint32_t const  size_)
 {
-  return opera_state_load(&CPU,"ARM",data_,sizeof(CPU));
+  return opera_state_load_sized(&CPU,"ARM",data_,size_,sizeof(CPU));
+}
+
+static
+bool
+opera_arm_state_read_payload(opera_state_reader_t *reader_,
+                             arm_core_t           *state_)
+{
+  return (opera_state_read_u32_array(reader_,state_->USER,ARM_ARRAY_COUNT(state_->USER)) &&
+          opera_state_read_u32_array(reader_,state_->CASH,ARM_ARRAY_COUNT(state_->CASH)) &&
+          opera_state_read_u32_array(reader_,state_->SVC,ARM_ARRAY_COUNT(state_->SVC)) &&
+          opera_state_read_u32_array(reader_,state_->ABT,ARM_ARRAY_COUNT(state_->ABT)) &&
+          opera_state_read_u32_array(reader_,state_->FIQ,ARM_ARRAY_COUNT(state_->FIQ)) &&
+          opera_state_read_u32_array(reader_,state_->IRQ,ARM_ARRAY_COUNT(state_->IRQ)) &&
+          opera_state_read_u32_array(reader_,state_->UND,ARM_ARRAY_COUNT(state_->UND)) &&
+          opera_state_read_u32_array(reader_,state_->SPSR,ARM_ARRAY_COUNT(state_->SPSR)) &&
+          opera_state_read_u32(reader_,&state_->CPSR) &&
+          opera_state_read_u8(reader_,&state_->nFIQ) &&
+          opera_state_read_u8(reader_,&state_->MAS_Access_Exept));
+}
+
+uint32_t
+opera_arm_state_load(void const     *data_,
+                     uint32_t const  size_)
+{
+  arm_core_t state;
+  opera_state_reader_t reader;
+  opera_state_reader_t payload;
+
+  opera_state_reader_init(&reader,data_,size_);
+  if(!opera_state_read_chunk(&reader,"ARM",&payload) ||
+     !opera_arm_state_read_payload(&payload,&state) ||
+     !opera_state_reader_finished(&payload))
+    return 0;
+
+  CPU = state;
+
+  return opera_state_reader_used(&reader);
 }
 
 static
@@ -477,6 +580,19 @@ SETF(int a_)
   CPU.CPSR = (CPU.CPSR & 0xffffffbf) | ((a_ ? 1 << 6 : 0));
 }
 
+static
+void
+arm_data_abort(void)
+{
+  CPU.SPSR[arm_mode_table[0x17]] = CPU.CPSR;
+  SETI(1);
+  SETM(0x17);
+  CPU.USER[14] = (CPU.USER[15] + 4);
+  CPU.USER[15] = 0x00000010;
+  CYCLES -= (SCYCLE + NCYCLE);
+  CPU.MAS_Access_Exept = false;
+}
+
 #define MODE ((CPU.CPSR & 0x1F))
 #define ISN  ((CPU.CPSR >> 31) & 1)
 #define ISZ  ((CPU.CPSR >> 30) & 1)
@@ -502,6 +618,10 @@ opera_arm_init(void)
   int i;
 
   g_SWI_HLE = 0;
+  addrr = 0;
+  vall = 0;
+  inuse = 0;
+  carry_out = 0;
 
   CYCLES = 0;
   for(i = 0; i < 16; i++)
@@ -537,6 +657,7 @@ opera_arm_reset(void)
   int i;
 
   CYCLES = 0;
+  g_SOFT_RESET_PENDING = 0;
   opera_mem_rom_select(ROM1);
 
   for(i = 0; i < 16; i++)
@@ -560,8 +681,6 @@ opera_arm_reset(void)
   CPU.USER[15] = ARM_INITIAL_PC;
   arm_cpsr_set(0x13);
 
-  opera_clio_reset();
-  opera_madam_reset();
 }
 
 void
@@ -575,10 +694,6 @@ opera_arm_swi_hle_get(void)
 {
   return g_SWI_HLE;
 }
-
-static int32_t addrr = 0;
-static int32_t vall  = 0;
-static int32_t inuse = 0;
 
 static
 void
@@ -746,6 +861,8 @@ stm_accur(uint32_t opc_,
           if(list & 1)
             {
               mwritew(base_comp,readusr(i));
+              if(g_SOFT_RESET_PENDING)
+                return;
               //if(MAS_Access_Exept)break;
               base_comp += 4;
             }
@@ -767,6 +884,8 @@ stm_accur(uint32_t opc_,
           if(list&1)
             {
               mwritew(base_comp,CPU.USER[i]);
+              if(g_SOFT_RESET_PENDING)
+                return;
               if(base_comp)
                 {
                   addrr = base_comp;
@@ -785,7 +904,11 @@ stm_accur(uint32_t opc_,
     }
 
   if((opc_ & 0x8000) /*&& !MAS_Access_Exept*/)
-    mwritew(base_comp,CPU.USER[15]+8);
+    {
+      mwritew(base_comp,CPU.USER[15]+8);
+      if(g_SOFT_RESET_PENDING)
+        return;
+    }
 
   CYCLES -= ((x - 2) * SCYCLE + NCYCLE + NCYCLE);
 }
@@ -906,8 +1029,6 @@ static void decode_swi(const uint32_t op_)
   decode_swi_lle();
 }
 
-
-static uint32_t carry_out = 0;
 
 static
 INLINE
@@ -1308,6 +1429,8 @@ ARM_SWAP(uint32_t cmd_)
       tmp = mreadb(addr);
       //	if(MAS_Access_Exept)return true;
       mwriteb(addr,CPU.USER[cmd_ & 0xF]);
+      if(g_SOFT_RESET_PENDING)
+        return;
       CPU.USER[15] -= 8;
       //	if(MAS_Access_Exept)return true;
       CPU.USER[(cmd_ >> 12) & 0xF] = tmp;
@@ -1317,6 +1440,8 @@ ARM_SWAP(uint32_t cmd_)
       tmp = mreadw(addr);
       //if(MAS_Access_Exept)return true;
       mwritew(addr,CPU.USER[cmd_ & 0xF]);
+      if(g_SOFT_RESET_PENDING)
+        return;
       CPU.USER[15] -= 8;
       //if(MAS_Access_Exept)return true;
       if(addr & 3)
@@ -1615,20 +1740,24 @@ opera_arm_execute(void)
                     }
                   else //words/halfwords
                     {
-                      uint32_t rora;
-
                       rora = tbas & 3;
                       val = mreadw(tbas);
 
-                      if(rora)
+                      if(rora && !CPU.MAS_Access_Exept)
                         val = ROTR(val,rora*8);
+                    }
+
+                  CPU.USER[15] = pc_tmp;
+                  if(CPU.MAS_Access_Exept)
+                    {
+                      arm_data_abort();
+                      break;
                     }
 
                   if(((cmd >> 12) & 0xF) == 0xF)
                     CYCLES -= (SCYCLE + NCYCLE);   // +1S+1N ifR15 load
 
                   CYCLES -= (NCYCLE + ICYCLE);  // +1N+1I
-                  CPU.USER[15] = pc_tmp;
 
                   if((cmd & (1 << 21)) || (!(cmd & (1 << 24))))
                     CPU.USER[(cmd >> 16) & 0xF] = base;
@@ -1653,11 +1782,19 @@ opera_arm_execute(void)
                   else //words/halfwords
                     mwritew(tbas,val);
 
+                  if(g_SOFT_RESET_PENDING)
+                    break;
+
+                  if(CPU.MAS_Access_Exept)
+                    {
+                      arm_data_abort();
+                      break;
+                    }
+
                   if((cmd & (1 << 21)) || !(cmd & (1 << 24)))
                     CPU.USER[(cmd >> 16) & 0xF] = base;
                 }
 
-              //if(MAS_Access_Exept)
               break;
             }
           else
@@ -1668,21 +1805,11 @@ opera_arm_execute(void)
         case 0x8:               //Block Data Transfer
         case 0x9:
           bdt_core(cmd);
-          /*if(MAS_Access_Exept)
+          if(CPU.MAS_Access_Exept)
             {
-            //sprintf(str,"*PC: 0x%8.8X DataAbort!!!\n",CPU.USER[15]);
-            //CDebug::DPrint(str);
-            //!!Exeption!!
-
-            CPU.SPSR[arm_mode_table[0x17]]=CPU.CPSR;
-            SETI(1);
-            SETM(0x17);
-            CPU.USER[14] = (CPU.USER[15] + 4);
-            CPU.USER[15] = 0x00000010;
-            CYCLES-=SCYCLE+NCYCLE;
-            MAS_Access_Exept=false;
-            break;
-            } */
+              arm_data_abort();
+              break;
+            }
           break;
 
         case 0xa:               //BRANCH
@@ -1707,6 +1834,12 @@ opera_arm_execute(void)
           CYCLES -= (SCYCLE + NCYCLE);
           break;
         }
+    }
+
+  if(g_SOFT_RESET_PENDING)
+    {
+      g_SOFT_RESET_PENDING = 0;
+      return -CYCLES;
     }
 
   if(!ISF && opera_clio_fiq_needed()/*CPU.nFIQ*/)
@@ -1748,8 +1881,17 @@ mwritew(uint32_t const addr_,
    index = (addr ^ 0x03400000);
    if(!(index & ~0xFFFF))
    {
+      if(clio_xbus_access_aborts(index))
+        {
+          CPU.MAS_Access_Exept = true;
+          return;
+        }
+
       if(opera_clio_poke(index,val_))
-         CPU.USER[15] += 4;  /* ??? */
+        {
+          opera_3do_soft_reset();
+          g_SOFT_RESET_PENDING = 1;
+        }
       return;
    }
 
@@ -1786,7 +1928,15 @@ mreadw(uint32_t const addr_)
 
   index = (addr ^ 0x03400000);
   if(!(index & ~0xFFFFF))
-    return opera_clio_peek(index);
+    {
+      if(clio_xbus_access_aborts(index))
+        {
+          CPU.MAS_Access_Exept = true;
+          return 0;
+        }
+
+      return opera_clio_peek(index);
+    }
 
   index = (addr ^ 0x03200000);
   if(!(index & ~0xFFFFF))
