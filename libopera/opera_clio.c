@@ -26,7 +26,7 @@
   *  Allen Wright
   *  John Sammons
   *  Felix Lazarev
-*/
+  */
 
 #include "opera_arm.h"
 #include "opera_clio.h"
@@ -42,22 +42,147 @@
 
 #include <string.h>
 
-#define DECREMENT    0x1
-#define RELOAD       0x2
-#define CASCADE      0x4
-#define FLABLODE     0x8
-#define RELOAD_VAL   0x10
+#define CLIO_REGISTER_COUNT      65536
+#define CLIO_INPUT_FIFO_COUNT    13
+#define CLIO_OUTPUT_FIFO_COUNT   4
+#define CLIO_FIFO_REG_STRIDE     0x10
+#define CLIO_FIFO_ADDR_MASK      0x0F
+#define CLIO_FIFO_CHANNEL_MASK   0x0F
+#define CLIO_FIFO_CHANNEL_SHIFT  4
+#define CLIO_FIFO_INPUT_MASK     0x500
+#define CLIO_FIFO_INPUT_VALUE    0x400
+#define CLIO_FIFO_LENGTH_BIAS    4
 
-#define VINT_MASK    0x7FF
-#define HCNT_MASK    0x7FF
-#define VCNT_MASK    0x7FF
-#define VCNT_FIELD   0x800
+#define CLIO_REG_CLIOREV          0x0000
+#define CLIO_REG_VINT0            0x0008
+#define CLIO_REG_VINT1            0x000C
+#define CLIO_REG_CSTATBITS        0x0028
+#define CLIO_REG_WDOG             0x002C
+#define CLIO_REG_HCNT             0x0030
+#define CLIO_REG_VCNT             0x0034
+#define CLIO_REG_RAND             0x003C
+#define CLIO_REG_SETINT0BITS      0x0040
+#define CLIO_REG_CLRINT0BITS      0x0044
+#define CLIO_REG_SETINT0ENBITS    0x0048
+#define CLIO_REG_CLRINT0ENBITS    0x004C
+#define CLIO_REG_SETMODE          0x0050
+#define CLIO_REG_CLRMODE          0x0054
+#define CLIO_REG_SETINT1BITS      0x0060
+#define CLIO_REG_CLRINT1BITS      0x0064
+#define CLIO_REG_SETINT1ENBITS    0x0068
+#define CLIO_REG_CLRINT1ENBITS    0x006C
+#define CLIO_REG_ADBIO            0x0084
 
-#define CSTAT_SOFT_RESET  0x10
-#define CSTAT_CLEAR_DIPIR 0x20
-#define CSTAT_DIPIR_RESET 0x40
+#define CLIO_REG_TIMER0           0x0100
+#define CLIO_REG_TIMER15_BACK     0x017C
+#define CLIO_TIMER_REG_STRIDE     0x04
+#define CLIO_TIMER_PAIR_STRIDE    0x08
+#define CLIO_REG_SETTM0           0x0200
+#define CLIO_REG_CLRTM0           0x0204
+#define CLIO_REG_SETTM1           0x0208
+#define CLIO_REG_CLRTM1           0x020C
+#define CLIO_REG_SLACK            0x0220
+#define CLIO_REG_FIFOINIT         0x0300
+#define CLIO_REG_DMAREQEN         0x0304
+#define CLIO_REG_DMAREQDIS        0x0308
+#define CLIO_REG_SETEXPCTL        0x0400
+#define CLIO_REG_CLREXPCTL        0x0404
+#define CLIO_REG_DIPIR2           0x0414
+#define CLIO_REG_EXP_SEL_FIRST    0x0500
+#define CLIO_REG_EXP_SEL_END      0x0540
+#define CLIO_REG_EXP_POLL_FIRST   0x0540
+#define CLIO_REG_EXP_POLL_END     0x0580
+#define CLIO_REG_EXP_CMD_FIRST    0x0580
+#define CLIO_REG_EXP_CMD_END      0x05C0
+#define CLIO_REG_EXP_DATA_FIRST   0x05C0
+#define CLIO_REG_EXP_DATA_END     0x0600
 
-#define WDOG_RESTART      0x0B
+#define CLIO_REG_SEMAPHORE        0x17D0
+#define CLIO_REG_DSPPRST1         0x17E8
+#define CLIO_REG_NOISE            0x17F0
+#define CLIO_REG_DSPPGW           0x17FC
+#define CLIO_REG_DSPPN32_FIRST    0x1800
+#define CLIO_REG_DSPPN32_LAST     0x1FFF
+#define CLIO_REG_DSPPN16_FIRST    0x2000
+#define CLIO_REG_DSPPN16_LAST     0x2FFF
+#define CLIO_REG_DSPPEI32_FIRST   0x3000
+#define CLIO_REG_DSPPEI32_LAST    0x33FF
+#define CLIO_REG_DSPPEI16_FIRST   0x3400
+#define CLIO_REG_DSPPEI16_LAST    0x37FF
+#define CLIO_REG_DSPPEO32_FIRST   0x3800
+#define CLIO_REG_DSPPEO32_LAST    0x3BFF
+#define CLIO_REG_DSPPEO16_FIRST   0x3C00
+#define CLIO_REG_DSPPEO16_LAST    0x3FFF
+
+#define CLIO_GREEN       0x02020000
+#define CLIO_SoftReset   0x10
+#define CLIO_ClearDIPIR  0x20
+#define CLIO_DIPIRReset  0x40
+
+#define VCNT_MASK          0x000007FF
+#define VCNT_FIELD         0x00000800
+#define VCNT_FIELD_SHIFT   11
+
+#define INT0_TIMINT1       0x00000400
+#define INT0_DDRINT0       0x00001000
+#define INT0_DRDINT0       0x00010000
+#define INT0_DEXINT        0x20000000
+#define INT0_SCNDPINT      0x80000000
+
+#define I_DMAtoDSPP_MASK   0x00001FFF
+#define I_DSPPtoDMA_MASK   0x000F0000
+#define I_DSPPtoDMA_SHIFT  16
+
+#define EN_DMAtofrEXP      0x00100000
+
+#define XB_CPUHASXBUS      (1 << 7)
+#define XB_DMAISOUT        (1 << 9)
+#define XB_DMAON           (1 << 11)
+#define XB_DipirNOSR       0x4000
+
+#define ADBIO_COUNT         4
+#define ADBIO_ENABLE_SHIFT  4
+
+#define TIMER_DECREMENT  0x1
+#define TIMER_RELOAD     0x2
+#define TIMER_CASCADE    0x4
+
+#define VINT_MASK    VCNT_MASK
+#define HCNT_MASK    VCNT_MASK
+
+#define WDOG_RESTART       0x0B
+#define WDOG_RESTART_MASK  0x0F
+
+#define CLIO_FIQ_REG_ALIAS_MASK  0x2C
+#define CLIO_SETMODE_MASK        0x3FFF0000
+#define CLIO_WORD_MASK           0xFFFF
+#define CLIO_WORD_SHIFT          16
+#define CLIO_TIMER_MASK          0x0F
+#define CLIO_TIMER_CONTROL_MASK  0x07
+#define CLIO_TIMER_CONTROL_SHIFT 2
+#define CLIO_TIMER_SET_COUNT     8
+#define CLIO_TIMER_SLACK_MASK    0x3FF
+#define CLIO_DEFAULT_TIMER_SLACK 64
+#define CLIO_DMA_TIMER_VAL_LIMIT 5800
+#define CLIO_DMA_TIMER_VAL_STEP  0x33
+#define CLIO_DMA_TIMER_FREQ_DIV  2000000
+
+#define CLIO_DSPPN32_MIRROR_MASK  0x400
+#define CLIO_DSPPN16_MIRROR_MASK  0x800
+#define CLIO_DSPP_IMEM_MASK       0xFF
+#define CLIO_DSPP_IMEM_READ_BASE  0x300
+
+#define FIFO_Count1  0x00000002
+#define FIFO_Count0  0x00000001
+
+#define MADAM_REG_DMATOFR_EXP0_CURADR  0x540
+#define MADAM_REG_DMATOFR_EXP0_CURLEN  0x544
+#define MADAM_DMA_IDLE_LEN             0xFFFFFFFC
+
+#define MADAM_DMA_CURADR_OFFSET  0x00
+#define MADAM_DMA_CURLEN_OFFSET  0x04
+#define MADAM_DMA_RLDADR_OFFSET  0x08
+#define MADAM_DMA_RLDLEN_OFFSET  0x0C
 
 struct fifo_s
 {
@@ -78,18 +203,18 @@ typedef struct clio_fifo_s clio_fifo_t;
 
 struct clio_s
 {
-  uint32_t    regs[65536];
+  uint32_t    regs[CLIO_REGISTER_COUNT];
   int32_t     dsp_word1;
   int32_t     dsp_word2;
   int32_t     dsp_address;
-  clio_fifo_t fifo_i[13];
-  clio_fifo_t fifo_o[4];
+  clio_fifo_t fifo_i[CLIO_INPUT_FIFO_COUNT];
+  clio_fifo_t fifo_o[CLIO_OUTPUT_FIFO_COUNT];
 };
 
 typedef struct clio_s clio_t;
 
 int flagtime;
-int TIMER_VAL = 0; //0x415
+int TIMER_VAL = 0;
 
 static uint32_t *MADAM_REGS;
 static clio_t    CLIO = {0};
@@ -99,14 +224,16 @@ static
 bool
 clio_timer_reg_addr(uint32_t addr_)
 {
-  return ((addr_ >= 0x100) && (addr_ <= 0x17C) && !(addr_ & 3));
+  return ((addr_ >= CLIO_REG_TIMER0) &&
+          (addr_ <= CLIO_REG_TIMER15_BACK) &&
+          !(addr_ & (CLIO_TIMER_REG_STRIDE - 1)));
 }
 
 static
 uint32_t
 timer_control_shift(const uint32_t timer_)
 {
-  return ((timer_ & 7) << 2);
+  return ((timer_ & CLIO_TIMER_CONTROL_MASK) << CLIO_TIMER_CONTROL_SHIFT);
 }
 
 static
@@ -115,15 +242,17 @@ clio_timer_regs_mask(void)
 {
   uint32_t addr;
 
-  for(addr = 0x100; addr <= 0x17C; addr += 4)
-    CLIO.regs[addr] &= 0xFFFF;
+  for(addr = CLIO_REG_TIMER0; addr <= CLIO_REG_TIMER15_BACK;
+      addr += CLIO_TIMER_REG_STRIDE)
+    CLIO.regs[addr] &= CLIO_WORD_MASK;
 }
 
 static
 void
 opera_clio_set_rom()
 {
-  opera_mem_rom_select((CLIO.regs[0x84] & ADBIO_OTHERROM) ? ROM2 : ROM1);
+  opera_mem_rom_select((CLIO.regs[CLIO_REG_ADBIO] & ADBIO_OTHERROM) ?
+                       ROM2 : ROM1);
 }
 
 uint32_t
@@ -151,16 +280,16 @@ clio_state_write_payload(opera_state_writer_t *writer_,
 {
   uint32_t i;
 
-  if(!opera_state_write_u32_array(writer_,state_->regs,65536) ||
+  if(!opera_state_write_u32_array(writer_,state_->regs,CLIO_REGISTER_COUNT) ||
      !opera_state_write_i32(writer_,state_->dsp_word1) ||
      !opera_state_write_i32(writer_,state_->dsp_word2) ||
      !opera_state_write_i32(writer_,state_->dsp_address))
     return false;
 
-  for(i = 0; i < 13; i++)
+  for(i = 0; i < CLIO_INPUT_FIFO_COUNT; i++)
     if(!clio_state_write_fifo(writer_,&state_->fifo_i[i]))
       return false;
-  for(i = 0; i < 4; i++)
+  for(i = 0; i < CLIO_OUTPUT_FIFO_COUNT; i++)
     if(!clio_state_write_fifo(writer_,&state_->fifo_o[i]))
       return false;
 
@@ -241,16 +370,16 @@ clio_state_read_payload(opera_state_reader_t *reader_,
 {
   uint32_t i;
 
-  if(!opera_state_read_u32_array(reader_,state_->regs,65536) ||
+  if(!opera_state_read_u32_array(reader_,state_->regs,CLIO_REGISTER_COUNT) ||
      !opera_state_read_i32(reader_,&state_->dsp_word1) ||
      !opera_state_read_i32(reader_,&state_->dsp_word2) ||
      !opera_state_read_i32(reader_,&state_->dsp_address))
     return false;
 
-  for(i = 0; i < 13; i++)
+  for(i = 0; i < CLIO_INPUT_FIFO_COUNT; i++)
     if(!clio_state_read_fifo(reader_,&state_->fifo_i[i]))
       return false;
-  for(i = 0; i < 4; i++)
+  for(i = 0; i < CLIO_OUTPUT_FIFO_COUNT; i++)
     if(!clio_state_read_fifo(reader_,&state_->fifo_o[i]))
       return false;
 
@@ -292,10 +421,10 @@ opera_clio_state_load(const void     *buf_,
   return opera_state_reader_used(&reader);
 }
 
-#define CURADR MADAM_REGS[base+0x00]
-#define CURLEN MADAM_REGS[base+0x04]
-#define RLDADR MADAM_REGS[base+0x08]
-#define RLDLEN MADAM_REGS[base+0x0C]
+#define CURADR MADAM_REGS[base + MADAM_DMA_CURADR_OFFSET]
+#define CURLEN MADAM_REGS[base + MADAM_DMA_CURLEN_OFFSET]
+#define RLDADR MADAM_REGS[base + MADAM_DMA_RLDADR_OFFSET]
+#define RLDLEN MADAM_REGS[base + MADAM_DMA_RLDLEN_OFFSET]
 
 void
 opera_clio_timer_set(uint32_t v200_,
@@ -316,73 +445,66 @@ opera_clio_timer_clear(uint32_t v204_,
 uint32_t
 opera_clio_line_vint0(void)
 {
-  return (CLIO.regs[8] & VINT_MASK);
+  return (CLIO.regs[CLIO_REG_VINT0] & VINT_MASK);
 }
 
 uint32_t
 opera_clio_line_vint1(void)
 {
-  return (CLIO.regs[12] & VINT_MASK);
+  return (CLIO.regs[CLIO_REG_VINT1] & VINT_MASK);
 }
 
 int
 opera_clio_fiq_needed(void)
 {
-  return ((CLIO.regs[0x40] & CLIO.regs[0x48]) ||
-          (CLIO.regs[0x60] & CLIO.regs[0x68]));
+  return ((CLIO.regs[CLIO_REG_SETINT0BITS] &
+           CLIO.regs[CLIO_REG_SETINT0ENBITS]) ||
+          (CLIO.regs[CLIO_REG_SETINT1BITS] &
+           CLIO.regs[CLIO_REG_SETINT1ENBITS]));
 }
 
 void
 opera_clio_fiq_generate(uint32_t reason1_,
                         uint32_t reason2_)
 {
-  CLIO.regs[0x40] |= reason1_;
-  CLIO.regs[0x60] |= reason2_;
+  CLIO.regs[CLIO_REG_SETINT0BITS] |= reason1_;
+  CLIO.regs[CLIO_REG_SETINT1BITS] |= reason2_;
   /* irq31 if exist irq32 and high */
-  if(CLIO.regs[0x60])
-    CLIO.regs[0x40] |= 0x80000000;
+  if(CLIO.regs[CLIO_REG_SETINT1BITS])
+    CLIO.regs[CLIO_REG_SETINT0BITS] |= INT0_SCNDPINT;
 }
 
 /*
   Documentation:
   * https://github.com/trapexit/portfolio_os/blob/master/src/kernel/includes/clio.h
 
-  | Register | Description
-  |----------|------------
-  | 0x0300   | FIFO init group masks
-  |          | DMA->DSPP   = 0x00001FFF [0:12]
-  |          | AudIn->DSPP = 0x00006000 [L:R]
-  |          | DSPP->DMA   = 0x000F0000 [0:3]
-  | 0x0304   | enable DMA
-  |          | DMA to DSPP      = 0x00001FFF
-  |          | DMA to UNCLE     = 0x00002000
-  |          | DMA to EXTERNAL  = 0x00004000
-  |          | DMA to DSPP PROG = 0x00008000
-  |          | DSPP to DMA MAKS = 0x000F0000
-  |          | DMA to/from XBUS = 0x00100000
-  |          | UNCLE to DMA     = 0x20000000
-  |          | EXTERNAL to DMA  = 0x40000000
-  | 0x0308   | disable / clear DMA
-  |          | bits same as above
- */
+  | Register           | Description
+  |--------------------|------------
+  | CLIO_REG_FIFOINIT  | FIFO init group masks
+  |                    | I_DMAtoDSPP_MASK, I_DSPPtoDMA_MASK
+  | CLIO_REG_DMAREQEN  | enable DMA
+  |                    | EN_DMAtofrEXP and related DMA enable bits
+  | CLIO_REG_DMAREQDIS | disable / clear DMA
+  |                    | bits same as above
+*/
 static
 void
 clio_handle_dma(uint32_t val_)
 {
-  CLIO.regs[0x304] |= val_;
+  CLIO.regs[CLIO_REG_DMAREQEN] |= val_;
 
-  if(val_ & 0x00100000)
+  if(val_ & EN_DMAtofrEXP)
     {
       int len;
       unsigned trg;
       uint8_t b0,b1,b2,b3;
 
-      trg = opera_madam_peek(0x540);
-      len = opera_madam_peek(0x544);
-      CLIO.regs[0x304] &= ~0x00100000;
-      CLIO.regs[0x400] &= ~0x80;
+      trg = opera_madam_peek(MADAM_REG_DMATOFR_EXP0_CURADR);
+      len = opera_madam_peek(MADAM_REG_DMATOFR_EXP0_CURLEN);
+      CLIO.regs[CLIO_REG_DMAREQEN] &= ~EN_DMAtofrEXP;
+      CLIO.regs[CLIO_REG_SETEXPCTL] &= ~XB_CPUHASXBUS;
 
-      if(CLIO.regs[0x404] & 0x200)
+      if(CLIO.regs[CLIO_REG_CLREXPCTL] & XB_DMAISOUT)
         {
           while(len >= 0)
             {
@@ -400,7 +522,7 @@ clio_handle_dma(uint32_t val_)
               len -= 4;
             }
 
-          CLIO.regs[0x400] |= 0x80;
+          CLIO.regs[CLIO_REG_SETEXPCTL] |= XB_CPUHASXBUS;
         }
       else
         {
@@ -420,11 +542,11 @@ clio_handle_dma(uint32_t val_)
               len -= 4;
             }
 
-          CLIO.regs[0x400] |= 0x80;
+          CLIO.regs[CLIO_REG_SETEXPCTL] |= XB_CPUHASXBUS;
         }
 
-      opera_madam_poke(0x544,0xFFFFFFFC);
-      opera_clio_fiq_generate(1<<29,0);
+      opera_madam_poke(MADAM_REG_DMATOFR_EXP0_CURLEN,MADAM_DMA_IDLE_LEN);
+      opera_clio_fiq_generate(INT0_DEXINT,0);
     }
 }
 
@@ -440,7 +562,7 @@ adbio_set(uint32_t *output_,
 
   if((val_ & mask) == 0)
     *output_ &= ~mask;
-  else if(val_ & (mask | (mask << 4)))
+  else if(val_ & (mask | (mask << ADBIO_ENABLE_SHIFT)))
     *output_ |= mask;
 }
 
@@ -454,306 +576,308 @@ opera_clio_poke(uint32_t addr_,
   if(!flagtime)
     TIMER_VAL = 0;
 
-  /* 0x40..0x4C, 0x60..0x6C case */
-  if((addr_ & ~0x2C) == 0x40)
+  /* ClioInt0/ClioInt1 register aliases. */
+  if((addr_ & ~CLIO_FIQ_REG_ALIAS_MASK) == CLIO_REG_SETINT0BITS)
     {
-      if(addr_ == 0x40)
+      if(addr_ == CLIO_REG_SETINT0BITS)
         {
-          CLIO.regs[0x40] |= val_;
-          if(CLIO.regs[0x60])
-            CLIO.regs[0x40] |= 0x80000000;
+          CLIO.regs[CLIO_REG_SETINT0BITS] |= val_;
+          if(CLIO.regs[CLIO_REG_SETINT1BITS])
+            CLIO.regs[CLIO_REG_SETINT0BITS] |= INT0_SCNDPINT;
           /*
-            if(CLIO.regs[0x40]&CLIO.regs[0x48])
+            if(CLIO.regs[CLIO_REG_SETINT0BITS]&CLIO.regs[CLIO_REG_SETINT0ENBITS])
             _arm_SetFIQ();
           */
           return 0;
         }
-      else if(addr_ == 0x44)
+      else if(addr_ == CLIO_REG_CLRINT0BITS)
         {
-          CLIO.regs[0x40] &= ~val_;
-          if(!CLIO.regs[0x60])
-            CLIO.regs[0x40] &= ~0x80000000;
+          CLIO.regs[CLIO_REG_SETINT0BITS] &= ~val_;
+          if(!CLIO.regs[CLIO_REG_SETINT1BITS])
+            CLIO.regs[CLIO_REG_SETINT0BITS] &= ~INT0_SCNDPINT;
           return 0;
         }
-      else if(addr_ == 0x48)
+      else if(addr_ == CLIO_REG_SETINT0ENBITS)
         {
-          CLIO.regs[0x48] |= val_;
+          CLIO.regs[CLIO_REG_SETINT0ENBITS] |= val_;
           /*
-            if(CLIO.regs[0x40] & CLIO.regs[0x48])
+            if(CLIO.regs[CLIO_REG_SETINT0BITS] & CLIO.regs[CLIO_REG_SETINT0ENBITS])
             _arm_SetFIQ();
           */
           return 0;
         }
-      else if(addr_ == 0x4C)
+      else if(addr_ == CLIO_REG_CLRINT0ENBITS)
         {
           /* always one for irq31 */
-          CLIO.regs[0x48] &= ~val_;
-          CLIO.regs[0x48] |= 0x80000000;
+          CLIO.regs[CLIO_REG_SETINT0ENBITS] &= ~val_;
+          CLIO.regs[CLIO_REG_SETINT0ENBITS] |= INT0_SCNDPINT;
           return 0;
         }
 #if 0
-      else if(addr_ == 0x50)
+      else if(addr_ == CLIO_REG_SETMODE)
         {
-          CLIO.regs[0x50] |= (val_ & 0x3FFF0000);
+          CLIO.regs[CLIO_REG_SETMODE] |= (val_ & CLIO_SETMODE_MASK);
           return 0;
         }
-      else if(addr_ == 0x54)
+      else if(addr_ == CLIO_REG_CLRMODE)
         {
-          CLIO.regs[0x50] &= ~val;
+          CLIO.regs[CLIO_REG_SETMODE] &= ~val;
           return 0;
         }
 #endif
-      else if(addr_ == 0x60)
+      else if(addr_ == CLIO_REG_SETINT1BITS)
         {
-          CLIO.regs[0x60] |= val_;
-          if(CLIO.regs[0x60])
-            CLIO.regs[0x40] |= 0x80000000;
+          CLIO.regs[CLIO_REG_SETINT1BITS] |= val_;
+          if(CLIO.regs[CLIO_REG_SETINT1BITS])
+            CLIO.regs[CLIO_REG_SETINT0BITS] |= INT0_SCNDPINT;
           /*
-            if(CLIO.regs[0x60] & CLIO.regs[0x68])
+            if(CLIO.regs[CLIO_REG_SETINT1BITS] & CLIO.regs[CLIO_REG_SETINT1ENBITS])
             _arm_SetFIQ();
           */
           return 0;
         }
-      else if(addr_ == 0x64)
+      else if(addr_ == CLIO_REG_CLRINT1BITS)
         {
-          CLIO.regs[0x60] &= ~val_;
-          if(!CLIO.regs[0x60])
-            CLIO.regs[0x40] &= ~0x80000000;
+          CLIO.regs[CLIO_REG_SETINT1BITS] &= ~val_;
+          if(!CLIO.regs[CLIO_REG_SETINT1BITS])
+            CLIO.regs[CLIO_REG_SETINT0BITS] &= ~INT0_SCNDPINT;
           return 0;
         }
-      else if(addr_ == 0x68)
+      else if(addr_ == CLIO_REG_SETINT1ENBITS)
         {
-          CLIO.regs[0x68] |= val_;
+          CLIO.regs[CLIO_REG_SETINT1ENBITS] |= val_;
           /*
-            if(CLIO.regs[0x60] & CLIO.regs[0x68])
+            if(CLIO.regs[CLIO_REG_SETINT1BITS] & CLIO.regs[CLIO_REG_SETINT1ENBITS])
             _arm_SetFIQ();
           */
           return 0;
         }
-      else if(addr_ == 0x6C)
+      else if(addr_ == CLIO_REG_CLRINT1ENBITS)
         {
-          CLIO.regs[0x68] &= ~val_;
+          CLIO.regs[CLIO_REG_SETINT1ENBITS] &= ~val_;
           return 0;
         }
     }
-  else if(addr_ == 0x84)
+  else if(addr_ == CLIO_REG_ADBIO)
     {
-      adbio_set(&CLIO.regs[0x84],val_,0);
-      adbio_set(&CLIO.regs[0x84],val_,1);
-      adbio_set(&CLIO.regs[0x84],val_,2);
-      adbio_set(&CLIO.regs[0x84],val_,3);
+      for(i = 0; i < ADBIO_COUNT; i++)
+        adbio_set(&CLIO.regs[CLIO_REG_ADBIO],val_,i);
 
       opera_clio_set_rom();
 
       return 0;
     }
-  else if(addr_ == 0x0300)
+  else if(addr_ == CLIO_REG_FIFOINIT)
     {
       /* clear down the fifos and stop them */
       base = 0;
-      CLIO.regs[0x304] &= ~val_;
+      CLIO.regs[CLIO_REG_DMAREQEN] &= ~val_;
 
-      for(i = 0; i < 13; i++)
+      for(i = 0; i < CLIO_INPUT_FIFO_COUNT; i++)
         {
           if(val_ & (1 << i))
             {
-              base = (0x400 + (i << 4));
+              base = (CLIO_REG_SETEXPCTL + (i * CLIO_FIFO_REG_STRIDE));
               RLDADR = CURADR = 0;
               RLDLEN = CURLEN = 0;
-              opera_clio_fifo_write(base + 0x00,0);
-              opera_clio_fifo_write(base + 0x04,0);
-              opera_clio_fifo_write(base + 0x08,0);
-              opera_clio_fifo_write(base + 0x0C,0);
+              opera_clio_fifo_write(base + MADAM_DMA_CURADR_OFFSET,0);
+              opera_clio_fifo_write(base + MADAM_DMA_CURLEN_OFFSET,0);
+              opera_clio_fifo_write(base + MADAM_DMA_RLDADR_OFFSET,0);
+              opera_clio_fifo_write(base + MADAM_DMA_RLDLEN_OFFSET,0);
               val_ &= ~(1 << i);
               CLIO.fifo_i[i].idx = 0;
             }
         }
 
-      for(i = 0; i < 4; i++)
+      for(i = 0; i < CLIO_OUTPUT_FIFO_COUNT; i++)
         {
-          if(val_ & (1 << (i + 16)))
+          if(val_ & (1 << (i + I_DSPPtoDMA_SHIFT)))
             {
-              base = (0x500 + (i << 4));
+              base = (CLIO_REG_EXP_SEL_FIRST + (i * CLIO_FIFO_REG_STRIDE));
               RLDADR = CURADR = 0;
               RLDLEN = CURLEN = 0;
-              opera_clio_fifo_write(base + 0x00,0);
-              opera_clio_fifo_write(base + 0x04,0);
-              opera_clio_fifo_write(base + 0x08,0);
-              opera_clio_fifo_write(base + 0x0C,0);
-              val_ &= ~(1 << (i + 16));
+              opera_clio_fifo_write(base + MADAM_DMA_CURADR_OFFSET,0);
+              opera_clio_fifo_write(base + MADAM_DMA_CURLEN_OFFSET,0);
+              opera_clio_fifo_write(base + MADAM_DMA_RLDADR_OFFSET,0);
+              opera_clio_fifo_write(base + MADAM_DMA_RLDLEN_OFFSET,0);
+              val_ &= ~(1 << (i + I_DSPPtoDMA_SHIFT));
               CLIO.fifo_o[i].idx = 0;
             }
         }
 
       return 0;
     }
-  else if(addr_ == 0x304) /* DMA enable */
+  else if(addr_ == CLIO_REG_DMAREQEN)
     {
       clio_handle_dma(val_);
 
       /* TODO: looks hacky, needs to be investigated */
       switch(val_)
         {
-        case 0x100000:
-          if(TIMER_VAL < 5800)
-            TIMER_VAL += 0x33;
-          flagtime = (opera_clock_cpu_get_freq() / 2000000);
+        case EN_DMAtofrEXP:
+          if(TIMER_VAL < CLIO_DMA_TIMER_VAL_LIMIT)
+            TIMER_VAL += CLIO_DMA_TIMER_VAL_STEP;
+          flagtime = (opera_clock_cpu_get_freq() / CLIO_DMA_TIMER_FREQ_DIV);
           break;
         default:
-          if(!CLIO.regs[0x304])
+          if(!CLIO.regs[CLIO_REG_DMAREQEN])
             TIMER_VAL = 0;
           break;
         }
       return 0;
     }
-  else if(addr_ == 0x308) /* DMA clear / disable */
+  else if(addr_ == CLIO_REG_DMAREQDIS)
     {
-      CLIO.regs[0x304] &= ~val_;
+      CLIO.regs[CLIO_REG_DMAREQEN] &= ~val_;
       return 0;
     }
-  else if(addr_ == 0x400) /* XBUS direction */
+  else if(addr_ == CLIO_REG_SETEXPCTL)
     {
-      if(val_ & 0x800)
+      if(val_ & XB_DMAON)
         return 0;
 
-      CLIO.regs[0x400] = val_;
+      CLIO.regs[CLIO_REG_SETEXPCTL] = val_;
       return 0;
     }
-  else if((addr_ >= 0x500) && (addr_ < 0x540))
+  else if((addr_ >= CLIO_REG_EXP_SEL_FIRST) && (addr_ < CLIO_REG_EXP_SEL_END))
     {
       opera_xbus_set_sel(val_);
       return 0;
     }
-  else if((addr_ >= 0x540) && (addr_ < 0x580))
+  else if((addr_ >= CLIO_REG_EXP_POLL_FIRST) && (addr_ < CLIO_REG_EXP_POLL_END))
     {
       opera_xbus_set_poll(val_);
       return 0;
     }
-  else if((addr_ >= 0x580) && (addr_ < 0x5C0))
+  else if((addr_ >= CLIO_REG_EXP_CMD_FIRST) && (addr_ < CLIO_REG_EXP_CMD_END))
     {
       /* on FIFO Filled execute the command */
       opera_xbus_fifo_set_cmd(val_);
       return 0;
     }
-  else if((addr_ >= 0x5c0) && (addr_ < 0x600))
+  else if((addr_ >= CLIO_REG_EXP_DATA_FIRST) && (addr_ < CLIO_REG_EXP_DATA_END))
     {
       /* on FIFO Filled execute the command */
       opera_xbus_fifo_set_data(val_);
       return 0;
     }
-  else if(addr_ == 0x28)
+  else if(addr_ == CLIO_REG_CSTATBITS)
     {
-      CLIO.regs[addr_] = (val_ & ~(CSTAT_SOFT_RESET | CSTAT_CLEAR_DIPIR));
-      if(val_ & CSTAT_CLEAR_DIPIR)
-        CLIO.regs[addr_] &= ~CSTAT_DIPIR_RESET;
-      return (val_ & CSTAT_SOFT_RESET);
+      CLIO.regs[addr_] = (val_ & ~(CLIO_SoftReset | CLIO_ClearDIPIR));
+      if(val_ & CLIO_ClearDIPIR)
+        CLIO.regs[addr_] &= ~CLIO_DIPIRReset;
+      return (val_ & CLIO_SoftReset);
     }
-  else if(addr_ == 0x2C)
+  else if(addr_ == CLIO_REG_WDOG)
     {
-      if((val_ & 0x0F) == WDOG_RESTART)
+      if((val_ & WDOG_RESTART_MASK) == WDOG_RESTART)
         CLIO.regs[addr_] = WDOG_RESTART;
       return 0;
     }
-  else if((addr_ == 0x08) || (addr_ == 0x0C))
+  else if((addr_ == CLIO_REG_VINT0) || (addr_ == CLIO_REG_VINT1))
     {
       CLIO.regs[addr_] = (val_ & VINT_MASK);
       return 0;
     }
-  else if(addr_ == 0x30)
+  else if(addr_ == CLIO_REG_HCNT)
     {
       CLIO.regs[addr_] = (val_ & HCNT_MASK);
       return 0;
     }
-  else if(addr_ == 0x34)
+  else if(addr_ == CLIO_REG_VCNT)
     {
       CLIO.regs[addr_] = (val_ & (VCNT_MASK | VCNT_FIELD));
       return 0;
     }
-  else if((addr_ >= 0x1800) && (addr_ <= 0x1FFF))
+  else if((addr_ >= CLIO_REG_DSPPN32_FIRST) &&
+          (addr_ <= CLIO_REG_DSPPN32_LAST))
     {
-      addr_ &= ~0x400; /* mirrors */
-      CLIO.dsp_word1   = (val_ >> 16);
-      CLIO.dsp_word2   = (val_ & 0xFFFF);
-      CLIO.dsp_address = ((addr_ - 0x1800) >> 1);
+      addr_ &= ~CLIO_DSPPN32_MIRROR_MASK;
+      CLIO.dsp_word1   = (val_ >> CLIO_WORD_SHIFT);
+      CLIO.dsp_word2   = (val_ & CLIO_WORD_MASK);
+      CLIO.dsp_address = ((addr_ - CLIO_REG_DSPPN32_FIRST) >> 1);
       opera_dsp_mem_write(CLIO.dsp_address+0,CLIO.dsp_word1);
       opera_dsp_mem_write(CLIO.dsp_address+1,CLIO.dsp_word2);
       return 0;
       /* DSPNRAMWrite 2 DSPW per 1ARMW */
     }
-  else if((addr_ >= 0x2000) && (addr_ <= 0x2FFF))
+  else if((addr_ >= CLIO_REG_DSPPN16_FIRST) &&
+          (addr_ <= CLIO_REG_DSPPN16_LAST))
     {
-      addr_ &= ~0x800; /* mirrors */
-      CLIO.dsp_word1   = (val_ & 0xFFFF);
-      CLIO.dsp_address = ((addr_ - 0x2000) >> 2);
+      addr_ &= ~CLIO_DSPPN16_MIRROR_MASK;
+      CLIO.dsp_word1   = (val_ & CLIO_WORD_MASK);
+      CLIO.dsp_address = ((addr_ - CLIO_REG_DSPPN16_FIRST) >> 2);
       opera_dsp_mem_write(CLIO.dsp_address,CLIO.dsp_word1);
       return 0;
     }
-  else if((addr_ >= 0x3000) && (addr_ <= 0x33FF))
+  else if((addr_ >= CLIO_REG_DSPPEI32_FIRST) &&
+          (addr_ <= CLIO_REG_DSPPEI32_LAST))
     {
-      CLIO.dsp_address  = ((addr_ - 0x3000) >> 1);
-      CLIO.dsp_address &= 0xFF;
-      CLIO.dsp_word1    = (val_ >> 16);
-      CLIO.dsp_word2    = (val_ & 0xFFFF);
+      CLIO.dsp_address  = ((addr_ - CLIO_REG_DSPPEI32_FIRST) >> 1);
+      CLIO.dsp_address &= CLIO_DSPP_IMEM_MASK;
+      CLIO.dsp_word1    = (val_ >> CLIO_WORD_SHIFT);
+      CLIO.dsp_word2    = (val_ & CLIO_WORD_MASK);
       opera_dsp_imem_write(CLIO.dsp_address+0,CLIO.dsp_word1);
       opera_dsp_imem_write(CLIO.dsp_address+1,CLIO.dsp_word2);
       return 0;
     }
-  else if((addr_ >= 0x3400) && (addr_ <= 0x37FF))
+  else if((addr_ >= CLIO_REG_DSPPEI16_FIRST) &&
+          (addr_ <= CLIO_REG_DSPPEI16_LAST))
     {
-      CLIO.dsp_address  = ((addr_ - 0x3400) >> 2);
-      CLIO.dsp_address &= 0xFF;
-      CLIO.dsp_word1    = (val_ & 0xFFFF);
+      CLIO.dsp_address  = ((addr_ - CLIO_REG_DSPPEI16_FIRST) >> 2);
+      CLIO.dsp_address &= CLIO_DSPP_IMEM_MASK;
+      CLIO.dsp_word1    = (val_ & CLIO_WORD_MASK);
       opera_dsp_imem_write(CLIO.dsp_address,CLIO.dsp_word1);
       return 0;
     }
-  else if(addr_ == 0x17E8) /* Reset */
+  else if(addr_ == CLIO_REG_DSPPRST1)
     {
       opera_dsp_reset();
       return 0;
     }
-  else if(addr_ == 0x17D0) /* Write DSP/ARM Semaphore */
+  else if(addr_ == CLIO_REG_SEMAPHORE)
     {
       opera_dsp_arm_semaphore_write(val_);
       return 0;
     }
-  else if(addr_ == 0x17FC) /* start / stop */
+  else if(addr_ == CLIO_REG_DSPPGW)
     {
       opera_dsp_set_running(val_ > 0);
       return 0;
     }
-  else if(addr_ == 0x200)
+  else if(addr_ == CLIO_REG_SETTM0)
     {
-      CLIO.regs[0x200] |= val_;
+      CLIO.regs[CLIO_REG_SETTM0] |= val_;
       opera_clio_timer_set(val_,0);
       return 0;
     }
-  else if(addr_ == 0x204)
+  else if(addr_ == CLIO_REG_CLRTM0)
     {
-      CLIO.regs[0x200] &= ~val_;
+      CLIO.regs[CLIO_REG_SETTM0] &= ~val_;
       opera_clio_timer_clear(val_,0);
       return 0;
     }
-  else if(addr_ == 0x208)
+  else if(addr_ == CLIO_REG_SETTM1)
     {
-      CLIO.regs[0x208] |= val_;
+      CLIO.regs[CLIO_REG_SETTM1] |= val_;
       opera_clio_timer_set(0,val_);
       return 0;
     }
-  else if(addr_ == 0x20C)
+  else if(addr_ == CLIO_REG_CLRTM1)
     {
-      CLIO.regs[0x208] &= ~val_;
+      CLIO.regs[CLIO_REG_SETTM1] &= ~val_;
       opera_clio_timer_clear(0,val_);
       return 0;
     }
-  else if(addr_ == 0x220)
+  else if(addr_ == CLIO_REG_SLACK)
     {
-      CLIO.regs[addr_] = (val_ & 0x3FF);
+      CLIO.regs[addr_] = (val_ & CLIO_TIMER_SLACK_MASK);
       opera_clock_timer_set_delay(CLIO.regs[addr_]);
       return 0;
     }
   else if(clio_timer_reg_addr(addr_))
     {
-      CLIO.regs[addr_] = (val_ & 0xFFFF);
+      CLIO.regs[addr_] = (val_ & CLIO_WORD_MASK);
       return 0;
     }
 
@@ -765,72 +889,74 @@ opera_clio_poke(uint32_t addr_,
 uint32_t
 opera_clio_peek(uint32_t addr_)
 {
-  /* 0x40..0x4C, 0x60..0x6C case */
-  if((addr_ & ~0x2C) == 0x40)
+  /* ClioInt0/ClioInt1 register aliases. */
+  if((addr_ & ~CLIO_FIQ_REG_ALIAS_MASK) == CLIO_REG_SETINT0BITS)
     {
       /* By read 40 and 44, 48 and 4c, 60 and 64, 68 and 6c same */
-      addr_ &= ~4;
-      if(addr_ == 0x40)
-        return CLIO.regs[0x40];
-      else if(addr_ == 0x48)
-        return (CLIO.regs[0x48] | 0x80000000);
-      else if(addr_ == 0x60)
-        return CLIO.regs[0x60];
-      else if(addr_ == 0x68)
-        return CLIO.regs[0x68];
+      addr_ &= ~CLIO_TIMER_REG_STRIDE;
+      if(addr_ == CLIO_REG_SETINT0BITS)
+        return CLIO.regs[CLIO_REG_SETINT0BITS];
+      else if(addr_ == CLIO_REG_SETINT0ENBITS)
+        return (CLIO.regs[CLIO_REG_SETINT0ENBITS] | INT0_SCNDPINT);
+      else if(addr_ == CLIO_REG_SETINT1BITS)
+        return CLIO.regs[CLIO_REG_SETINT1BITS];
+      else if(addr_ == CLIO_REG_SETINT1ENBITS)
+        return CLIO.regs[CLIO_REG_SETINT1ENBITS];
       return 0;
     }
-  else if(addr_ == 0x3C) // RandSample
+  else if(addr_ == CLIO_REG_RAND)
     return prng32();
-  else if(addr_ == 0x2C)
+  else if(addr_ == CLIO_REG_WDOG)
     return 0;
-  else if(addr_ == 0x204)
-    return CLIO.regs[0x200];
-  else if(addr_ == 0x20C)
-    return CLIO.regs[0x208];
-  else if(addr_ == 0x308) /* Using the enable DMA register to store state */
-    return CLIO.regs[0x304];
-  else if (addr_ == 0x414)
-    return 0x4000; /* TO CHECK!!! requested by CDROMDIPIR */
-  else if((addr_ >= 0x500) && (addr_ < 0x540))
+  else if(addr_ == CLIO_REG_CLRTM0)
+    return CLIO.regs[CLIO_REG_SETTM0];
+  else if(addr_ == CLIO_REG_CLRTM1)
+    return CLIO.regs[CLIO_REG_SETTM1];
+  else if(addr_ == CLIO_REG_DMAREQDIS)
+    return CLIO.regs[CLIO_REG_DMAREQEN];
+  else if (addr_ == CLIO_REG_DIPIR2)
+    return XB_DipirNOSR; /* TO CHECK!!! requested by CDROMDIPIR */
+  else if((addr_ >= CLIO_REG_EXP_SEL_FIRST) && (addr_ < CLIO_REG_EXP_SEL_END))
     return opera_xbus_get_res();
-  else if((addr_ >= 0x540) && (addr_ < 0x580))
+  else if((addr_ >= CLIO_REG_EXP_POLL_FIRST) && (addr_ < CLIO_REG_EXP_POLL_END))
     return opera_xbus_get_poll();
-  else if((addr_ >= 0x580) && (addr_ < 0x5C0))
+  else if((addr_ >= CLIO_REG_EXP_CMD_FIRST) && (addr_ < CLIO_REG_EXP_CMD_END))
     return opera_xbus_fifo_get_status();
-  else if((addr_ >= 0x5C0) && (addr_ < 0x600))
+  else if((addr_ >= CLIO_REG_EXP_DATA_FIRST) && (addr_ < CLIO_REG_EXP_DATA_END))
     return opera_xbus_fifo_get_data();
-  else if(addr_ == 0x0)
-    return 0x02020000;
-  else if((addr_ == 0x08) || (addr_ == 0x0C))
+  else if(addr_ == CLIO_REG_CLIOREV)
+    return CLIO_GREEN;
+  else if((addr_ == CLIO_REG_VINT0) || (addr_ == CLIO_REG_VINT1))
     return (CLIO.regs[addr_] & VINT_MASK);
-  else if(addr_ == 0x30)
+  else if(addr_ == CLIO_REG_HCNT)
     return (CLIO.regs[addr_] & HCNT_MASK);
-  else if(addr_ == 0x34)
+  else if(addr_ == CLIO_REG_VCNT)
     return (CLIO.regs[addr_] & (VCNT_MASK | VCNT_FIELD));
-  else if((addr_ >= 0x3800) && (addr_ <= 0x3BFF))
+  else if((addr_ >= CLIO_REG_DSPPEO32_FIRST) &&
+          (addr_ <= CLIO_REG_DSPPEO32_LAST))
     {
       /* 2DSPW per 1ARMW */
-      CLIO.dsp_address  = ((addr_ - 0x3800) >> 1);
-      CLIO.dsp_address &= 0xFF;
-      CLIO.dsp_address += 0x300;
+      CLIO.dsp_address  = ((addr_ - CLIO_REG_DSPPEO32_FIRST) >> 1);
+      CLIO.dsp_address &= CLIO_DSPP_IMEM_MASK;
+      CLIO.dsp_address += CLIO_DSPP_IMEM_READ_BASE;
       CLIO.dsp_word1    = opera_dsp_imem_read(CLIO.dsp_address+0);
       CLIO.dsp_word2    = opera_dsp_imem_read(CLIO.dsp_address+1);
-      return ((CLIO.dsp_word1 << 16) | CLIO.dsp_word2);
+      return ((CLIO.dsp_word1 << CLIO_WORD_SHIFT) | CLIO.dsp_word2);
     }
-  else if((addr_ >= 0x3C00) && (addr_ <= 0x3FFF))
+  else if((addr_ >= CLIO_REG_DSPPEO16_FIRST) &&
+          (addr_ <= CLIO_REG_DSPPEO16_LAST))
     {
-      CLIO.dsp_address  = ((addr_ - 0x3C00) >> 2);
-      CLIO.dsp_address &= 0xFF;
-      CLIO.dsp_address += 0x300;
+      CLIO.dsp_address  = ((addr_ - CLIO_REG_DSPPEO16_FIRST) >> 2);
+      CLIO.dsp_address &= CLIO_DSPP_IMEM_MASK;
+      CLIO.dsp_address += CLIO_DSPP_IMEM_READ_BASE;
       return opera_dsp_imem_read(CLIO.dsp_address);
     }
-  else if(addr_ == 0x17F0) // DSP NOISE
+  else if(addr_ == CLIO_REG_NOISE)
     return prng32();
-  else if(addr_ == 0x17D0) /* read DSP/ARM semaphore */
+  else if(addr_ == CLIO_REG_SEMAPHORE)
     return opera_dsp_arm_semaphore_read();
   else if(clio_timer_reg_addr(addr_))
-    return (CLIO.regs[addr_] & 0xFFFF);
+    return (CLIO.regs[addr_] & CLIO_WORD_MASK);
 
   return CLIO.regs[addr_];
 }
@@ -839,22 +965,26 @@ void
 opera_clio_vcnt_update(int line_,
                        int field_)
 {
-  CLIO.regs[0x34] = (((field_ << 11) & VCNT_FIELD) |
-                     ((uint32_t)line_ & VCNT_MASK));
+  CLIO.regs[CLIO_REG_VCNT] = (((field_ << VCNT_FIELD_SHIFT) & VCNT_FIELD) |
+                              ((uint32_t)line_ & VCNT_MASK));
 }
 
 static
 uint32_t
 timer_flags(const uint32_t timer_)
 {
-  return ((CLIO.regs[((timer_ < 8) ? 0x200 : 0x208)] >> timer_control_shift(timer_)) & 0xF);
+  return ((CLIO.regs[((timer_ < CLIO_TIMER_SET_COUNT) ?
+                      CLIO_REG_SETTM0 : CLIO_REG_SETTM1)] >>
+           timer_control_shift(timer_)) & CLIO_TIMER_MASK);
 }
 
 static
 void
 timer_disable(const uint32_t timer_)
 {
-  CLIO.regs[((timer_ < 8) ? 0x200 : 0x208)] &= ~(DECREMENT << timer_control_shift(timer_));
+  CLIO.regs[((timer_ < CLIO_TIMER_SET_COUNT) ?
+             CLIO_REG_SETTM0 : CLIO_REG_SETTM1)] &=
+    ~(TIMER_DECREMENT << timer_control_shift(timer_));
 }
 
 void
@@ -865,32 +995,32 @@ opera_clio_timer_execute(uint32_t timer_)
   uint32_t  flags;
   uint32_t  underflow;
 
-  timer_ &= 0x0F;
+  timer_ &= CLIO_TIMER_MASK;
   if(timer_ == 0)
     TIMER_CARRY = 0;
 
   underflow = 0;
   flags = timer_flags(timer_);
-  if(flags & DECREMENT)
+  if(flags & TIMER_DECREMENT)
     {
-      if((flags & CASCADE) && !TIMER_CARRY)
+      if((flags & TIMER_CASCADE) && !TIMER_CARRY)
         {
           TIMER_CARRY = 0;
           return;
         }
 
-      reg   = &CLIO.regs[(0x100 + (timer_ << 3))];
-      count = (reg[0] & 0xFFFF);
+      reg   = &CLIO.regs[(CLIO_REG_TIMER0 + (timer_ * CLIO_TIMER_PAIR_STRIDE))];
+      count = (reg[0] & CLIO_WORD_MASK);
       if(count == 0)
         {
           underflow = 1;
           if(timer_ & 1)
-            opera_clio_fiq_generate(1<<(10-(timer_>>1)),0);
-          if(flags & RELOAD)
-            reg[0] = (reg[4] & 0xFFFF);
+            opera_clio_fiq_generate(INT0_TIMINT1 >> (timer_ >> 1),0);
+          if(flags & TIMER_RELOAD)
+            reg[0] = (reg[CLIO_TIMER_REG_STRIDE] & CLIO_WORD_MASK);
           else
             {
-              reg[0] = 0xFFFF;
+              reg[0] = CLIO_WORD_MASK;
               timer_disable(timer_);
             }
         }
@@ -906,19 +1036,19 @@ opera_clio_timer_execute(uint32_t timer_)
 uint32_t
 opera_clio_timer_get_delay(void)
 {
-  return CLIO.regs[0x220];
+  return CLIO.regs[CLIO_REG_SLACK];
 }
 
 void opera_clio_init(int reason_)
 {
   memset(&CLIO,0,sizeof(CLIO));
 
-  //CLIO.regs[8]=240;
+  //CLIO.regs[CLIO_REG_VINT0]=240;
 
-  CLIO.regs[0x0028] = reason_;
-  CLIO.regs[0x0400] = 0x80;
-  CLIO.regs[0x0220] = 64;
-  opera_clock_timer_set_delay(CLIO.regs[0x220]);
+  CLIO.regs[CLIO_REG_CSTATBITS] = reason_;
+  CLIO.regs[CLIO_REG_SETEXPCTL] = XB_CPUHASXBUS;
+  CLIO.regs[CLIO_REG_SLACK] = CLIO_DEFAULT_TIMER_SLACK;
+  opera_clock_timer_set_delay(CLIO.regs[CLIO_REG_SLACK]);
   MADAM_REGS = opera_madam_registers();
   TIMER_VAL  = 0;
   flagtime   = 0;
@@ -951,7 +1081,7 @@ INLINE
 bool
 dma_channel_enabled(uint32_t const channel_)
 {
-  return (CLIO.regs[0x304] & (1 << channel_));
+  return (CLIO.regs[CLIO_REG_DMAREQEN] & (1 << channel_));
 }
 
 uint16_t
@@ -970,7 +1100,7 @@ opera_clio_fifo_ei(uint16_t channel_)
   else
     {
       CLIO.fifo_i[channel_].idx = 0;
-      opera_clio_fiq_generate(1<<(channel_+16),0);
+      opera_clio_fiq_generate(INT0_DRDINT0 << channel_,0);
 
       /* reload enabled see patent WO09410641A1, 49.16 */
       if((CLIO.fifo_i[channel_].next.addr != 0) && dma_channel_enabled(channel_))
@@ -1008,12 +1138,12 @@ opera_clio_fifo_eo(uint16_t channel_,
   if((CLIO.fifo_o[channel_].start.len - CLIO.fifo_o[channel_].idx) > 0)
     {
       opera_clio_fifo_eo_write(channel_,val_);
-      CLIO.fifo_o[channel_].idx += 2;
+      CLIO.fifo_o[channel_].idx += sizeof(uint16_t);
     }
   else
     {
       CLIO.fifo_o[channel_].idx = 0;
-      opera_clio_fiq_generate(1<<(channel_+12),0);
+      opera_clio_fiq_generate(INT0_DDRINT0 << channel_,0);
 
       /* reload enabled? */
       if((CLIO.fifo_o[channel_].next.addr != 0) && dma_channel_enabled(channel_))
@@ -1032,7 +1162,7 @@ uint16_t
 opera_clio_fifo_ei_status(uint8_t channel_)
 {
   if(CLIO.fifo_i[channel_].start.addr != 0)
-    return 2; /* fixme */
+    return FIFO_Count1; /* fixme */
 
   return 0;
 }
@@ -1041,38 +1171,50 @@ uint16_t
 opera_clio_fifo_eo_status(uint8_t channel_)
 {
   if(CLIO.fifo_o[channel_].start.addr != 0)
-    return 1;
+    return FIFO_Count0;
   return 0;
+}
+
+static
+INLINE
+uint32_t
+clio_fifo_channel(uint32_t addr_)
+{
+  return ((addr_ >> CLIO_FIFO_CHANNEL_SHIFT) & CLIO_FIFO_CHANNEL_MASK);
 }
 
 uint32_t
 opera_clio_fifo_read(uint32_t addr_)
 {
-  if((addr_ & 0x500) == 0x400)
+  uint32_t channel;
+
+  channel = clio_fifo_channel(addr_);
+
+  if((addr_ & CLIO_FIFO_INPUT_MASK) == CLIO_FIFO_INPUT_VALUE)
     {
-      switch(addr_ & 0x0F)
+      switch(addr_ & CLIO_FIFO_ADDR_MASK)
         {
-        case 0x00:
-          return CLIO.fifo_i[(addr_>>4) & 0xF].start.addr + CLIO.fifo_i[(addr_>>4)&0xF].idx;
-        case 0x04:
-          return CLIO.fifo_i[(addr_>>4) & 0xF].start.len - CLIO.fifo_i[(addr_>>4)&0xF].idx;
-        case 0x08:
-          return CLIO.fifo_i[(addr_>>4) & 0xF].next.addr;
-        case 0x0C:
-          return CLIO.fifo_i[(addr_>>4) & 0xF].next.len;
+        case MADAM_DMA_CURADR_OFFSET:
+          return CLIO.fifo_i[channel].start.addr + CLIO.fifo_i[channel].idx;
+        case MADAM_DMA_CURLEN_OFFSET:
+          return CLIO.fifo_i[channel].start.len - CLIO.fifo_i[channel].idx;
+        case MADAM_DMA_RLDADR_OFFSET:
+          return CLIO.fifo_i[channel].next.addr;
+        case MADAM_DMA_RLDLEN_OFFSET:
+          return CLIO.fifo_i[channel].next.len;
         }
     }
 
-  switch(addr_ & 0xF)
+  switch(addr_ & CLIO_FIFO_ADDR_MASK)
     {
-    case 0x00:
-      return CLIO.fifo_o[(addr_>>4)&0xF].start.addr + CLIO.fifo_o[(addr_>>4)&0xF].idx;
-    case 0x04:
-      return CLIO.fifo_o[(addr_>>4)&0xF].start.len - CLIO.fifo_o[(addr_>>4)&0xF].idx;
-    case 0x08:
-      return CLIO.fifo_o[(addr_>>4)&0xF].next.addr;
-    case 0x0C:
-      return CLIO.fifo_o[(addr_>>4)&0xF].next.len;
+    case MADAM_DMA_CURADR_OFFSET:
+      return CLIO.fifo_o[channel].start.addr + CLIO.fifo_o[channel].idx;
+    case MADAM_DMA_CURLEN_OFFSET:
+      return CLIO.fifo_o[channel].start.len - CLIO.fifo_o[channel].idx;
+    case MADAM_DMA_RLDADR_OFFSET:
+      return CLIO.fifo_o[channel].next.addr;
+    case MADAM_DMA_RLDLEN_OFFSET:
+      return CLIO.fifo_o[channel].next.len;
     }
 
   return 0;
@@ -1081,50 +1223,54 @@ opera_clio_fifo_read(uint32_t addr_)
 void
 opera_clio_fifo_write(uint32_t addr_, uint32_t val_)
 {
-  if((addr_& 0x500) == 0x400)
+  uint32_t channel;
+
+  channel = clio_fifo_channel(addr_);
+
+  if((addr_ & CLIO_FIFO_INPUT_MASK) == CLIO_FIFO_INPUT_VALUE)
     {
-      switch(addr_ & 0x0F)
+      switch(addr_ & CLIO_FIFO_ADDR_MASK)
         {
-        case 0x00:
+        case MADAM_DMA_CURADR_OFFSET:
           /* see patent WO09410641A1, 46.25 */
-          CLIO.fifo_i[(addr_>>4)&0xF].start.addr = val_;
-          CLIO.fifo_i[(addr_>>4)&0xF].next.addr  = 0;
+          CLIO.fifo_i[channel].start.addr = val_;
+          CLIO.fifo_i[channel].next.addr = 0;
           break;
-        case 0x04:
+        case MADAM_DMA_CURLEN_OFFSET:
           if(val_ != 0)
-            CLIO.fifo_i[(addr_>>4)&0xF].start.len = (val_ + 4);
+            CLIO.fifo_i[channel].start.len = (val_ + CLIO_FIFO_LENGTH_BIAS);
           else
-            CLIO.fifo_i[(addr_>>4)&0xF].start.len = 0;
+            CLIO.fifo_i[channel].start.len = 0;
 
           /* see patent WO09410641A1, 46.25 */
-          CLIO.fifo_i[(addr_>>4)&0xF].next.len = 0;
+          CLIO.fifo_i[channel].next.len = 0;
           break;
-        case 0x08:
-          CLIO.fifo_i[(addr_>>4)&0xF].next.addr = val_;
+        case MADAM_DMA_RLDADR_OFFSET:
+          CLIO.fifo_i[channel].next.addr = val_;
           break;
-        case 0x0C:
+        case MADAM_DMA_RLDLEN_OFFSET:
           if(val_ != 0)
-            CLIO.fifo_i[(addr_>>4)&0xF].next.len = (val_ + 4);
+            CLIO.fifo_i[channel].next.len = (val_ + CLIO_FIFO_LENGTH_BIAS);
           else
-            CLIO.fifo_i[(addr_>>4)&0xF].next.len = 0;
+            CLIO.fifo_i[channel].next.len = 0;
           break;
         }
     }
   else
     {
-      switch (addr_ & 0xF)
+      switch (addr_ & CLIO_FIFO_ADDR_MASK)
         {
-        case 0x00:
-          CLIO.fifo_o[(addr_>>4)&0xF].start.addr = val_;
+        case MADAM_DMA_CURADR_OFFSET:
+          CLIO.fifo_o[channel].start.addr = val_;
           break;
-        case 0x04:
-          CLIO.fifo_o[(addr_>>4)&0xF].start.len  = (val_ + 4);
+        case MADAM_DMA_CURLEN_OFFSET:
+          CLIO.fifo_o[channel].start.len = (val_ + CLIO_FIFO_LENGTH_BIAS);
           break;
-        case 0x08:
-          CLIO.fifo_o[(addr_>>4)&0xF].next.addr  = val_;
+        case MADAM_DMA_RLDADR_OFFSET:
+          CLIO.fifo_o[channel].next.addr = val_;
           break;
-        case 0x0C:
-          CLIO.fifo_o[(addr_>>4)&0xF].next.len   = (val_ + 4);
+        case MADAM_DMA_RLDLEN_OFFSET:
+          CLIO.fifo_o[channel].next.len = (val_ + CLIO_FIFO_LENGTH_BIAS);
           break;
         }
     }
