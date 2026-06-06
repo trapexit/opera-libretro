@@ -53,6 +53,7 @@ void     opera_clio_fifo_write(uint32_t addr_, uint32_t val_);
 uint32_t opera_clio_fifo_read(uint32_t addr_);
 void     opera_clio_fifo_eo(uint16_t channel_, uint16_t val_);
 void     opera_clio_fifo_eo_flush(uint8_t mask_);
+uint16_t opera_clio_fifo_eo_read(uint16_t channel_);
 uint16_t opera_clio_fifo_ei(uint16_t channel_);
 uint16_t opera_clio_fifo_eo_status(uint8_t channel_);
 uint16_t opera_clio_fifo_ei_status(uint8_t channel_);

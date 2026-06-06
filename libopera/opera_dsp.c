@@ -1469,6 +1469,11 @@ opera_dsp_imem_read(uint16_t addr_)
       return DSP.dregs.INT;
     case 0x3EF:
       return DSP.dregs.DSPPRLD;
+    case 0x3F0:
+    case 0x3F1:
+    case 0x3F2:
+    case 0x3F3:
+      return opera_clio_fifo_eo_read(addr_ & 0x0F);
     default:
       break;
     }

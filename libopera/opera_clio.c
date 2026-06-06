@@ -52,6 +52,8 @@
 #define CLIO_FIFO_INPUT_MASK     0x500
 #define CLIO_FIFO_INPUT_VALUE    0x400
 #define CLIO_FIFO_LENGTH_BIAS    4
+#define CLIO_DSPP_OUTPUT_FIFO_DEPTH 8
+#define CLIO_DSPP_OUTPUT_FIFO_MASK  (CLIO_DSPP_OUTPUT_FIFO_DEPTH - 1)
 
 #define CLIO_REG_CLIOREV          0x0000
 #define CLIO_REG_VINT0            0x0008
@@ -172,8 +174,12 @@
 #define CLIO_DSPP_IMEM_MASK       0xFF
 #define CLIO_DSPP_IMEM_READ_BASE  0x300
 
-#define FIFO_Count1  0x00000002
-#define FIFO_Count0  0x00000001
+#define FIFO_Flush      0x00000020
+#define FIFO_FullEmpty  0x00000010
+#define FIFO_OverUnder  0x00000008
+#define FIFO_Count2     0x00000004
+#define FIFO_Count1     0x00000002
+#define FIFO_Count0     0x00000001
 
 #define MADAM_REG_DMATOFR_EXP0_CURADR  0x540
 #define MADAM_REG_DMATOFR_EXP0_CURLEN  0x544
@@ -201,6 +207,18 @@ struct clio_fifo_s
 
 typedef struct clio_fifo_s clio_fifo_t;
 
+struct clio_dspp_output_fifo_s
+{
+  uint16_t data[CLIO_DSPP_OUTPUT_FIFO_DEPTH];
+  uint8_t  read_idx;
+  uint8_t  write_idx;
+  uint8_t  count;
+  bool     over_under;
+  bool     flushed;
+};
+
+typedef struct clio_dspp_output_fifo_s clio_dspp_output_fifo_t;
+
 struct clio_s
 {
   uint32_t    regs[CLIO_REGISTER_COUNT];
@@ -218,7 +236,14 @@ int TIMER_VAL = 0;
 
 static uint32_t *MADAM_REGS;
 static clio_t    CLIO = {0};
+static clio_dspp_output_fifo_t CLIO_DSPP_OUTPUT_FIFO[CLIO_OUTPUT_FIFO_COUNT] = {0};
 static uint32_t  TIMER_CARRY = 0;
+
+static bool dma_channel_enabled(uint32_t const channel_);
+static void clio_dspp_output_fifo_reset(uint32_t const channel_);
+static void clio_dspp_output_fifos_reset(void);
+static void clio_dspp_output_fifo_drain(uint16_t channel_);
+static void clio_dspp_output_fifos_drain(uint32_t mask_);
 
 static
 bool
@@ -275,6 +300,21 @@ clio_state_write_fifo(opera_state_writer_t *writer_,
 
 static
 bool
+clio_state_write_dspp_output_fifo(opera_state_writer_t       *writer_,
+                                  clio_dspp_output_fifo_t const *fifo_)
+{
+  return (opera_state_write_u16_array(writer_,
+                                      fifo_->data,
+                                      CLIO_DSPP_OUTPUT_FIFO_DEPTH) &&
+          opera_state_write_u8(writer_,fifo_->read_idx) &&
+          opera_state_write_u8(writer_,fifo_->write_idx) &&
+          opera_state_write_u8(writer_,fifo_->count) &&
+          opera_state_write_u8(writer_,fifo_->over_under ? 1 : 0) &&
+          opera_state_write_u8(writer_,fifo_->flushed ? 1 : 0));
+}
+
+static
+bool
 clio_state_write_payload(opera_state_writer_t *writer_,
                          clio_t const         *state_)
 {
@@ -293,9 +333,16 @@ clio_state_write_payload(opera_state_writer_t *writer_,
     if(!clio_state_write_fifo(writer_,&state_->fifo_o[i]))
       return false;
 
-  return (opera_state_write_i32(writer_,flagtime) &&
-          opera_state_write_i32(writer_,TIMER_VAL) &&
-          opera_state_write_u32(writer_,TIMER_CARRY));
+  if(!opera_state_write_i32(writer_,flagtime) ||
+     !opera_state_write_i32(writer_,TIMER_VAL) ||
+     !opera_state_write_u32(writer_,TIMER_CARRY))
+    return false;
+
+  for(i = 0; i < CLIO_OUTPUT_FIFO_COUNT; i++)
+    if(!clio_state_write_dspp_output_fifo(writer_,&CLIO_DSPP_OUTPUT_FIFO[i]))
+      return false;
+
+  return true;
 }
 
 static
@@ -342,6 +389,7 @@ opera_clio_state_load_v1(const void     *buf_,
       TIMER_VAL = 0;
       flagtime = 0;
       TIMER_CARRY = 0;
+      clio_dspp_output_fifos_reset();
       opera_clio_set_rom();
     }
 
@@ -361,12 +409,74 @@ clio_state_read_fifo(opera_state_reader_t *reader_,
 }
 
 static
+void
+clio_dspp_output_fifo_clear(clio_dspp_output_fifo_t *fifo_)
+{
+  memset(fifo_,0,sizeof(*fifo_));
+  fifo_->flushed = true;
+}
+
+static
+void
+clio_dspp_output_fifos_clear(clio_dspp_output_fifo_t fifos_[CLIO_OUTPUT_FIFO_COUNT])
+{
+  uint32_t channel;
+
+  for(channel = 0; channel < CLIO_OUTPUT_FIFO_COUNT; channel++)
+    clio_dspp_output_fifo_clear(&fifos_[channel]);
+}
+
+static
+void
+clio_dspp_output_fifo_reset(uint32_t const channel_)
+{
+  clio_dspp_output_fifo_clear(&CLIO_DSPP_OUTPUT_FIFO[channel_]);
+}
+
+static
+void
+clio_dspp_output_fifos_reset(void)
+{
+  clio_dspp_output_fifos_clear(CLIO_DSPP_OUTPUT_FIFO);
+}
+
+static
+bool
+clio_state_read_dspp_output_fifo(opera_state_reader_t    *reader_,
+                                 clio_dspp_output_fifo_t *fifo_)
+{
+  uint8_t b;
+
+  if(!opera_state_read_u16_array(reader_,
+                                 fifo_->data,
+                                 CLIO_DSPP_OUTPUT_FIFO_DEPTH) ||
+     !opera_state_read_u8(reader_,&fifo_->read_idx) ||
+     !opera_state_read_u8(reader_,&fifo_->write_idx) ||
+     !opera_state_read_u8(reader_,&fifo_->count) ||
+     !opera_state_read_u8(reader_,&b))
+    return false;
+  fifo_->over_under = (b != 0);
+
+  if(!opera_state_read_u8(reader_,&b))
+    return false;
+  fifo_->flushed = (b != 0);
+
+  fifo_->read_idx  &= CLIO_DSPP_OUTPUT_FIFO_MASK;
+  fifo_->write_idx &= CLIO_DSPP_OUTPUT_FIFO_MASK;
+  if(fifo_->count > CLIO_DSPP_OUTPUT_FIFO_DEPTH)
+    fifo_->count = CLIO_DSPP_OUTPUT_FIFO_DEPTH;
+
+  return true;
+}
+
+static
 bool
 clio_state_read_payload(opera_state_reader_t *reader_,
                         clio_t               *state_,
                         int32_t              *flagtime_state_,
                         int32_t              *timer_val_state_,
-                        uint32_t             *timer_carry_state_)
+                        uint32_t             *timer_carry_state_,
+                        clio_dspp_output_fifo_t dspp_output_fifos_[CLIO_OUTPUT_FIFO_COUNT])
 {
   uint32_t i;
 
@@ -388,6 +498,14 @@ clio_state_read_payload(opera_state_reader_t *reader_,
      !opera_state_read_u32(reader_,timer_carry_state_))
     return false;
 
+  clio_dspp_output_fifos_clear(dspp_output_fifos_);
+  if(opera_state_reader_remaining(reader_) == 0)
+    return true;
+
+  for(i = 0; i < CLIO_OUTPUT_FIFO_COUNT; i++)
+    if(!clio_state_read_dspp_output_fifo(reader_,&dspp_output_fifos_[i]))
+      return false;
+
   return true;
 }
 
@@ -399,6 +517,7 @@ opera_clio_state_load(const void     *buf_,
   int32_t flagtime_state;
   int32_t timer_val_state;
   uint32_t timer_carry_state;
+  clio_dspp_output_fifo_t dspp_output_fifos[CLIO_OUTPUT_FIFO_COUNT];
   opera_state_reader_t reader;
   opera_state_reader_t payload;
 
@@ -408,11 +527,15 @@ opera_clio_state_load(const void     *buf_,
                               &state,
                               &flagtime_state,
                               &timer_val_state,
-                              &timer_carry_state) ||
+                              &timer_carry_state,
+                              dspp_output_fifos) ||
      !opera_state_reader_finished(&payload))
     return 0;
 
   CLIO = state;
+  memcpy(CLIO_DSPP_OUTPUT_FIFO,
+         dspp_output_fifos,
+         sizeof(CLIO_DSPP_OUTPUT_FIFO));
   flagtime = flagtime_state;
   TIMER_VAL = timer_val_state;
   TIMER_CARRY = timer_carry_state;
@@ -492,6 +615,7 @@ void
 clio_handle_dma(uint32_t val_)
 {
   CLIO.regs[CLIO_REG_DMAREQEN] |= val_;
+  clio_dspp_output_fifos_drain(val_);
 
   if(val_ & EN_DMAtofrEXP)
     {
@@ -702,6 +826,7 @@ opera_clio_poke(uint32_t addr_,
               opera_clio_fifo_write(base + MADAM_DMA_RLDLEN_OFFSET,0);
               val_ &= ~(1 << (i + I_DSPPtoDMA_SHIFT));
               CLIO.fifo_o[i].idx = 0;
+              clio_dspp_output_fifo_reset(i);
             }
         }
 
@@ -1042,6 +1167,7 @@ opera_clio_timer_get_delay(void)
 void opera_clio_init(int reason_)
 {
   memset(&CLIO,0,sizeof(CLIO));
+  clio_dspp_output_fifos_reset();
 
   //CLIO.regs[CLIO_REG_VINT0]=240;
 
@@ -1059,6 +1185,7 @@ void
 opera_clio_reset(void)
 {
   memset(&CLIO,0,sizeof(CLIO));
+  clio_dspp_output_fifos_reset();
   TIMER_CARRY = 0;
 }
 
@@ -1070,10 +1197,49 @@ opera_clio_fifo_ei_read(uint16_t channel_)
 
 static
 void
-opera_clio_fifo_eo_write(uint16_t channel_,
-                         uint16_t val_)
+clio_fifo_o_dma_write(uint16_t channel_,
+                      uint16_t val_)
 {
   opera_mem_write16(((CLIO.fifo_o[channel_].start.addr + CLIO.fifo_o[channel_].idx)),val_);
+}
+
+static
+bool
+clio_fifo_o_dma_accept(uint16_t channel_,
+                       uint16_t val_)
+{
+  if(CLIO.fifo_o[channel_].start.addr == 0)
+    return false;
+
+  if((CLIO.fifo_o[channel_].start.len - CLIO.fifo_o[channel_].idx) > 0)
+    {
+      clio_fifo_o_dma_write(channel_,val_);
+      CLIO.fifo_o[channel_].idx += sizeof(uint16_t);
+      return true;
+    }
+
+  CLIO.fifo_o[channel_].idx = 0;
+  opera_clio_fiq_generate(INT0_DDRINT0 << channel_,0);
+
+  if((CLIO.fifo_o[channel_].next.addr != 0) &&
+     dma_channel_enabled(channel_ + I_DSPPtoDMA_SHIFT))
+    {
+      CLIO.fifo_o[channel_].start.addr = CLIO.fifo_o[channel_].next.addr;
+      CLIO.fifo_o[channel_].start.len  = CLIO.fifo_o[channel_].next.len;
+
+      if((CLIO.fifo_o[channel_].start.len - CLIO.fifo_o[channel_].idx) > 0)
+        {
+          clio_fifo_o_dma_write(channel_,val_);
+          CLIO.fifo_o[channel_].idx += sizeof(uint16_t);
+          return true;
+        }
+    }
+  else
+    {
+      CLIO.fifo_o[channel_].start.addr = 0;
+    }
+
+  return false;
 }
 
 static
@@ -1128,34 +1294,86 @@ opera_clio_fifo_ei(uint16_t channel_)
   // opera_clio_fiq_generate(1<<(channel_+16),0);
 }
 
+static
+bool
+clio_dspp_output_fifo_push(uint16_t channel_,
+                           uint16_t val_)
+{
+  clio_dspp_output_fifo_t *fifo;
+
+  fifo = &CLIO_DSPP_OUTPUT_FIFO[channel_];
+  if(fifo->count >= CLIO_DSPP_OUTPUT_FIFO_DEPTH)
+    {
+      fifo->over_under = true;
+      return false;
+    }
+
+  fifo->data[fifo->write_idx] = val_;
+  fifo->write_idx = ((fifo->write_idx + 1) & CLIO_DSPP_OUTPUT_FIFO_MASK);
+  fifo->count++;
+  fifo->flushed = false;
+
+  return true;
+}
+
+static
+uint16_t
+clio_dspp_output_fifo_pop(uint16_t channel_)
+{
+  clio_dspp_output_fifo_t *fifo;
+  uint16_t val;
+
+  fifo = &CLIO_DSPP_OUTPUT_FIFO[channel_];
+  if(fifo->count == 0)
+    {
+      fifo->over_under = true;
+      return 0;
+    }
+
+  val = fifo->data[fifo->read_idx];
+  fifo->read_idx = ((fifo->read_idx + 1) & CLIO_DSPP_OUTPUT_FIFO_MASK);
+  fifo->count--;
+
+  return val;
+}
+
+static
+void
+clio_dspp_output_fifo_drain(uint16_t channel_)
+{
+  clio_dspp_output_fifo_t *fifo;
+
+  fifo = &CLIO_DSPP_OUTPUT_FIFO[channel_];
+  while(fifo->count > 0)
+    {
+      if(!clio_fifo_o_dma_accept(channel_,fifo->data[fifo->read_idx]))
+        return;
+
+      (void)clio_dspp_output_fifo_pop(channel_);
+    }
+}
+
+static
+void
+clio_dspp_output_fifos_drain(uint32_t mask_)
+{
+  uint32_t channel;
+
+  for(channel = 0; channel < CLIO_OUTPUT_FIFO_COUNT; channel++)
+    if(mask_ & (1 << (channel + I_DSPPtoDMA_SHIFT)))
+      clio_dspp_output_fifo_drain((uint16_t)channel);
+}
+
 void
 opera_clio_fifo_eo(uint16_t channel_,
                    uint16_t val_)
 {
-  if(CLIO.fifo_o[channel_].start.addr == 0)
+  if(channel_ >= CLIO_OUTPUT_FIFO_COUNT)
     return;
 
-  if((CLIO.fifo_o[channel_].start.len - CLIO.fifo_o[channel_].idx) > 0)
-    {
-      opera_clio_fifo_eo_write(channel_,val_);
-      CLIO.fifo_o[channel_].idx += sizeof(uint16_t);
-    }
-  else
-    {
-      CLIO.fifo_o[channel_].idx = 0;
-      opera_clio_fiq_generate(INT0_DDRINT0 << channel_,0);
-
-      /* reload enabled? */
-      if((CLIO.fifo_o[channel_].next.addr != 0) && dma_channel_enabled(channel_))
-        {
-          CLIO.fifo_o[channel_].start.addr = CLIO.fifo_o[channel_].next.addr;
-          CLIO.fifo_o[channel_].start.len  = CLIO.fifo_o[channel_].next.len;
-        }
-      else
-        {
-          CLIO.fifo_o[channel_].start.addr = 0;
-        }
-    }
+  clio_dspp_output_fifo_drain(channel_);
+  if(clio_dspp_output_fifo_push(channel_,val_))
+    clio_dspp_output_fifo_drain(channel_);
 }
 
 void
@@ -1168,8 +1386,18 @@ opera_clio_fifo_eo_flush(uint8_t mask_)
       if(!(mask_ & (1 << channel)))
         continue;
 
+      clio_dspp_output_fifo_reset(channel);
       opera_clio_fiq_generate(INT0_DDRINT0 << channel,0);
     }
+}
+
+uint16_t
+opera_clio_fifo_eo_read(uint16_t channel_)
+{
+  if(channel_ >= CLIO_OUTPUT_FIFO_COUNT)
+    return 0;
+
+  return clio_dspp_output_fifo_pop(channel_);
 }
 
 uint16_t
@@ -1184,9 +1412,22 @@ opera_clio_fifo_ei_status(uint8_t channel_)
 uint16_t
 opera_clio_fifo_eo_status(uint8_t channel_)
 {
-  if(CLIO.fifo_o[channel_].start.addr != 0)
-    return FIFO_Count0;
-  return 0;
+  clio_dspp_output_fifo_t *fifo;
+  uint16_t status;
+
+  if(channel_ >= CLIO_OUTPUT_FIFO_COUNT)
+    return 0;
+
+  fifo = &CLIO_DSPP_OUTPUT_FIFO[channel_];
+  status = (fifo->count & (FIFO_Count0 | FIFO_Count1 | FIFO_Count2));
+  if(fifo->count >= CLIO_DSPP_OUTPUT_FIFO_DEPTH)
+    status |= FIFO_FullEmpty;
+  if(fifo->over_under)
+    status |= FIFO_OverUnder;
+  if(fifo->flushed)
+    status |= FIFO_Flush;
+
+  return status;
 }
 
 static
@@ -1276,9 +1517,11 @@ opera_clio_fifo_write(uint32_t addr_, uint32_t val_)
         {
         case MADAM_DMA_CURADR_OFFSET:
           CLIO.fifo_o[channel].start.addr = val_;
+          clio_dspp_output_fifo_drain((uint16_t)channel);
           break;
         case MADAM_DMA_CURLEN_OFFSET:
           CLIO.fifo_o[channel].start.len = (val_ + CLIO_FIFO_LENGTH_BIAS);
+          clio_dspp_output_fifo_drain((uint16_t)channel);
           break;
         case MADAM_DMA_RLDADR_OFFSET:
           CLIO.fifo_o[channel].next.addr = val_;
