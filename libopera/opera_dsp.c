@@ -1050,6 +1050,7 @@ opera_dsp_loop(void)
       uint32_t AOP    = 0;      /* 1st operand */
       uint32_t RBSR   = 0;	/* return address */
       int      fExact = 0;
+      bool     just_branched = false;
       bool     work   = true;
 
       opera_dsp_reset();
@@ -1068,25 +1069,33 @@ opera_dsp_loop(void)
               switch((inst.raw >> 7) & 0xFF)
                 {
                 case 0:         /* NOP TODO */
+                  just_branched = false;
                   break;
                 case 1:         /* branch accum */
                   DSP.dregs.PC = ((Y >> 16) & 0x3FF);
+                  just_branched = true;
                   break;
                 case 2:         /* set rbase */
                   DSP.RBASEx4 = ((inst.cif.BCH_ADDR & 0x3F) << 2);
+                  just_branched = false;
                   break;
                 case 3:         /* set rmap */
                   DSP.REGi = (inst.cif.BCH_ADDR & 7);
+                  just_branched = false;
                   break;
                 case 4:         /* RTS */
                   DSP.dregs.PC = RBSR;
+                  just_branched = true;
                   break;
                 case 5:         /* set op_mask */
                   DSP.flags.nOP_MASK = ~(inst.cif.BCH_ADDR & 0x1F);
+                  just_branched = false;
                   break;
                 case 6:         /* -not used2- ins */
+                  just_branched = false;
                   break;
                 case 7:         /* sleep */
+                  just_branched = false;
                   work = false;
                   break;
                 case 8:
@@ -1099,6 +1108,7 @@ opera_dsp_loop(void)
                 case 15:
                   /* jump */
                   DSP.dregs.PC = inst.cif.BCH_ADDR;
+                  just_branched = true;
                   break;
                 case 16:
                 case 17:
@@ -1111,6 +1121,7 @@ opera_dsp_loop(void)
                   /* jsr */
                   RBSR         = DSP.dregs.PC;
                   DSP.dregs.PC = inst.cif.BCH_ADDR;
+                  just_branched = true;
                   break;
                 case 24:
                 case 25:
@@ -1121,7 +1132,8 @@ opera_dsp_loop(void)
                 case 30:
                 case 31:
                   /* branch only if was branched */
-                  DSP.dregs.PC = inst.cif.BCH_ADDR;
+                  if(just_branched)
+                    DSP.dregs.PC = inst.cif.BCH_ADDR;
                   break;
                 case 32:
                 case 33:
@@ -1149,6 +1161,7 @@ opera_dsp_loop(void)
                       addr = dsp_read(addr);
                     dsp_write(addr,op);
                   }
+                  just_branched = false;
                   break;
                 case 48:
                 case 49:
@@ -1176,16 +1189,25 @@ opera_dsp_loop(void)
                       addr = dsp_read(addr);
                     dsp_write(addr,op);
                   }
+                  just_branched = false;
                   break;
                 default: /* condition branch */
                   if(1 & DSP.BRCONDTAB[inst.br.bits][fExact+((flags.raw*0x10080402)>>24)])
-                    DSP.dregs.PC = inst.cif.BCH_ADDR;
+                    {
+                      DSP.dregs.PC = inst.cif.BCH_ADDR;
+                      just_branched = true;
+                    }
+                  else
+                    {
+                      just_branched = false;
+                    }
                   break;
                 }
             }
           else
             {
               /* ALU instruction */
+              just_branched = false;
               DSP.flags.req.raw = DSP.INSTTRAS[inst.raw].req.raw;
               DSP.flags.BS      = DSP.INSTTRAS[inst.raw].BS;
 
