@@ -422,14 +422,14 @@ typedef union PXC_u PXC_t;
 #define MADAM_REG_REGCTL1    0x134
 #define MADAM_REG_REGCTL2    0x138
 #define MADAM_REG_REGCTL3    0x13C
-#define MADAM_REG_XYPOSL     0x140
-#define MADAM_REG_XYPOSH     0x144
-#define MADAM_REG_DXYL       0x148
-#define MADAM_REG_DXYH       0x14C
-#define MADAM_REG_LINEDXYL   0x150
-#define MADAM_REG_LINEDXYH   0x154
-#define MADAM_REG_DDXYL      0x158
-#define MADAM_REG_DDXYH      0x15C
+#define MADAM_REG_XYPOSH     0x140
+#define MADAM_REG_XYPOSL     0x144
+#define MADAM_REG_LINEDXYH   0x148
+#define MADAM_REG_LINEDXYL   0x14C
+#define MADAM_REG_DXYH       0x150
+#define MADAM_REG_DXYL       0x154
+#define MADAM_REG_DDXYH      0x158
+#define MADAM_REG_DDXYL      0x15C
 
 #define MADAM_REG_CURRENTCCB  0x5A0
 #define MADAM_REG_NEXTCCB     0x5A4
