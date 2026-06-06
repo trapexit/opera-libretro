@@ -837,7 +837,7 @@ dsp_operand_load(int requests_)
     DSP.flags.ALU2 = ops[idx++];
 
   if(DSP.flags.req.rq.BS)
-    DSP.flags.BS = ops[idx++];
+    DSP.flags.BS = (ops[idx++] & 0x1F);
 
   if(op_cnt != idx)
     {
