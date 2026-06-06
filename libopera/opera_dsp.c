@@ -48,6 +48,13 @@
 #define TOPBIT       0x80000000
 #define SYSTEM_TICKS 568        /* ceil(((25000000 / 44100) + 1)) */
 
+#define DSP_AUDIO_STATUS_AUDLOCK 0x8000
+#define DSP_AUDIO_STATUS_LFTFULL 0x0002
+#define DSP_AUDIO_STATUS_RGTFULL 0x0001
+#define DSP_AUDIO_STATUS_MASK    (DSP_AUDIO_STATUS_AUDLOCK | \
+                                  DSP_AUDIO_STATUS_LFTFULL | \
+                                  DSP_AUDIO_STATUS_RGTFULL)
+
 #pragma pack(push,1)
 
 struct CIFTAG_s
@@ -255,6 +262,14 @@ static dsp_t DSP;
 
 static
 INLINE
+uint16_t
+dsp_audio_status(void)
+{
+  return (DSP.dregs.AudioOutStatus & DSP_AUDIO_STATUS_MASK);
+}
+
+static
+INLINE
 uint32_t
 hash16(uint32_t i_,
        uint32_t k_)
@@ -323,7 +338,7 @@ dsp_read(uint32_t addr_)
     case 0xEA:
       return prng16();
     case 0xEB:
-      return DSP.dregs.AudioOutStatus;
+      return dsp_audio_status();
     case 0xEC:
       return DSP.dregs.Sema4Status;
     case 0xED:
@@ -423,7 +438,9 @@ dsp_write(uint32_t addr_,
   switch(addr_)
     {
     case 0x3EB:
-      DSP.dregs.AudioOutStatus = val_;
+      DSP.dregs.AudioOutStatus =
+        ((DSP.dregs.AudioOutStatus & ~DSP_AUDIO_STATUS_AUDLOCK) |
+         (val_ & DSP_AUDIO_STATUS_AUDLOCK));
       break;
     case 0x3EC:
       /* DSP write to Sema4ACK */
@@ -451,8 +468,12 @@ dsp_write(uint32_t addr_,
       opera_clio_fifo_eo_flush(val_ & 0x0F);
       break;
     case 0x3FE: /* DAC Left channel */
+      DSP.IMem[addr_] = val_;
+      DSP.dregs.AudioOutStatus |= DSP_AUDIO_STATUS_LFTFULL;
+      break;
     case 0x3FF: /* DAC Right channel */
       DSP.IMem[addr_] = val_;
+      DSP.dregs.AudioOutStatus |= DSP_AUDIO_STATUS_RGTFULL;
       break;
     default:
       if(addr_ < 0x100)
@@ -564,7 +585,13 @@ uint32_t
 opera_dsp_state_load_v1(const void     *buf_,
                         uint32_t const  size_)
 {
-  return opera_state_load_sized(&DSP,"DSPP",buf_,size_,sizeof(DSP));
+  uint32_t rv;
+
+  rv = opera_state_load_sized(&DSP,"DSPP",buf_,size_,sizeof(DSP));
+  if(rv != 0)
+    DSP.dregs.AudioOutStatus &= DSP_AUDIO_STATUS_MASK;
+
+  return rv;
 }
 
 static
@@ -655,6 +682,7 @@ opera_dsp_state_load(const void     *buf_,
     return 0;
 
   DSP = state;
+  DSP.dregs.AudioOutStatus &= DSP_AUDIO_STATUS_MASK;
 
   return opera_state_reader_used(&reader);
 }
@@ -1014,6 +1042,8 @@ opera_dsp_loop(void)
   uint32_t Y;	/* accumulator */
   uint32_t BOP; /* 1st & 2nd operand */
   dsp_alu_flags_t flags;
+
+  DSP.dregs.AudioOutStatus &= DSP_AUDIO_STATUS_AUDLOCK;
 
   if(DSP.flags.Running)
     {
@@ -1460,7 +1490,7 @@ opera_dsp_imem_read(uint16_t addr_)
   switch(addr_)
     {
     case 0x3EB:
-      return DSP.dregs.AudioOutStatus;
+      return dsp_audio_status();
     case 0x3EC:
       return DSP.dregs.Sema4Status;
     case 0x3ED:
