@@ -448,6 +448,7 @@ dsp_write(uint32_t addr_,
       break;
     case 0x3FD:
       /* FLUSH EOFIFO */
+      opera_clio_fifo_eo_flush(val_ & 0x0F);
       break;
     case 0x3FE: /* DAC Left channel */
     case 0x3FF: /* DAC Right channel */

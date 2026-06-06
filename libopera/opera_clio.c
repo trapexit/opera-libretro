@@ -1158,6 +1158,20 @@ opera_clio_fifo_eo(uint16_t channel_,
     }
 }
 
+void
+opera_clio_fifo_eo_flush(uint8_t mask_)
+{
+  uint32_t channel;
+
+  for(channel = 0; channel < CLIO_OUTPUT_FIFO_COUNT; channel++)
+    {
+      if(!(mask_ & (1 << channel)))
+        continue;
+
+      opera_clio_fiq_generate(INT0_DDRINT0 << channel,0);
+    }
+}
+
 uint16_t
 opera_clio_fifo_ei_status(uint8_t channel_)
 {
