@@ -45,8 +45,12 @@
 #define ALUSIZEMASK 0xFFFFFFFF
 #endif
 
-#define TOPBIT       0x80000000
-#define SYSTEM_TICKS 568        /* ceil(((25000000 / 44100) + 1)) */
+#define TOPBIT 0x80000000
+
+#define SYSTEM_CLOCK_RATE  25000000
+#define DEFAULT_SAMPLERATE 44100
+#define SYSTEM_TICKS       (((SYSTEM_CLOCK_RATE + DEFAULT_SAMPLERATE - 1) / \
+                             DEFAULT_SAMPLERATE) + 1)
 
 #define DSP_AUDIO_STATUS_AUDLOCK 0x8000
 #define DSP_AUDIO_STATUS_LFTFULL 0x0002
@@ -54,6 +58,54 @@
 #define DSP_AUDIO_STATUS_MASK    (DSP_AUDIO_STATUS_AUDLOCK | \
                                   DSP_AUDIO_STATUS_LFTFULL | \
                                   DSP_AUDIO_STATUS_RGTFULL)
+
+#define FIFO_Count1   0x00000002
+#define INT0_DSPPINT  0x00000800
+
+#define LAST_N_MEM     0x3FF
+#define OFFSET_I_MEM   0x100
+
+#define DSPP_SLEEP_OPCODE 0x8380
+
+#define NUM_AUDIO_INPUT_DMAS  13
+#define NUM_AUDIO_OUTPUT_DMAS 4
+
+#define DSPP_FIFOHEAD_ZERO_ADDRESS 0x070
+#define DSPI_NOISE                 0x0EA
+
+#define DSPP_AUDIO_STATUS_READ 0x0EB
+#define DSPP_SEMA4_STATUS_READ 0x0EC
+#define DSPP_SEMA4_DATA_READ   0x0ED
+#define DSPP_PC_READ           0x0EE
+#define DSPP_DSPPCNT_READ      0x0EF
+
+#define DSPP_EI_FIFO_DATA_FIRST   0x0F0
+#define DSPP_EI_FIFO_STATUS_FIRST 0x0D0
+#define DSPP_EI_FIFO_STATUS_COUNT (NUM_AUDIO_INPUT_DMAS + 2)
+#define DSPP_EO_FIFO_STATUS_FIRST 0x0E0
+#define DSPP_EO_FIFO_DATA_FIRST   0x3F0
+
+#define DSPP_AUDIO_STATUS_WRITE 0x3EB
+#define DSPP_SEMA4_ACK_WRITE    0x3EC
+#define DSPP_SEMA4_DATA_WRITE   0x3ED
+#define DSPP_INT_WRITE          0x3EE
+#define DSPP_DSPPRLD_WRITE      0x3EF
+#define DSPP_EO_FIFO_FLUSH      0x3FD
+#define DSPP_DAC_LEFT           0x3FE
+#define DSPP_DAC_RIGHT          0x3FF
+
+#define DSPP_FIFO_CHANNEL_MASK           0x0F
+#define DSPP_IMEM_LOW_MASK               0x7F
+#define DSPP_IMEM_DIRECT_MASK            0x80
+#define DSPP_EI_FIFO_DATA_TO_HEAD_OFFSET (DSPP_EI_FIFO_DATA_FIRST - \
+                                          DSPP_FIFOHEAD_ZERO_ADDRESS)
+#define DSPP_I_MEM_MIRROR_SIZE           0x200
+
+#define DSPP_SEMA4_DSP_ACK      0x0001
+#define DSPP_SEMA4_DSP_WROTE    0x0004
+#define DSPP_SEMA4_ARM_WROTE    0x0008
+#define DSPP_SEMA4_DATA_MASK    0xFFFF
+#define DSPP_SEMA4_STATUS_SHIFT 16
 
 #pragma pack(push,1)
 
@@ -270,6 +322,16 @@ dsp_audio_status(void)
 
 static
 INLINE
+bool
+dsp_addr_in_range(uint32_t addr_,
+                  uint32_t first_,
+                  uint32_t count_)
+{
+  return ((addr_ - first_) < count_);
+}
+
+static
+INLINE
 uint32_t
 hash16(uint32_t i_,
        uint32_t k_)
@@ -330,102 +392,71 @@ static
 uint16_t
 dsp_read(uint32_t addr_)
 {
-  uint16_t val;
-
-  /* addr &= 0x3FF; */
-  switch(addr_)
+  /* addr &= LAST_N_MEM; */
+  if(dsp_addr_in_range(addr_,DSPP_EI_FIFO_DATA_FIRST,NUM_AUDIO_INPUT_DMAS))
     {
-    case 0xEA:
-      return prng16();
-    case 0xEB:
-      return dsp_audio_status();
-    case 0xEC:
-      return DSP.dregs.Sema4Status;
-    case 0xED:
-      return DSP.dregs.Sema4Data;
-    case 0xEE:
-      return DSP.dregs.PC;
-    case 0xEF:
-      return DSP.dregs.DSPPCNT;
-    case 0xF0:
-    case 0xF1:
-    case 0xF2:
-    case 0xF3:
-    case 0xF4:
-    case 0xF5:
-    case 0xF6:
-    case 0xF7:
-    case 0xF8:
-    case 0xF9:
-    case 0xFA:
-    case 0xFB:
-    case 0xFC:
       /*
         printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
         val=IMem[addr-0x80];
       */
-      if(DSP.CPUSupply[addr_ - 0xF0])
-        return (DSP.CPUSupply[addr_ - 0xF0] = 0, DSP.IMem[addr_ - 0x80]);
-      return opera_clio_fifo_ei(addr_ & 0x0F);
-    case 0x70:
-    case 0x71:
-    case 0x72:
-    case 0x73:
-    case 0x74:
-    case 0x75:
-    case 0x76:
-    case 0x77:
-    case 0x78:
-    case 0x79:
-    case 0x7A:
-    case 0x7B:
-    case 0x7C:
+      if(DSP.CPUSupply[addr_ - DSPP_EI_FIFO_DATA_FIRST])
+        return (DSP.CPUSupply[addr_ - DSPP_EI_FIFO_DATA_FIRST] = 0,
+                DSP.IMem[addr_ - DSPP_EI_FIFO_DATA_TO_HEAD_OFFSET]);
+      return opera_clio_fifo_ei(addr_ & DSPP_FIFO_CHANNEL_MASK);
+    }
+
+  if(dsp_addr_in_range(addr_,DSPP_FIFOHEAD_ZERO_ADDRESS,NUM_AUDIO_INPUT_DMAS))
+    {
       //printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
-      if(DSP.CPUSupply[addr_ - 0x70])
-        return (DSP.CPUSupply[addr_ - 0x70] = 0, DSP.IMem[addr_]);
-      return opera_clio_fifo_ei_read(addr_ & 0x0F);
-    case 0xD0:
-    case 0xD1:
-    case 0xD2:
-    case 0xD3:
-    case 0xD4:
-    case 0xD5:
-    case 0xD6:
-    case 0xD7:
-    case 0xD8:
-    case 0xD9:
-    case 0xDA:
-    case 0xDB:
-    case 0xDC:
-    case 0xDD:
-    case 0xDE:
+      if(DSP.CPUSupply[addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS])
+        return (DSP.CPUSupply[addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS] = 0,
+                DSP.IMem[addr_]);
+      return opera_clio_fifo_ei_read(addr_ & DSPP_FIFO_CHANNEL_MASK);
+    }
+
+  if(dsp_addr_in_range(addr_,DSPP_EI_FIFO_STATUS_FIRST,DSPP_EI_FIFO_STATUS_COUNT))
+    {
       /*
         what is last two case's?
         if(CPUSupply[addr&0x0f])
         {
         CPUSupply[addr&0x0f]=0;
         printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
-        return IMem[0x70+addr&0x0f];
+        return IMem[DSPP_FIFOHEAD_ZERO_ADDRESS+addr&DSPP_FIFO_CHANNEL_MASK];
         }
         else
         printf("#DSP read EIFifo status 0x%4.4X\n",addr&0x0f);
       */
-      if(DSP.CPUSupply[addr_ & 0x0F])
-        return 2;
-      return opera_clio_fifo_ei_status(addr_ & 0x0F);
-    case 0xE0:
-    case 0xE1:
-    case 0xE2:
-    case 0xE3:
-      return opera_clio_fifo_eo_status(addr_ & 0x0F);
-    default:
-      //printf("#EIRead 0x%3.3X>=0x%4.4X\n",addr, IMem[addr_ & 0x7F]);
-      addr_ -= 0x100;
-      if(addr_ < 0x200)
-        return DSP.IMem[addr_ | 0x100];
+      if(DSP.CPUSupply[addr_ & DSPP_FIFO_CHANNEL_MASK])
+        return FIFO_Count1;
+      return opera_clio_fifo_ei_status(addr_ & DSPP_FIFO_CHANNEL_MASK);
     }
 
-  return DSP.IMem[addr_ & 0x7F];
+  if(dsp_addr_in_range(addr_,DSPP_EO_FIFO_STATUS_FIRST,NUM_AUDIO_OUTPUT_DMAS))
+    return opera_clio_fifo_eo_status(addr_ & DSPP_FIFO_CHANNEL_MASK);
+
+  switch(addr_)
+    {
+    case DSPI_NOISE:
+      return prng16();
+    case DSPP_AUDIO_STATUS_READ:
+      return dsp_audio_status();
+    case DSPP_SEMA4_STATUS_READ:
+      return DSP.dregs.Sema4Status;
+    case DSPP_SEMA4_DATA_READ:
+      return DSP.dregs.Sema4Data;
+    case DSPP_PC_READ:
+      return DSP.dregs.PC;
+    case DSPP_DSPPCNT_READ:
+      return DSP.dregs.DSPPCNT;
+    default:
+      //printf("#EIRead 0x%3.3X>=0x%4.4X\n",addr, IMem[addr_ & DSPP_IMEM_LOW_MASK]);
+      addr_ -= OFFSET_I_MEM;
+      if(addr_ < DSPP_I_MEM_MIRROR_SIZE)
+        return DSP.IMem[addr_ | OFFSET_I_MEM];
+    }
+
+  return DSP.IMem[addr_ & DSPP_IMEM_LOW_MASK];
 }
 
 /* DSP IWRITE (includes EO,I) */
@@ -434,56 +465,57 @@ void
 dsp_write(uint32_t addr_,
           uint16_t val_)
 {
-  addr_ &= 0x3FF;
+  addr_ &= LAST_N_MEM;
+
+  if(dsp_addr_in_range(addr_,DSPP_EO_FIFO_DATA_FIRST,NUM_AUDIO_OUTPUT_DMAS))
+    {
+      opera_clio_fifo_eo(addr_ & DSPP_FIFO_CHANNEL_MASK,val_);
+      return;
+    }
+
   switch(addr_)
     {
-    case 0x3EB:
+    case DSPP_AUDIO_STATUS_WRITE:
       DSP.dregs.AudioOutStatus =
         ((DSP.dregs.AudioOutStatus & ~DSP_AUDIO_STATUS_AUDLOCK) |
          (val_ & DSP_AUDIO_STATUS_AUDLOCK));
       break;
-    case 0x3EC:
+    case DSPP_SEMA4_ACK_WRITE:
       /* DSP write to Sema4ACK */
-      DSP.dregs.Sema4Status |= 0x01;
+      DSP.dregs.Sema4Status |= DSPP_SEMA4_DSP_ACK;
       break;
-    case 0x3ED:
+    case DSPP_SEMA4_DATA_WRITE:
       DSP.dregs.Sema4Data   = val_;
-      DSP.dregs.Sema4Status = 0x4;  /* DSP write to Sema4Data */
+      DSP.dregs.Sema4Status = DSPP_SEMA4_DSP_WROTE;  /* DSP write to Sema4Data */
       break;
-    case 0x3EE:
+    case DSPP_INT_WRITE:
       DSP.dregs.INT    = val_;
       DSP.flags.GenFIQ = true;
       break;
-    case 0x3EF:
+    case DSPP_DSPPRLD_WRITE:
       DSP.dregs.DSPPRLD = val_;
       break;
-    case 0x3F0:
-    case 0x3F1:
-    case 0x3F2:
-    case 0x3F3:
-      opera_clio_fifo_eo(addr_ & 0x0F,val_);
-      break;
-    case 0x3FD:
+    case DSPP_EO_FIFO_FLUSH:
       /* FLUSH EOFIFO */
-      opera_clio_fifo_eo_flush(val_ & 0x0F);
+      opera_clio_fifo_eo_flush(val_ & DSPP_FIFO_CHANNEL_MASK);
       break;
-    case 0x3FE: /* DAC Left channel */
+    case DSPP_DAC_LEFT: /* DAC Left channel */
       DSP.IMem[addr_] = val_;
       DSP.dregs.AudioOutStatus |= DSP_AUDIO_STATUS_LFTFULL;
       break;
-    case 0x3FF: /* DAC Right channel */
+    case DSPP_DAC_RIGHT: /* DAC Right channel */
       DSP.IMem[addr_] = val_;
       DSP.dregs.AudioOutStatus |= DSP_AUDIO_STATUS_RGTFULL;
       break;
     default:
-      if(addr_ < 0x100)
+      if(addr_ < OFFSET_I_MEM)
         return;
 
-      addr_ -= 0x100;
-      if(addr_ < 0x200)
-        DSP.IMem[addr_ | 0x100] = val_;
+      addr_ -= OFFSET_I_MEM;
+      if(addr_ < DSPP_I_MEM_MIRROR_SIZE)
+        DSP.IMem[addr_ | OFFSET_I_MEM] = val_;
       else
-        DSP.IMem[addr_ + 0x100] = val_;
+        DSP.IMem[addr_ + OFFSET_I_MEM] = val_;
       break;
     }
 }
@@ -1020,7 +1052,7 @@ opera_dsp_init(void)
   DSP.dregs.Sema4Status = 0;
 
   for(i = 0; i < sizeof(DSP.NMem)/sizeof(DSP.NMem[0]); i++)
-    DSP.NMem[i] = 0x8380; /* sleep */
+    DSP.NMem[i] = DSPP_SLEEP_OPCODE; /* sleep */
 
   for(i = 0; i < 16; i++)
     DSP.CPUSupply[i] = 0;
@@ -1072,7 +1104,7 @@ opera_dsp_loop(void)
                   just_branched = false;
                   break;
                 case 1:         /* branch accum */
-                  DSP.dregs.PC = ((Y >> 16) & 0x3FF);
+                  DSP.dregs.PC = ((Y >> 16) & LAST_N_MEM);
                   just_branched = true;
                   break;
                 case 2:         /* set rbase */
@@ -1453,7 +1485,7 @@ opera_dsp_loop(void)
       if(1 & DSP.flags.GenFIQ)
         {
           DSP.flags.GenFIQ = false;
-          opera_clio_fiq_generate(0x800,0); /* AudioFIQ */
+          opera_clio_fiq_generate(INT0_DSPPINT,0); /* AudioFIQ */
         }
 
       DSP.dregs.DSPPCNT -= SYSTEM_TICKS;
@@ -1461,7 +1493,7 @@ opera_dsp_loop(void)
         DSP.dregs.DSPPCNT += DSP.dregs.DSPPRLD;
     }
 
-  return ((DSP.IMem[0x3FF] << 16) | DSP.IMem[0x3FE]);
+  return ((DSP.IMem[DSPP_DAC_RIGHT] << 16) | DSP.IMem[DSPP_DAC_LEFT]);
 }
 
 /* CPU writes NMEM of DSP */
@@ -1470,7 +1502,7 @@ opera_dsp_mem_write(uint16_t addr_,
                      uint16_t val_)
 {
   //mwriteh(addr,val);
-  DSP.NMem[addr_ & 0x3FF] = val_;
+  DSP.NMem[addr_ & LAST_N_MEM] = val_;
 }
 
 void
@@ -1484,14 +1516,14 @@ void
 opera_dsp_imem_write(uint16_t addr_,
                       uint16_t val_)
 {
-  if((addr_ >= 0x70) && (addr_ <= 0x7C))
+  if(dsp_addr_in_range(addr_,DSPP_FIFOHEAD_ZERO_ADDRESS,NUM_AUDIO_INPUT_DMAS))
     {
-      DSP.CPUSupply[addr_ - 0x70] = 1;
-      DSP.IMem[addr_ & 0x7F]      = val_;
+      DSP.CPUSupply[addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS] = 1;
+      DSP.IMem[addr_ & DSPP_IMEM_LOW_MASK]              = val_;
     }
-  else if(!(addr_ & 0x80))
+  else if(!(addr_ & DSPP_IMEM_DIRECT_MASK))
     {
-      DSP.IMem[addr_ & 0x7F] = val_;
+      DSP.IMem[addr_ & DSPP_IMEM_LOW_MASK] = val_;
     }
 }
 
@@ -1501,31 +1533,29 @@ opera_dsp_arm_semaphore_write(uint32_t val_)
   // How about Sema4ACK? Now don't think about it
   // ARM write to Sema4Data low 16 bits
   // ARM be last
-  DSP.dregs.Sema4Data   = (val_ & 0xFFFF);
-  DSP.dregs.Sema4Status = 0x8;
+  DSP.dregs.Sema4Data   = (val_ & DSPP_SEMA4_DATA_MASK);
+  DSP.dregs.Sema4Status = DSPP_SEMA4_ARM_WROTE;
 }
 
 /* CPU reads from EO,I of DSP */
 uint16_t
 opera_dsp_imem_read(uint16_t addr_)
 {
+  if(dsp_addr_in_range(addr_,DSPP_EO_FIFO_DATA_FIRST,NUM_AUDIO_OUTPUT_DMAS))
+    return opera_clio_fifo_eo_read(addr_ & DSPP_FIFO_CHANNEL_MASK);
+
   switch(addr_)
     {
-    case 0x3EB:
+    case DSPP_AUDIO_STATUS_WRITE:
       return dsp_audio_status();
-    case 0x3EC:
+    case DSPP_SEMA4_ACK_WRITE:
       return DSP.dregs.Sema4Status;
-    case 0x3ED:
+    case DSPP_SEMA4_DATA_WRITE:
       return DSP.dregs.Sema4Data;
-    case 0x3EE:
+    case DSPP_INT_WRITE:
       return DSP.dregs.INT;
-    case 0x3EF:
+    case DSPP_DSPPRLD_WRITE:
       return DSP.dregs.DSPPRLD;
-    case 0x3F0:
-    case 0x3F1:
-    case 0x3F2:
-    case 0x3F3:
-      return opera_clio_fifo_eo_read(addr_ & 0x0F);
     default:
       break;
     }
@@ -1536,5 +1566,6 @@ opera_dsp_imem_read(uint16_t addr_)
 uint32_t
 opera_dsp_arm_semaphore_read(void)
 {
-  return ((DSP.dregs.Sema4Status << 16) | DSP.dregs.Sema4Data);
+  return ((DSP.dregs.Sema4Status << DSPP_SEMA4_STATUS_SHIFT) |
+          DSP.dregs.Sema4Data);
 }
