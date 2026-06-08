@@ -31,6 +31,7 @@
 #ifndef	LIBOPERA_CLIO_H_INCLUDED
 #define LIBOPERA_CLIO_H_INCLUDED
 
+#include "boolean.h"
 #include "extern_c.h"
 
 #include <stdint.h>
@@ -55,6 +56,8 @@ void     opera_clio_fifo_eo(uint16_t channel_, uint16_t val_);
 void     opera_clio_fifo_eo_flush(uint8_t mask_);
 uint16_t opera_clio_fifo_eo_read(uint16_t channel_);
 uint16_t opera_clio_fifo_ei(uint16_t channel_);
+bool     opera_clio_fifo_ei_pop(uint16_t channel_, uint16_t *value_);
+bool     opera_clio_fifo_ei_peek(uint16_t channel_, uint16_t *value_);
 uint16_t opera_clio_fifo_eo_status(uint8_t channel_);
 uint16_t opera_clio_fifo_ei_status(uint8_t channel_);
 uint16_t opera_clio_fifo_ei_read(uint16_t channel_);

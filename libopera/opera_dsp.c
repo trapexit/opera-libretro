@@ -62,6 +62,7 @@
                                   DSP_AUDIO_STATUS_LFTFULL | \
                                   DSP_AUDIO_STATUS_RGTFULL)
 
+#define FIFO_OverUnder 0x00000008
 #define FIFO_Count1   0x00000002
 #define INT0_DSPPINT  0x00000800
 
@@ -72,6 +73,7 @@
 
 #define DSPP_AUDIO_INPUT_DMA_COUNT 13
 #define DSPP_EI_FIFO_COUNT         15
+#define DSPP_EI_FIFO_REFILL_DELAY  1
 #define NUM_AUDIO_OUTPUT_DMAS      4
 
 #define DSPP_FIFOHEAD_ZERO_ADDRESS 0x070
@@ -336,6 +338,17 @@ struct dsp_runtime_s
 
 typedef struct dsp_runtime_s dsp_runtime_t;
 
+struct dsp_ei_fifo_shadow_s
+{
+  uint16_t value;
+  bool     valid;
+  bool     refill_pending;
+  uint8_t  refill_delay;
+  bool     underflow;
+};
+
+typedef struct dsp_ei_fifo_shadow_s dsp_ei_fifo_shadow_t;
+
 struct dsp_s
 {
   uint32_t   RBASEx4;
@@ -349,6 +362,7 @@ struct dsp_s
   INTAG_t    flags;
   int        CPUSupply[16];
   dsp_runtime_t runtime;
+  dsp_ei_fifo_shadow_t ei_fifo[DSPP_EI_FIFO_COUNT];
 };
 
 typedef struct dsp_s dsp_t;
@@ -356,6 +370,37 @@ typedef struct dsp_s dsp_t;
 #pragma pack(pop)
 
 static dsp_t DSP;
+
+static
+void
+dsp_state_ei_fifo_reset(dsp_t *state_)
+{
+  uint32_t i;
+
+  for(i = 0; i < DSPP_EI_FIFO_COUNT; i++)
+    {
+      state_->ei_fifo[i].value =
+        state_->IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + i];
+      state_->ei_fifo[i].valid           = true;
+      state_->ei_fifo[i].refill_pending  = false;
+      state_->ei_fifo[i].refill_delay    = 0;
+      state_->ei_fifo[i].underflow       = false;
+    }
+}
+
+static
+void
+dsp_ei_fifo_control_reset(dsp_t *state_)
+{
+  uint32_t i;
+
+  for(i = 0; i < DSPP_EI_FIFO_COUNT; i++)
+    {
+      state_->ei_fifo[i].refill_pending = false;
+      state_->ei_fifo[i].refill_delay   = 0;
+      state_->ei_fifo[i].underflow      = false;
+    }
+}
 
 static
 void
@@ -430,10 +475,179 @@ dsp_counter_tick(void)
 
 static
 void
+dsp_ei_fifo_shadow_update(uint32_t channel_,
+                          uint16_t value_)
+{
+  if(channel_ >= DSPP_EI_FIFO_COUNT)
+    return;
+
+  DSP.ei_fifo[channel_].value = value_;
+  DSP.ei_fifo[channel_].valid = true;
+  DSP.IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + channel_] = value_;
+}
+
+static
+void
+dsp_ei_fifo_shadow_write(uint32_t channel_,
+                         uint16_t value_)
+{
+  if(channel_ >= DSPP_EI_FIFO_COUNT)
+    return;
+
+  dsp_ei_fifo_shadow_update(channel_,value_);
+  DSP.ei_fifo[channel_].refill_pending = false;
+  DSP.ei_fifo[channel_].refill_delay   = 0;
+  DSP.ei_fifo[channel_].underflow      = false;
+  DSP.CPUSupply[channel_]              = 1;
+}
+
+static
+void
+dsp_ei_fifo_ensure_shadow(uint32_t channel_)
+{
+  if(channel_ >= DSPP_EI_FIFO_COUNT)
+    return;
+
+  if(DSP.ei_fifo[channel_].valid)
+    return;
+
+  dsp_ei_fifo_shadow_update(channel_,
+                            DSP.IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + channel_]);
+}
+
+static
+uint16_t
+dsp_ei_fifo_data_read(uint32_t channel_)
+{
+  uint16_t value;
+
+  dsp_ei_fifo_ensure_shadow(channel_);
+
+  if(channel_ >= DSPP_EI_FIFO_COUNT)
+    return 0;
+
+  if(DSP.CPUSupply[channel_])
+    {
+      DSP.CPUSupply[channel_] = 0;
+      return DSP.ei_fifo[channel_].value;
+    }
+
+  if(channel_ < DSPP_AUDIO_INPUT_DMA_COUNT)
+    {
+      if(opera_clio_fifo_ei_pop((uint16_t)channel_,&value))
+        {
+          dsp_ei_fifo_shadow_update(channel_,value);
+          DSP.ei_fifo[channel_].underflow = false;
+          return value;
+        }
+
+      DSP.ei_fifo[channel_].underflow = true;
+    }
+
+  return DSP.ei_fifo[channel_].value;
+}
+
+static
+uint16_t
+dsp_ei_fifo_head_read(uint32_t channel_)
+{
+  uint16_t value;
+
+  dsp_ei_fifo_ensure_shadow(channel_);
+
+  if(channel_ >= DSPP_EI_FIFO_COUNT)
+    return 0;
+
+  if(DSP.CPUSupply[channel_])
+    return DSP.ei_fifo[channel_].value;
+
+  if((channel_ < DSPP_AUDIO_INPUT_DMA_COUNT) &&
+     opera_clio_fifo_ei_peek((uint16_t)channel_,&value))
+    {
+      dsp_ei_fifo_shadow_update(channel_,value);
+      return value;
+    }
+
+  return DSP.ei_fifo[channel_].value;
+}
+
+static
+uint16_t
+dsp_ei_fifo_status(uint32_t channel_)
+{
+  uint16_t status;
+
+  if(channel_ >= DSPP_EI_FIFO_COUNT)
+    return 0;
+
+  status = 0;
+  if(channel_ < DSPP_AUDIO_INPUT_DMA_COUNT)
+    status = opera_clio_fifo_ei_status((uint8_t)channel_);
+
+  if(DSP.ei_fifo[channel_].underflow)
+    status |= FIFO_OverUnder;
+
+  return status;
+}
+
+static
+bool
+dsp_ei_fifo_has_pending_refill(void)
+{
+  uint32_t i;
+
+  for(i = 0; i < DSPP_AUDIO_INPUT_DMA_COUNT; i++)
+    if(DSP.ei_fifo[i].refill_pending)
+      return true;
+
+  return false;
+}
+
+static
+void
+dsp_ei_fifo_refill_tick(void)
+{
+  uint32_t i;
+
+  for(i = 0; i < DSPP_AUDIO_INPUT_DMA_COUNT; i++)
+    {
+      uint16_t value;
+
+      if(!DSP.ei_fifo[i].refill_pending)
+        continue;
+
+      if(DSP.ei_fifo[i].refill_delay > 0)
+        {
+          DSP.ei_fifo[i].refill_delay--;
+          continue;
+        }
+
+      DSP.ei_fifo[i].refill_pending = false;
+      if(opera_clio_fifo_ei_pop((uint16_t)i,&value))
+        dsp_ei_fifo_shadow_update(i,value);
+      else
+        DSP.ei_fifo[i].underflow = true;
+    }
+}
+
+static
+void
+dsp_ei_fifo_refill_advance(uint32_t ticks_)
+{
+  while((ticks_ > 0) && dsp_ei_fifo_has_pending_refill())
+    {
+      dsp_ei_fifo_refill_tick();
+      ticks_--;
+    }
+}
+
+static
+void
 dsp_sleep_advance(uint32_t *ticks_)
 {
   if(DSP.dregs.DSPPRLD == 0)
     {
+      dsp_ei_fifo_refill_advance(*ticks_);
       if(DSP.dregs.AudioOutStatus & DSP_AUDIO_STATUS_AUDLOCK)
         {
           *ticks_ = 0;
@@ -454,11 +668,13 @@ dsp_sleep_advance(uint32_t *ticks_)
 
   if((uint32_t)DSP.dregs.DSPPCNT > *ticks_)
     {
+      dsp_ei_fifo_refill_advance(*ticks_);
       dsp_counter_decrement(*ticks_);
       *ticks_ = 0;
       return;
     }
 
+  dsp_ei_fifo_refill_advance((uint32_t)DSP.dregs.DSPPCNT);
   *ticks_ -= (uint32_t)DSP.dregs.DSPPCNT;
   dsp_cycle_reset();
 }
@@ -593,16 +809,7 @@ dsp_read(uint32_t addr_)
       uint32_t channel;
 
       channel = (addr_ & DSPP_FIFO_CHANNEL_MASK);
-      /*
-        printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
-        val=IMem[addr-0x80];
-      */
-      if(DSP.CPUSupply[channel])
-        return (DSP.CPUSupply[channel] = 0,
-                DSP.IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + channel]);
-      if(channel >= DSPP_AUDIO_INPUT_DMA_COUNT)
-        return DSP.IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + channel];
-      return opera_clio_fifo_ei(channel);
+      return dsp_ei_fifo_data_read(channel);
     }
 
   if(dsp_addr_in_range(addr_,DSPP_FIFOHEAD_ZERO_ADDRESS,DSPP_EI_FIFO_COUNT))
@@ -610,13 +817,7 @@ dsp_read(uint32_t addr_)
       uint32_t channel;
 
       channel = (addr_ & DSPP_FIFO_CHANNEL_MASK);
-      //printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
-      if(DSP.CPUSupply[channel])
-        return (DSP.CPUSupply[channel] = 0,
-                DSP.IMem[addr_]);
-      if(channel >= DSPP_AUDIO_INPUT_DMA_COUNT)
-        return DSP.IMem[addr_];
-      return opera_clio_fifo_ei_read(channel);
+      return dsp_ei_fifo_head_read(channel);
     }
 
   if(dsp_addr_in_range(addr_,DSPP_EI_FIFO_STATUS_FIRST,DSPP_EI_FIFO_COUNT))
@@ -624,11 +825,7 @@ dsp_read(uint32_t addr_)
       uint32_t channel;
 
       channel = (addr_ & DSPP_FIFO_CHANNEL_MASK);
-      if(DSP.CPUSupply[channel])
-        return FIFO_Count1;
-      if(channel >= DSPP_AUDIO_INPUT_DMA_COUNT)
-        return 0;
-      return opera_clio_fifo_ei_status(channel);
+      return dsp_ei_fifo_status(channel);
     }
 
   if(dsp_addr_in_range(addr_,DSPP_EO_FIFO_STATUS_FIRST,NUM_AUDIO_OUTPUT_DMAS))
@@ -790,6 +987,14 @@ dsp_state_write_payload(opera_state_writer_t *writer_,
      !opera_state_write_u8(writer_,state_->runtime.sleeping ? 1 : 0))
     return false;
 
+  for(i = 0; i < DSPP_EI_FIFO_COUNT; i++)
+    if(!opera_state_write_u16(writer_,state_->ei_fifo[i].value) ||
+       !opera_state_write_u8(writer_,state_->ei_fifo[i].valid ? 1 : 0) ||
+       !opera_state_write_u8(writer_,state_->ei_fifo[i].refill_pending ? 1 : 0) ||
+       !opera_state_write_u8(writer_,state_->ei_fifo[i].refill_delay) ||
+       !opera_state_write_u8(writer_,state_->ei_fifo[i].underflow ? 1 : 0))
+      return false;
+
   return true;
 }
 
@@ -837,6 +1042,7 @@ opera_dsp_state_load_v1(const void     *buf_,
   if(rv != 0)
     {
       dsp_state_runtime_reset(&state);
+      dsp_state_ei_fifo_reset(&state);
       DSP = state;
       DSP.dregs.AudioOutStatus &= DSP_AUDIO_STATUS_MASK;
     }
@@ -916,6 +1122,7 @@ dsp_state_read_payload(opera_state_reader_t *reader_,
     }
 
   dsp_state_runtime_reset(state_);
+  dsp_state_ei_fifo_reset(state_);
   if(opera_state_reader_finished(reader_))
     return true;
 
@@ -934,6 +1141,28 @@ dsp_state_read_payload(opera_state_reader_t *reader_,
   if(branch_delay_kind > DSP_BRANCH_DELAY_AFTER_BFM_TARGET)
     branch_delay_kind = DSP_BRANCH_DELAY_NONE;
   state_->runtime.branch_delay.kind = (dsp_branch_delay_kind_t)branch_delay_kind;
+
+  if(opera_state_reader_finished(reader_))
+    return true;
+
+  for(i = 0; i < DSPP_EI_FIFO_COUNT; i++)
+    {
+      if(!opera_state_read_u16(reader_,&state_->ei_fifo[i].value) ||
+         !opera_state_read_u8(reader_,&b))
+        return false;
+      state_->ei_fifo[i].valid = (b != 0);
+      if(!opera_state_read_u8(reader_,&b))
+        return false;
+      state_->ei_fifo[i].refill_pending = (b != 0);
+      if(!opera_state_read_u8(reader_,&state_->ei_fifo[i].refill_delay) ||
+         !opera_state_read_u8(reader_,&b))
+        return false;
+      state_->ei_fifo[i].underflow = (b != 0);
+
+      if(state_->ei_fifo[i].refill_delay > DSPP_EI_FIFO_REFILL_DELAY)
+        state_->ei_fifo[i].refill_delay = DSPP_EI_FIFO_REFILL_DELAY;
+      state_->IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + i] = state_->ei_fifo[i].value;
+    }
 
   return true;
 }
@@ -1298,6 +1527,8 @@ opera_dsp_init(void)
 
   for(i = 0; i < 16; i++)
     DSP.CPUSupply[i] = 0;
+
+  dsp_state_ei_fifo_reset(&DSP);
 }
 
 void
@@ -1309,6 +1540,7 @@ opera_dsp_reset(void)
   DSP.flags.GenFIQ  = false;
 
   dsp_cycle_reset();
+  dsp_ei_fifo_control_reset(&DSP);
 }
 
 uint32_t
@@ -1805,6 +2037,7 @@ opera_dsp_loop(void)
 dsp_tick_complete:
           ticks--;
           DSP_SAVE_RUNTIME();
+          dsp_ei_fifo_refill_tick();
           if(dsp_counter_tick())
             DSP_LOAD_RUNTIME();
         }
@@ -1848,8 +2081,7 @@ opera_dsp_imem_write(uint16_t addr_,
       uint32_t channel;
 
       channel = (addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS);
-      DSP.CPUSupply[channel]               = 1;
-      DSP.IMem[addr_ & DSPP_IMEM_LOW_MASK] = val_;
+      dsp_ei_fifo_shadow_write(channel,val_);
     }
   else if(!(addr_ & DSPP_IMEM_DIRECT_MASK))
     {

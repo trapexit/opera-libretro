@@ -1195,6 +1195,9 @@ opera_clio_fifo_ei_read(uint16_t channel_)
   if(channel_ >= CLIO_INPUT_FIFO_COUNT)
     return 0;
 
+  if(CLIO.fifo_i[channel_].start.addr == 0)
+    return 0;
+
   return opera_mem_read16(((CLIO.fifo_i[channel_].start.addr + CLIO.fifo_i[channel_].idx)));
 }
 
@@ -1256,48 +1259,78 @@ dma_channel_enabled(uint32_t const channel_)
 uint16_t
 opera_clio_fifo_ei(uint16_t channel_)
 {
-  uint16_t val_;
+  uint16_t val;
+
+  if(opera_clio_fifo_ei_pop(channel_,&val))
+    return val;
+
+  return 0;
+}
+
+bool
+opera_clio_fifo_ei_peek(uint16_t  channel_,
+                        uint16_t *value_)
+{
+  if(value_ == NULL)
+    return false;
 
   if(channel_ >= CLIO_INPUT_FIFO_COUNT)
-    return 0;
+    return false;
 
   if(CLIO.fifo_i[channel_].start.addr == 0)
-    return 0;
+    return false;
+
+  if((CLIO.fifo_i[channel_].start.len - CLIO.fifo_i[channel_].idx) <= 0)
+    return false;
+
+  *value_ = opera_clio_fifo_ei_read(channel_);
+  return true;
+}
+
+bool
+opera_clio_fifo_ei_pop(uint16_t  channel_,
+                       uint16_t *value_)
+{
+  if(value_ == NULL)
+    return false;
+
+  if(channel_ >= CLIO_INPUT_FIFO_COUNT)
+    return false;
+
+  if(CLIO.fifo_i[channel_].start.addr == 0)
+    return false;
 
   if((CLIO.fifo_i[channel_].start.len - CLIO.fifo_i[channel_].idx) > 0)
     {
-      val_ = opera_clio_fifo_ei_read(channel_);
+      *value_ = opera_clio_fifo_ei_read(channel_);
       CLIO.fifo_i[channel_].idx += sizeof(uint16_t);
+      return true;
+    }
+
+  CLIO.fifo_i[channel_].idx = 0;
+  opera_clio_fiq_generate(INT0_DRDINT0 << channel_,0);
+
+  /* reload enabled see patent WO09410641A1, 49.16 */
+  if((CLIO.fifo_i[channel_].next.addr != 0) && dma_channel_enabled(channel_))
+    {
+      CLIO.fifo_i[channel_].start.addr = CLIO.fifo_i[channel_].next.addr;
+      CLIO.fifo_i[channel_].start.len  = CLIO.fifo_i[channel_].next.len;
+
+      if((CLIO.fifo_i[channel_].start.len - CLIO.fifo_i[channel_].idx) > 0)
+        {
+          *value_ = opera_clio_fifo_ei_read(channel_);
+          CLIO.fifo_i[channel_].idx += sizeof(uint16_t);
+          return true;
+        }
+
+      CLIO.fifo_i[channel_].start.addr = 0;
     }
   else
     {
-      CLIO.fifo_i[channel_].idx = 0;
-      opera_clio_fiq_generate(INT0_DRDINT0 << channel_,0);
-
-      /* reload enabled see patent WO09410641A1, 49.16 */
-      if((CLIO.fifo_i[channel_].next.addr != 0) && dma_channel_enabled(channel_))
-        {
-          CLIO.fifo_i[channel_].start.addr = CLIO.fifo_i[channel_].next.addr;
-          CLIO.fifo_i[channel_].start.len  = CLIO.fifo_i[channel_].next.len;
-
-          val_ = opera_clio_fifo_ei_read(channel_);
-          CLIO.fifo_i[channel_].idx += sizeof(uint16_t);
-        }
-      else
-        {
-          CLIO.fifo_i[channel_].start.addr = 0;
-          val_ = 0;
-        }
+      CLIO.fifo_i[channel_].start.addr = 0;
     }
 
-  return val_;
-
-
-  // JMK SEZ: What is this? It was commented out along with this whole "else"
-  //          block, but I had to bring this else block back from the dead
-  //          in order to initialize val appropriately.
-
-  // opera_clio_fiq_generate(1<<(channel_+16),0);
+  return false;
 }
 
 static
