@@ -101,11 +101,12 @@
                                           DSPP_FIFOHEAD_ZERO_ADDRESS)
 #define DSPP_I_MEM_MIRROR_SIZE           0x200
 
-#define DSPP_SEMA4_DSP_ACK      0x0001
-#define DSPP_SEMA4_DSP_WROTE    0x0004
-#define DSPP_SEMA4_ARM_WROTE    0x0008
-#define DSPP_SEMA4_DATA_MASK    0xFFFF
-#define DSPP_SEMA4_STATUS_SHIFT 16
+#define DSPP_SEMA4_STATUS_DSP_ACK   0x0001
+#define DSPP_SEMA4_STATUS_CPU_ACK   0x0002
+#define DSPP_SEMA4_STATUS_DSP_WROTE 0x0004
+#define DSPP_SEMA4_STATUS_CPU_WROTE 0x0008
+#define DSPP_SEMA4_DATA_MASK        0xFFFF
+#define DSPP_SEMA4_STATUS_SHIFT     16
 
 #pragma pack(push,1)
 
@@ -481,12 +482,12 @@ dsp_write(uint32_t addr_,
          (val_ & DSP_AUDIO_STATUS_AUDLOCK));
       break;
     case DSPP_SEMA4_ACK_WRITE:
-      /* DSP write to Sema4ACK */
-      DSP.dregs.Sema4Status |= DSPP_SEMA4_DSP_ACK;
+      /* DSP write to Sema4ACK. */
+      DSP.dregs.Sema4Status |= DSPP_SEMA4_STATUS_DSP_ACK;
       break;
     case DSPP_SEMA4_DATA_WRITE:
       DSP.dregs.Sema4Data   = val_;
-      DSP.dregs.Sema4Status = DSPP_SEMA4_DSP_WROTE;  /* DSP write to Sema4Data */
+      DSP.dregs.Sema4Status = DSPP_SEMA4_STATUS_DSP_WROTE;
       break;
     case DSPP_INT_WRITE:
       DSP.dregs.INT    = val_;
@@ -1048,7 +1049,10 @@ opera_dsp_init(void)
 
   opera_dsp_reset();
 
-  /* ?? 8-CPU last, 4-DSP last, 2-CPU ACK, 1 DSP ACK ?? */
+  /*
+   * CPU reads pack this status into the upper halfword. Portfolio OS checks
+   * SEMAPHORE_DSPP_WROTE as 0x40000, matching DSP-wrote status bit 2.
+   */
   DSP.dregs.Sema4Status = 0;
 
   for(i = 0; i < sizeof(DSP.NMem)/sizeof(DSP.NMem[0]); i++)
@@ -1530,11 +1534,9 @@ opera_dsp_imem_write(uint16_t addr_,
 void
 opera_dsp_arm_semaphore_write(uint32_t val_)
 {
-  // How about Sema4ACK? Now don't think about it
-  // ARM write to Sema4Data low 16 bits
-  // ARM be last
+  /* CPU writes Sema4Data low 16 bits; CPU ACK writes are not modeled. */
   DSP.dregs.Sema4Data   = (val_ & DSPP_SEMA4_DATA_MASK);
-  DSP.dregs.Sema4Status = DSPP_SEMA4_ARM_WROTE;
+  DSP.dregs.Sema4Status = DSPP_SEMA4_STATUS_CPU_WROTE;
 }
 
 /* CPU reads from EO,I of DSP */
