@@ -67,8 +67,9 @@
 
 #define DSPP_SLEEP_OPCODE 0x8380
 
-#define NUM_AUDIO_INPUT_DMAS  13
-#define NUM_AUDIO_OUTPUT_DMAS 4
+#define DSPP_AUDIO_INPUT_DMA_COUNT 13
+#define DSPP_EI_FIFO_COUNT         15
+#define NUM_AUDIO_OUTPUT_DMAS      4
 
 #define DSPP_FIFOHEAD_ZERO_ADDRESS 0x070
 #define DSPI_NOISE                 0x0EA
@@ -81,7 +82,6 @@
 
 #define DSPP_EI_FIFO_DATA_FIRST   0x0F0
 #define DSPP_EI_FIFO_STATUS_FIRST 0x0D0
-#define DSPP_EI_FIFO_STATUS_COUNT (NUM_AUDIO_INPUT_DMAS + 2)
 #define DSPP_EO_FIFO_STATUS_FIRST 0x0E0
 #define DSPP_EO_FIFO_DATA_FIRST   0x3F0
 
@@ -97,8 +97,6 @@
 #define DSPP_FIFO_CHANNEL_MASK           0x0F
 #define DSPP_IMEM_LOW_MASK               0x7F
 #define DSPP_IMEM_DIRECT_MASK            0x80
-#define DSPP_EI_FIFO_DATA_TO_HEAD_OFFSET (DSPP_EI_FIFO_DATA_FIRST - \
-                                          DSPP_FIFOHEAD_ZERO_ADDRESS)
 #define DSPP_I_MEM_MIRROR_SIZE           0x200
 
 #define DSPP_SEMA4_STATUS_DSP_ACK   0x0001
@@ -394,43 +392,47 @@ uint16_t
 dsp_read(uint32_t addr_)
 {
   /* addr &= LAST_N_MEM; */
-  if(dsp_addr_in_range(addr_,DSPP_EI_FIFO_DATA_FIRST,NUM_AUDIO_INPUT_DMAS))
+  if(dsp_addr_in_range(addr_,DSPP_EI_FIFO_DATA_FIRST,DSPP_EI_FIFO_COUNT))
     {
+      uint32_t channel;
+
+      channel = (addr_ & DSPP_FIFO_CHANNEL_MASK);
       /*
         printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
         val=IMem[addr-0x80];
       */
-      if(DSP.CPUSupply[addr_ - DSPP_EI_FIFO_DATA_FIRST])
-        return (DSP.CPUSupply[addr_ - DSPP_EI_FIFO_DATA_FIRST] = 0,
-                DSP.IMem[addr_ - DSPP_EI_FIFO_DATA_TO_HEAD_OFFSET]);
-      return opera_clio_fifo_ei(addr_ & DSPP_FIFO_CHANNEL_MASK);
+      if(DSP.CPUSupply[channel])
+        return (DSP.CPUSupply[channel] = 0,
+                DSP.IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + channel]);
+      if(channel >= DSPP_AUDIO_INPUT_DMA_COUNT)
+        return DSP.IMem[DSPP_FIFOHEAD_ZERO_ADDRESS + channel];
+      return opera_clio_fifo_ei(channel);
     }
 
-  if(dsp_addr_in_range(addr_,DSPP_FIFOHEAD_ZERO_ADDRESS,NUM_AUDIO_INPUT_DMAS))
+  if(dsp_addr_in_range(addr_,DSPP_FIFOHEAD_ZERO_ADDRESS,DSPP_EI_FIFO_COUNT))
     {
+      uint32_t channel;
+
+      channel = (addr_ & DSPP_FIFO_CHANNEL_MASK);
       //printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
-      if(DSP.CPUSupply[addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS])
-        return (DSP.CPUSupply[addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS] = 0,
+      if(DSP.CPUSupply[channel])
+        return (DSP.CPUSupply[channel] = 0,
                 DSP.IMem[addr_]);
-      return opera_clio_fifo_ei_read(addr_ & DSPP_FIFO_CHANNEL_MASK);
+      if(channel >= DSPP_AUDIO_INPUT_DMA_COUNT)
+        return DSP.IMem[addr_];
+      return opera_clio_fifo_ei_read(channel);
     }
 
-  if(dsp_addr_in_range(addr_,DSPP_EI_FIFO_STATUS_FIRST,DSPP_EI_FIFO_STATUS_COUNT))
+  if(dsp_addr_in_range(addr_,DSPP_EI_FIFO_STATUS_FIRST,DSPP_EI_FIFO_COUNT))
     {
-      /*
-        what is last two case's?
-        if(CPUSupply[addr&0x0f])
-        {
-        CPUSupply[addr&0x0f]=0;
-        printf("#DSP read from CPU!!! chan=0x%x\n",addr&0x0f);
-        return IMem[DSPP_FIFOHEAD_ZERO_ADDRESS+addr&DSPP_FIFO_CHANNEL_MASK];
-        }
-        else
-        printf("#DSP read EIFifo status 0x%4.4X\n",addr&0x0f);
-      */
-      if(DSP.CPUSupply[addr_ & DSPP_FIFO_CHANNEL_MASK])
+      uint32_t channel;
+
+      channel = (addr_ & DSPP_FIFO_CHANNEL_MASK);
+      if(DSP.CPUSupply[channel])
         return FIFO_Count1;
-      return opera_clio_fifo_ei_status(addr_ & DSPP_FIFO_CHANNEL_MASK);
+      if(channel >= DSPP_AUDIO_INPUT_DMA_COUNT)
+        return 0;
+      return opera_clio_fifo_ei_status(channel);
     }
 
   if(dsp_addr_in_range(addr_,DSPP_EO_FIFO_STATUS_FIRST,NUM_AUDIO_OUTPUT_DMAS))
@@ -1520,10 +1522,13 @@ void
 opera_dsp_imem_write(uint16_t addr_,
                       uint16_t val_)
 {
-  if(dsp_addr_in_range(addr_,DSPP_FIFOHEAD_ZERO_ADDRESS,NUM_AUDIO_INPUT_DMAS))
+  if(dsp_addr_in_range(addr_,DSPP_FIFOHEAD_ZERO_ADDRESS,DSPP_EI_FIFO_COUNT))
     {
-      DSP.CPUSupply[addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS] = 1;
-      DSP.IMem[addr_ & DSPP_IMEM_LOW_MASK]              = val_;
+      uint32_t channel;
+
+      channel = (addr_ - DSPP_FIFOHEAD_ZERO_ADDRESS);
+      DSP.CPUSupply[channel]               = 1;
+      DSP.IMem[addr_ & DSPP_IMEM_LOW_MASK] = val_;
     }
   else if(!(addr_ & DSPP_IMEM_DIRECT_MASK))
     {

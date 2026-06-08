@@ -1192,6 +1192,9 @@ opera_clio_reset(void)
 uint16_t
 opera_clio_fifo_ei_read(uint16_t channel_)
 {
+  if(channel_ >= CLIO_INPUT_FIFO_COUNT)
+    return 0;
+
   return opera_mem_read16(((CLIO.fifo_i[channel_].start.addr + CLIO.fifo_i[channel_].idx)));
 }
 
@@ -1254,6 +1257,9 @@ uint16_t
 opera_clio_fifo_ei(uint16_t channel_)
 {
   uint16_t val_;
+
+  if(channel_ >= CLIO_INPUT_FIFO_COUNT)
+    return 0;
 
   if(CLIO.fifo_i[channel_].start.addr == 0)
     return 0;
@@ -1403,6 +1409,9 @@ opera_clio_fifo_eo_read(uint16_t channel_)
 uint16_t
 opera_clio_fifo_ei_status(uint8_t channel_)
 {
+  if(channel_ >= CLIO_INPUT_FIFO_COUNT)
+    return 0;
+
   if(CLIO.fifo_i[channel_].start.addr != 0)
     return FIFO_Count1; /* fixme */
 
@@ -1447,6 +1456,9 @@ opera_clio_fifo_read(uint32_t addr_)
 
   if((addr_ & CLIO_FIFO_INPUT_MASK) == CLIO_FIFO_INPUT_VALUE)
     {
+      if(channel >= CLIO_INPUT_FIFO_COUNT)
+        return 0;
+
       switch(addr_ & CLIO_FIFO_ADDR_MASK)
         {
         case MADAM_DMA_CURADR_OFFSET:
@@ -1459,6 +1471,9 @@ opera_clio_fifo_read(uint32_t addr_)
           return CLIO.fifo_i[channel].next.len;
         }
     }
+
+  if(channel >= CLIO_OUTPUT_FIFO_COUNT)
+    return 0;
 
   switch(addr_ & CLIO_FIFO_ADDR_MASK)
     {
@@ -1484,6 +1499,9 @@ opera_clio_fifo_write(uint32_t addr_, uint32_t val_)
 
   if((addr_ & CLIO_FIFO_INPUT_MASK) == CLIO_FIFO_INPUT_VALUE)
     {
+      if(channel >= CLIO_INPUT_FIFO_COUNT)
+        return;
+
       switch(addr_ & CLIO_FIFO_ADDR_MASK)
         {
         case MADAM_DMA_CURADR_OFFSET:
@@ -1513,6 +1531,9 @@ opera_clio_fifo_write(uint32_t addr_, uint32_t val_)
     }
   else
     {
+      if(channel >= CLIO_OUTPUT_FIFO_COUNT)
+        return;
+
       switch (addr_ & CLIO_FIFO_ADDR_MASK)
         {
         case MADAM_DMA_CURADR_OFFSET:
