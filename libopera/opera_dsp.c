@@ -287,6 +287,24 @@ enum dsp_write_kind_e
 
 typedef enum dsp_write_kind_e dsp_write_kind_t;
 
+enum dsp_branch_delay_kind_e
+{
+  DSP_BRANCH_DELAY_NONE,
+  DSP_BRANCH_DELAY_AFTER_BRANCH,
+  DSP_BRANCH_DELAY_AFTER_BFM_TARGET
+};
+
+typedef enum dsp_branch_delay_kind_e dsp_branch_delay_kind_t;
+
+struct dsp_branch_delay_s
+{
+  dsp_branch_delay_kind_t kind;
+  uint16_t                branch_target;
+  uint16_t                bfm_target;
+};
+
+typedef struct dsp_branch_delay_s dsp_branch_delay_t;
+
 struct dsp_s
 {
   uint32_t   RBASEx4;
@@ -349,6 +367,50 @@ hash16(uint32_t i_,
   uint32_t const hash = (i_ * k_);
 
   return (((hash >> 16) ^ hash) & 0xFFFF);
+}
+
+static
+INLINE
+bool
+dsp_control_is_bfm(ITAG_t inst_)
+{
+  uint32_t control;
+
+  control = ((inst_.raw >> 7) & 0xFF);
+
+  return (inst_.aif.PAD && (control >= 24) && (control <= 31));
+}
+
+static
+INLINE
+bool
+dsp_control_executes_in_branch_delay(ITAG_t inst_)
+{
+  if(!inst_.aif.PAD)
+    return false;
+
+  switch((inst_.raw >> 7) & 0xFF)
+    {
+    case 0: /* NOP */
+    case 2: /* RBASE */
+    case 3: /* RMAP */
+    case 5: /* operand mask */
+      return true;
+    default:
+      break;
+    }
+
+  return false;
+}
+
+static
+INLINE
+void
+dsp_branch_delay_take(dsp_branch_delay_t *delay_,
+                      uint16_t target_)
+{
+  delay_->kind          = DSP_BRANCH_DELAY_AFTER_BRANCH;
+  delay_->branch_target = (target_ & LAST_N_MEM);
 }
 
 static
@@ -1101,8 +1163,8 @@ opera_dsp_loop(void)
       uint32_t AOP    = 0;      /* 1st operand */
       uint32_t RBSR   = 0;	/* return address */
       int      fExact = 0;
-      bool     just_branched = false;
       bool     work   = true;
+      dsp_branch_delay_t branch_delay = { DSP_BRANCH_DELAY_NONE, 0, 0 };
 
       opera_dsp_reset();
 
@@ -1113,40 +1175,81 @@ opera_dsp_loop(void)
       do
         {
           ITAG_t inst;
+          bool   redirect_after_slot;
+          bool   bfm_target_slot;
+          uint16_t redirect_target;
+          uint16_t bfm_target;
+
+          redirect_after_slot = false;
+          redirect_target     = 0;
+          bfm_target_slot = (branch_delay.kind == DSP_BRANCH_DELAY_AFTER_BFM_TARGET);
+          bfm_target      = branch_delay.bfm_target;
+          if(bfm_target_slot)
+            branch_delay.kind = DSP_BRANCH_DELAY_NONE;
 
           inst.raw = DSP.NMem[DSP.dregs.PC++];
+          if(branch_delay.kind == DSP_BRANCH_DELAY_AFTER_BRANCH)
+            {
+              uint16_t branch_target;
+
+              branch_target = branch_delay.branch_target;
+              branch_delay.kind = DSP_BRANCH_DELAY_NONE;
+
+              if(dsp_control_is_bfm(inst))
+                {
+                  branch_delay.kind       = DSP_BRANCH_DELAY_AFTER_BFM_TARGET;
+                  branch_delay.bfm_target = (inst.cif.BCH_ADDR & LAST_N_MEM);
+                  DSP.dregs.PC            = branch_target;
+                  continue;
+                }
+              else if(dsp_control_executes_in_branch_delay(inst))
+                {
+                  redirect_after_slot = true;
+                  redirect_target     = branch_target;
+                }
+              else
+                {
+                  DSP.dregs.PC = branch_target;
+                  continue;
+                }
+            }
+
+          if(bfm_target_slot)
+            {
+              if(!dsp_control_executes_in_branch_delay(inst))
+                {
+                  DSP.dregs.PC = bfm_target;
+                  continue;
+                }
+
+              redirect_after_slot = true;
+              redirect_target     = bfm_target;
+            }
+
           if(inst.aif.PAD)
             { // Control instruction
               switch((inst.raw >> 7) & 0xFF)
                 {
                 case 0:         /* NOP TODO */
-                  just_branched = false;
                   break;
                 case 1:         /* branch accum */
-                  DSP.dregs.PC = ((Y >> 16) & LAST_N_MEM);
-                  just_branched = true;
+                  dsp_branch_delay_take(&branch_delay,(Y >> 16));
                   break;
                 case 2:         /* set rbase */
                   DSP.RBASEx4 = ((inst.cif.BCH_ADDR & 0x3F) << 2);
-                  just_branched = false;
                   break;
                 case 3:         /* set rmap */
                   DSP.REGi = (inst.cif.BCH_ADDR & 7);
-                  just_branched = false;
                   break;
                 case 4:         /* RTS */
-                  DSP.dregs.PC = RBSR;
-                  just_branched = true;
+                  dsp_branch_delay_take(&branch_delay,RBSR);
                   break;
                 case 5:         /* set op_mask */
                   DSP.flags.nOP_MASK = ~(inst.cif.BCH_ADDR & 0x1F);
-                  just_branched = false;
                   break;
                 case 6:         /* -not used2- ins */
-                  just_branched = false;
                   break;
                 case 7:         /* sleep */
-                  just_branched = false;
                   work = false;
                   break;
                 case 8:
@@ -1158,8 +1261,7 @@ opera_dsp_loop(void)
                 case 14:
                 case 15:
                   /* jump */
-                  DSP.dregs.PC = inst.cif.BCH_ADDR;
-                  just_branched = true;
+                  dsp_branch_delay_take(&branch_delay,inst.cif.BCH_ADDR);
                   break;
                 case 16:
                 case 17:
@@ -1170,9 +1272,8 @@ opera_dsp_loop(void)
                 case 22:
                 case 23:
                   /* jsr */
-                  RBSR         = DSP.dregs.PC;
-                  DSP.dregs.PC = inst.cif.BCH_ADDR;
-                  just_branched = true;
+                  RBSR = DSP.dregs.PC;
+                  dsp_branch_delay_take(&branch_delay,inst.cif.BCH_ADDR);
                   break;
                 case 24:
                 case 25:
@@ -1182,9 +1283,7 @@ opera_dsp_loop(void)
                 case 29:
                 case 30:
                 case 31:
-                  /* branch only if was branched */
-                  if(just_branched)
-                    DSP.dregs.PC = inst.cif.BCH_ADDR;
+                  /* Branch-From only redirects from a pending branch slot. */
                   break;
                 case 32:
                 case 33:
@@ -1220,7 +1319,6 @@ opera_dsp_loop(void)
                       }
                     dsp_write(addr,op,kind);
                   }
-                  just_branched = false;
                   break;
                 case 48:
                 case 49:
@@ -1256,25 +1354,16 @@ opera_dsp_loop(void)
                       }
                     dsp_write(addr,op,kind);
                   }
-                  just_branched = false;
                   break;
                 default: /* condition branch */
                   if(1 & DSP.BRCONDTAB[inst.br.bits][fExact+((flags.raw*0x10080402)>>24)])
-                    {
-                      DSP.dregs.PC = inst.cif.BCH_ADDR;
-                      just_branched = true;
-                    }
-                  else
-                    {
-                      just_branched = false;
-                    }
+                    dsp_branch_delay_take(&branch_delay,inst.cif.BCH_ADDR);
                   break;
                 }
             }
           else
             {
               /* ALU instruction */
-              just_branched = false;
               DSP.flags.req.raw = DSP.INSTTRAS[inst.raw].req.raw;
               DSP.flags.BS      = DSP.INSTTRAS[inst.raw].BS;
 
@@ -1512,6 +1601,12 @@ opera_dsp_loop(void)
 
               if(DSP.flags.WRITEBACK)
                 dsp_write(DSP.flags.WRITEBACK,((int32_t)Y) >> 16,DSP_WRITE_WRITEBACK);
+            }
+
+          if(redirect_after_slot)
+            {
+              branch_delay.kind = DSP_BRANCH_DELAY_NONE;
+              DSP.dregs.PC      = redirect_target;
             }
 
         } while(work);
