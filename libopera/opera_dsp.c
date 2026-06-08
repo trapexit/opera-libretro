@@ -276,6 +276,17 @@ struct INTAG_s
 
 typedef struct INTAG_s INTAG_t;
 
+enum dsp_write_kind_e
+{
+  DSP_WRITE_DIRECT,
+  DSP_WRITE_INDIRECT,
+  DSP_WRITE_REGISTER_DIRECT,
+  DSP_WRITE_REGISTER_INDIRECT,
+  DSP_WRITE_WRITEBACK
+};
+
+typedef enum dsp_write_kind_e dsp_write_kind_t;
+
 struct dsp_s
 {
   uint32_t   RBASEx4;
@@ -466,7 +477,8 @@ dsp_read(uint32_t addr_)
 static
 void
 dsp_write(uint32_t addr_,
-          uint16_t val_)
+          uint16_t val_,
+          dsp_write_kind_t kind_)
 {
   addr_ &= LAST_N_MEM;
 
@@ -496,7 +508,8 @@ dsp_write(uint32_t addr_,
       DSP.flags.GenFIQ = true;
       break;
     case DSPP_DSPPRLD_WRITE:
-      DSP.dregs.DSPPRLD = val_;
+      if(kind_ == DSP_WRITE_DIRECT)
+        DSP.dregs.DSPPRLD = val_;
       break;
     case DSPP_EO_FIFO_FLUSH:
       /* FLUSH EOFIFO */
@@ -1192,12 +1205,20 @@ opera_dsp_loop(void)
                   {
                     uint16_t op;
                     uint16_t addr;
+                    dsp_write_kind_t kind;
 
                     op   = dsp_operand_load1();
                     addr = DSP.REGCONV[DSP.REGi][inst.r2of.R1] ^ DSP.RBASEx4;
                     if(inst.r2of.R1_DI)
-                      addr = dsp_read(addr);
-                    dsp_write(addr,op);
+                      {
+                        addr = dsp_read(addr);
+                        kind = DSP_WRITE_REGISTER_INDIRECT;
+                      }
+                    else
+                      {
+                        kind = DSP_WRITE_REGISTER_DIRECT;
+                      }
+                    dsp_write(addr,op,kind);
                   }
                   just_branched = false;
                   break;
@@ -1220,12 +1241,20 @@ opera_dsp_loop(void)
                   {
                     uint16_t op;
                     uint16_t addr;
+                    dsp_write_kind_t kind;
 
                     op   = dsp_operand_load1();
                     addr = inst.cif.BCH_ADDR;
                     if(inst.nrof.DI)
-                      addr = dsp_read(addr);
-                    dsp_write(addr,op);
+                      {
+                        addr = dsp_read(addr);
+                        kind = DSP_WRITE_INDIRECT;
+                      }
+                    else
+                      {
+                        kind = DSP_WRITE_DIRECT;
+                      }
+                    dsp_write(addr,op,kind);
                   }
                   just_branched = false;
                   break;
@@ -1482,7 +1511,7 @@ opera_dsp_loop(void)
                 }
 
               if(DSP.flags.WRITEBACK)
-                dsp_write(DSP.flags.WRITEBACK,((int32_t)Y) >> 16);
+                dsp_write(DSP.flags.WRITEBACK,((int32_t)Y) >> 16,DSP_WRITE_WRITEBACK);
             }
 
         } while(work);
