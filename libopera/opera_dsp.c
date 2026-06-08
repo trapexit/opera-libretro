@@ -51,6 +51,9 @@
 #define DEFAULT_SAMPLERATE 44100
 #define SYSTEM_TICKS       (((SYSTEM_CLOCK_RATE + DEFAULT_SAMPLERATE - 1) / \
                              DEFAULT_SAMPLERATE) + 1)
+#define DSPP_DEFAULT_RELOAD SYSTEM_TICKS
+
+#define DSP_STATE_V1_RAW_SIZE 76143 /* Legacy raw dsp_t payload size. */
 
 #define DSP_AUDIO_STATUS_AUDLOCK 0x8000
 #define DSP_AUDIO_STATUS_LFTFULL 0x0002
@@ -305,22 +308,6 @@ struct dsp_branch_delay_s
 
 typedef struct dsp_branch_delay_s dsp_branch_delay_t;
 
-struct dsp_s
-{
-  uint32_t   RBASEx4;
-  INSTTRAS_t INSTTRAS[0x8000];
-  uint16_t   REGCONV[8][16];
-  int        BRCONDTAB[32][32];
-  uint16_t   NMem[2048];
-  uint16_t   IMem[1024];
-  int        REGi;
-  REGSTAG_t  dregs;
-  INTAG_t    flags;
-  int        CPUSupply[16];
-};
-
-typedef struct dsp_s dsp_t;
-
 union dsp_alu_flags_u
 {
   uint32_t raw;
@@ -336,9 +323,145 @@ union dsp_alu_flags_u
 
 typedef union dsp_alu_flags_u dsp_alu_flags_t;
 
+struct dsp_runtime_s
+{
+  uint32_t           Y;
+  uint32_t           BOP;
+  uint32_t           RBSR;
+  int                fExact;
+  dsp_alu_flags_t    alu_flags;
+  dsp_branch_delay_t branch_delay;
+  bool               sleeping;
+};
+
+typedef struct dsp_runtime_s dsp_runtime_t;
+
+struct dsp_s
+{
+  uint32_t   RBASEx4;
+  INSTTRAS_t INSTTRAS[0x8000];
+  uint16_t   REGCONV[8][16];
+  int        BRCONDTAB[32][32];
+  uint16_t   NMem[2048];
+  uint16_t   IMem[1024];
+  int        REGi;
+  REGSTAG_t  dregs;
+  INTAG_t    flags;
+  int        CPUSupply[16];
+  dsp_runtime_t runtime;
+};
+
+typedef struct dsp_s dsp_t;
+
 #pragma pack(pop)
 
 static dsp_t DSP;
+
+static
+void
+dsp_state_runtime_reset(dsp_t *state_)
+{
+  state_->runtime.Y                 = 0;
+  state_->runtime.BOP               = 0;
+  state_->runtime.RBSR              = 0;
+  state_->runtime.fExact            = 0;
+  state_->runtime.alu_flags.raw     = 0;
+  state_->runtime.branch_delay.kind = DSP_BRANCH_DELAY_NONE;
+  state_->runtime.branch_delay.branch_target = 0;
+  state_->runtime.branch_delay.bfm_target    = 0;
+  state_->runtime.sleeping          = false;
+}
+
+static
+void
+dsp_state_sequential_reset(dsp_t *state_)
+{
+  dsp_state_runtime_reset(state_);
+  state_->flags.MULT1     = 0;
+  state_->flags.MULT2     = 0;
+  state_->flags.ALU1      = 0;
+  state_->flags.ALU2      = 0;
+  state_->flags.BS        = 0;
+  state_->flags.RMAP      = 0;
+  state_->flags.WRITEBACK = 0;
+  state_->flags.req.raw   = 0;
+}
+
+static
+void
+dsp_cycle_reset(void)
+{
+  DSP.dregs.DSPPCNT  = DSP.dregs.DSPPRLD;
+  DSP.dregs.PC       = 0;
+  DSP.RBASEx4        = 0;
+  DSP.REGi           = 0;
+  DSP.flags.nOP_MASK = ~0;
+
+  dsp_state_sequential_reset(&DSP);
+}
+
+static
+void
+dsp_counter_decrement(uint32_t ticks_)
+{
+  uint16_t counter;
+
+  counter = (uint16_t)DSP.dregs.DSPPCNT;
+  counter = (uint16_t)(counter - (uint16_t)ticks_);
+  DSP.dregs.DSPPCNT = (int16_t)counter;
+}
+
+static
+bool
+dsp_counter_tick(void)
+{
+  dsp_counter_decrement(1);
+
+  if(DSP.dregs.DSPPRLD == 0)
+    return false;
+
+  if(DSP.dregs.DSPPCNT > 0)
+    return false;
+
+  dsp_cycle_reset();
+
+  return true;
+}
+
+static
+void
+dsp_sleep_advance(uint32_t *ticks_)
+{
+  if(DSP.dregs.DSPPRLD == 0)
+    {
+      if(DSP.dregs.AudioOutStatus & DSP_AUDIO_STATUS_AUDLOCK)
+        {
+          *ticks_ = 0;
+          dsp_cycle_reset();
+          return;
+        }
+
+      dsp_counter_decrement(*ticks_);
+      *ticks_ = 0;
+      return;
+    }
+
+  if(DSP.dregs.DSPPCNT <= 0)
+    {
+      dsp_cycle_reset();
+      return;
+    }
+
+  if((uint32_t)DSP.dregs.DSPPCNT > *ticks_)
+    {
+      dsp_counter_decrement(*ticks_);
+      *ticks_ = 0;
+      return;
+    }
+
+  *ticks_ -= (uint32_t)DSP.dregs.DSPPCNT;
+  dsp_cycle_reset();
+}
 
 static
 INLINE
@@ -601,7 +724,7 @@ dsp_write(uint32_t addr_,
 uint32_t
 opera_dsp_state_size_v1(void)
 {
-  return opera_state_save_size(sizeof(DSP));
+  return opera_state_save_size(DSP_STATE_V1_RAW_SIZE);
 }
 
 static
@@ -656,6 +779,17 @@ dsp_state_write_payload(opera_state_writer_t *writer_,
     if(!opera_state_write_i32(writer_,state_->CPUSupply[i]))
       return false;
 
+  if(!opera_state_write_u32(writer_,state_->runtime.Y) ||
+     !opera_state_write_u32(writer_,state_->runtime.BOP) ||
+     !opera_state_write_u32(writer_,state_->runtime.RBSR) ||
+     !opera_state_write_i32(writer_,state_->runtime.fExact) ||
+     !opera_state_write_u32(writer_,state_->runtime.alu_flags.raw) ||
+     !opera_state_write_u32(writer_,state_->runtime.branch_delay.kind) ||
+     !opera_state_write_u16(writer_,state_->runtime.branch_delay.branch_target) ||
+     !opera_state_write_u16(writer_,state_->runtime.branch_delay.bfm_target) ||
+     !opera_state_write_u8(writer_,state_->runtime.sleeping ? 1 : 0))
+    return false;
+
   return true;
 }
 
@@ -696,10 +830,16 @@ opera_dsp_state_load_v1(const void     *buf_,
                         uint32_t const  size_)
 {
   uint32_t rv;
+  dsp_t state;
 
-  rv = opera_state_load_sized(&DSP,"DSPP",buf_,size_,sizeof(DSP));
+  memset(&state,0,sizeof(state));
+  rv = opera_state_load_sized(&state,"DSPP",buf_,size_,DSP_STATE_V1_RAW_SIZE);
   if(rv != 0)
-    DSP.dregs.AudioOutStatus &= DSP_AUDIO_STATUS_MASK;
+    {
+      dsp_state_runtime_reset(&state);
+      DSP = state;
+      DSP.dregs.AudioOutStatus &= DSP_AUDIO_STATUS_MASK;
+    }
 
   return rv;
 }
@@ -711,6 +851,7 @@ dsp_state_read_payload(opera_state_reader_t *reader_,
 {
   uint32_t i;
   uint32_t j;
+  uint32_t branch_delay_kind;
   int8_t bs;
   uint8_t b;
 
@@ -773,6 +914,26 @@ dsp_state_read_payload(opera_state_reader_t *reader_,
         return false;
       state_->CPUSupply[i] = v;
     }
+
+  dsp_state_runtime_reset(state_);
+  if(opera_state_reader_finished(reader_))
+    return true;
+
+  if(!opera_state_read_u32(reader_,&state_->runtime.Y) ||
+     !opera_state_read_u32(reader_,&state_->runtime.BOP) ||
+     !opera_state_read_u32(reader_,&state_->runtime.RBSR) ||
+     !opera_state_read_i32(reader_,&state_->runtime.fExact) ||
+     !opera_state_read_u32(reader_,&state_->runtime.alu_flags.raw) ||
+     !opera_state_read_u32(reader_,&branch_delay_kind) ||
+     !opera_state_read_u16(reader_,&state_->runtime.branch_delay.branch_target) ||
+     !opera_state_read_u16(reader_,&state_->runtime.branch_delay.bfm_target) ||
+     !opera_state_read_u8(reader_,&b))
+    return false;
+  state_->runtime.sleeping = (b != 0);
+
+  if(branch_delay_kind > DSP_BRANCH_DELAY_AFTER_BFM_TARGET)
+    branch_delay_kind = DSP_BRANCH_DELAY_NONE;
+  state_->runtime.branch_delay.kind = (dsp_branch_delay_kind_t)branch_delay_kind;
 
   return true;
 }
@@ -1121,8 +1282,8 @@ opera_dsp_init(void)
 
   DSP.flags.Running = false;
   DSP.flags.GenFIQ  = false;
-  DSP.dregs.DSPPRLD = SYSTEM_TICKS;
-  DSP.dregs.AUDCNT  = SYSTEM_TICKS;
+  DSP.dregs.DSPPRLD = DSPP_DEFAULT_RELOAD;
+  DSP.dregs.AUDCNT  = DSPP_DEFAULT_RELOAD;
 
   opera_dsp_reset();
 
@@ -1142,11 +1303,12 @@ opera_dsp_init(void)
 void
 opera_dsp_reset(void)
 {
-  DSP.dregs.DSPPCNT  = DSP.dregs.DSPPRLD;
-  DSP.dregs.PC       = 0;
-  DSP.RBASEx4        = 0;
-  DSP.REGi           = 0;
-  DSP.flags.nOP_MASK = ~0;
+  DSP.dregs.DSPPRLD = DSPP_DEFAULT_RELOAD;
+  DSP.dregs.AUDCNT  = DSPP_DEFAULT_RELOAD;
+  DSP.flags.Running = false;
+  DSP.flags.GenFIQ  = false;
+
+  dsp_cycle_reset();
 }
 
 uint32_t
@@ -1155,30 +1317,61 @@ opera_dsp_loop(void)
   uint32_t Y;	/* accumulator */
   uint32_t BOP; /* 1st & 2nd operand */
   dsp_alu_flags_t flags;
+  uint32_t ticks;
 
   DSP.dregs.AudioOutStatus &= DSP_AUDIO_STATUS_AUDLOCK;
 
   if(DSP.flags.Running)
     {
       uint32_t AOP    = 0;      /* 1st operand */
-      uint32_t RBSR   = 0;	/* return address */
-      int      fExact = 0;
-      bool     work   = true;
-      dsp_branch_delay_t branch_delay = { DSP_BRANCH_DELAY_NONE, 0, 0 };
+      uint32_t RBSR;	/* return address */
+      int      fExact;
+      dsp_branch_delay_t branch_delay;
 
-      opera_dsp_reset();
+#define DSP_LOAD_RUNTIME()                         \
+      do                                           \
+        {                                          \
+          Y            = DSP.runtime.Y;            \
+          BOP          = DSP.runtime.BOP;          \
+          RBSR         = DSP.runtime.RBSR;         \
+          fExact       = DSP.runtime.fExact;       \
+          flags        = DSP.runtime.alu_flags;    \
+          branch_delay = DSP.runtime.branch_delay; \
+        }                                          \
+      while(0)
 
-      Y   = 0;
-      BOP = 0;
-      flags.raw = 0;
+#define DSP_SAVE_RUNTIME()                         \
+      do                                           \
+        {                                          \
+          DSP.runtime.Y            = Y;            \
+          DSP.runtime.BOP          = BOP;          \
+          DSP.runtime.RBSR         = RBSR;         \
+          DSP.runtime.fExact       = fExact;       \
+          DSP.runtime.alu_flags    = flags;        \
+          DSP.runtime.branch_delay = branch_delay; \
+        }                                          \
+      while(0)
 
-      do
+      ticks = SYSTEM_TICKS;
+      /* A DSP audio tick is one cyclic DSPP run; memory state persists. */
+      dsp_cycle_reset();
+      DSP_LOAD_RUNTIME();
+
+      while((ticks > 0) && DSP.flags.Running)
         {
           ITAG_t inst;
           bool   redirect_after_slot;
           bool   bfm_target_slot;
           uint16_t redirect_target;
           uint16_t bfm_target;
+
+          if(DSP.runtime.sleeping)
+            {
+              DSP_SAVE_RUNTIME();
+              dsp_sleep_advance(&ticks);
+              DSP_LOAD_RUNTIME();
+              continue;
+            }
 
           redirect_after_slot = false;
           redirect_target     = 0;
@@ -1200,7 +1393,7 @@ opera_dsp_loop(void)
                   branch_delay.kind       = DSP_BRANCH_DELAY_AFTER_BFM_TARGET;
                   branch_delay.bfm_target = (inst.cif.BCH_ADDR & LAST_N_MEM);
                   DSP.dregs.PC            = branch_target;
-                  continue;
+                  goto dsp_tick_complete;
                 }
               else if(dsp_control_executes_in_branch_delay(inst))
                 {
@@ -1210,7 +1403,7 @@ opera_dsp_loop(void)
               else
                 {
                   DSP.dregs.PC = branch_target;
-                  continue;
+                  goto dsp_tick_complete;
                 }
             }
 
@@ -1219,7 +1412,7 @@ opera_dsp_loop(void)
               if(!dsp_control_executes_in_branch_delay(inst))
                 {
                   DSP.dregs.PC = bfm_target;
-                  continue;
+                  goto dsp_tick_complete;
                 }
 
               redirect_after_slot = true;
@@ -1250,7 +1443,7 @@ opera_dsp_loop(void)
                 case 6:         /* -not used2- ins */
                   break;
                 case 7:         /* sleep */
-                  work = false;
+                  DSP.runtime.sleeping = true;
                   break;
                 case 8:
                 case 9:
@@ -1609,7 +1802,12 @@ opera_dsp_loop(void)
               DSP.dregs.PC      = redirect_target;
             }
 
-        } while(work);
+dsp_tick_complete:
+          ticks--;
+          DSP_SAVE_RUNTIME();
+          if(dsp_counter_tick())
+            DSP_LOAD_RUNTIME();
+        }
 
 
       if(1 & DSP.flags.GenFIQ)
@@ -1618,9 +1816,8 @@ opera_dsp_loop(void)
           opera_clio_fiq_generate(INT0_DSPPINT,0); /* AudioFIQ */
         }
 
-      DSP.dregs.DSPPCNT -= SYSTEM_TICKS;
-      if(DSP.dregs.DSPPCNT <= 0)
-        DSP.dregs.DSPPCNT += DSP.dregs.DSPPRLD;
+#undef DSP_SAVE_RUNTIME
+#undef DSP_LOAD_RUNTIME
     }
 
   return ((DSP.IMem[DSPP_DAC_RIGHT] << 16) | DSP.IMem[DSPP_DAC_LEFT]);
