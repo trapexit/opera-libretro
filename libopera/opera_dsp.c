@@ -39,13 +39,14 @@
 
 #include <string.h>
 
-#if 0 //20 bit ALU
-#define ALUSIZEMASK 0xFFFFF000
-#else //32 bit ALU
-#define ALUSIZEMASK 0xFFFFFFFF
-#endif
-
-#define TOPBIT 0x80000000
+#define DSPP_ACC_MASK          0xFFFFF000u
+#define DSPP_ACC_SIGN          0x80000000u
+#define DSPP_ACC_HIGH_WORD     0xFFFF0000u
+#define DSPP_ACC_LOW_NIBBLE    0x0000F000u
+#define DSPP_ACC_UNIT          0x00001000u
+#define DSPP_ACC_CARRY_BIT     0x00010000u
+#define DSPP_ACC_POS_CLIP      0x7FFFF000u
+#define DSPP_ACC_NEG_CLIP      0x80000000u
 
 #define SYSTEM_CLOCK_RATE  25000000
 #define DEFAULT_SAMPLERATE 44100
@@ -755,47 +756,161 @@ dsp_branch_delay_take(dsp_branch_delay_t *delay_,
 static
 OPERA_FORCEINLINE
 int
-ADD_CFLAG(const uint32_t a_,
-          const uint32_t b_,
-          const uint32_t y_)
+dspp_acc_negative(uint32_t value_)
 {
-  return ((a_ &  b_ & TOPBIT) ||
-          (a_ & ~y_ & TOPBIT) ||
-          (b_ & ~y_ & TOPBIT));
+  return ((value_ & DSPP_ACC_SIGN) != 0);
+}
+
+static
+OPERA_FORCEINLINE
+uint32_t
+dspp_acc_mask(uint32_t value_)
+{
+  return (value_ & DSPP_ACC_MASK);
+}
+
+static
+OPERA_FORCEINLINE
+int32_t
+dspp_acc_s32(uint32_t value_)
+{
+  return (int32_t)dspp_acc_mask(value_);
+}
+
+static
+OPERA_FORCEINLINE
+uint32_t
+dspp_operand_to_acc(uint16_t value_)
+{
+  return ((uint32_t)value_ << 16);
+}
+
+static
+OPERA_FORCEINLINE
+uint16_t
+dspp_acc_to_word(uint32_t value_)
+{
+  return (uint16_t)(dspp_acc_mask(value_) >> 16);
+}
+
+static
+OPERA_FORCEINLINE
+uint32_t
+dspp_multiply_to_acc(int16_t a_,
+                     int16_t b_)
+{
+  int32_t product;
+
+  product = ((int32_t)a_ * (int32_t)b_);
+
+  return dspp_acc_mask((uint32_t)product << 1);
 }
 
 static
 OPERA_FORCEINLINE
 int
-SUB_CFLAG(const uint32_t a_,
-          const uint32_t b_,
-          const uint32_t y_)
+dspp_acc_add_carry(uint32_t a_,
+                   uint32_t b_,
+                   uint32_t y_)
 {
-  return (( a_ & ~b_ & TOPBIT) ||
-          ( a_ & ~y_ & TOPBIT) ||
-          (~b_ & ~y_ & TOPBIT));
+  a_ = dspp_acc_mask(a_);
+  b_ = dspp_acc_mask(b_);
+  y_ = dspp_acc_mask(y_);
+
+  return (((a_ & b_) | (a_ & ~y_) | (b_ & ~y_)) & DSPP_ACC_SIGN) != 0;
 }
 
 static
 OPERA_FORCEINLINE
 int
-ADD_VFLAG(const uint32_t a_,
-          const uint32_t b_,
-          const uint32_t y_)
+dspp_acc_sub_carry(uint32_t a_,
+                   uint32_t b_,
+                   uint32_t y_)
 {
-  return (( a_ &  b_ & ~y_ & TOPBIT) ||
-          (~a_ & ~b_ &  y_ & TOPBIT));
+  a_ = dspp_acc_mask(a_);
+  b_ = dspp_acc_mask(b_);
+  y_ = dspp_acc_mask(y_);
+
+  return (((a_ & ~b_) | (a_ & ~y_) | (~b_ & ~y_)) & DSPP_ACC_SIGN) != 0;
 }
 
 static
 OPERA_FORCEINLINE
 int
-SUB_VFLAG(const uint32_t a_,
-          const uint32_t b_,
-          const uint32_t y_)
+dspp_acc_add_overflow(uint32_t a_,
+                      uint32_t b_,
+                      uint32_t y_)
 {
-  return (( a_ & ~b_ & ~y_ & TOPBIT) ||
-          (~a_ &  b_ &  y_ & TOPBIT));
+  a_ = dspp_acc_mask(a_);
+  b_ = dspp_acc_mask(b_);
+  y_ = dspp_acc_mask(y_);
+
+  return (((a_ & b_ & ~y_) | (~a_ & ~b_ & y_)) & DSPP_ACC_SIGN) != 0;
+}
+
+static
+OPERA_FORCEINLINE
+int
+dspp_acc_sub_overflow(uint32_t a_,
+                      uint32_t b_,
+                      uint32_t y_)
+{
+  a_ = dspp_acc_mask(a_);
+  b_ = dspp_acc_mask(b_);
+  y_ = dspp_acc_mask(y_);
+
+  return (((a_ & ~b_ & ~y_) | (~a_ & b_ & y_)) & DSPP_ACC_SIGN) != 0;
+}
+
+static
+OPERA_FORCEINLINE
+int
+dspp_acc_zero(uint32_t value_)
+{
+  return ((dspp_acc_mask(value_) & DSPP_ACC_HIGH_WORD) == 0);
+}
+
+static
+OPERA_FORCEINLINE
+int
+dspp_acc_exact(uint32_t value_)
+{
+  return ((dspp_acc_mask(value_) & DSPP_ACC_LOW_NIBBLE) == 0);
+}
+
+static
+OPERA_FORCEINLINE
+uint32_t
+dspp_acc_arithmetic_shift_right(uint32_t value_,
+                                uint32_t shift_)
+{
+  return dspp_acc_mask((uint32_t)(dspp_acc_s32(value_) >> shift_));
+}
+
+static
+OPERA_FORCEINLINE
+uint32_t
+dspp_acc_logical_shift_right(uint32_t value_,
+                             uint32_t shift_)
+{
+  return dspp_acc_mask(dspp_acc_mask(value_) >> shift_);
+}
+
+static
+OPERA_FORCEINLINE
+uint32_t
+dspp_acc_rotate_high_word_left(uint32_t value_,
+                               uint8_t *carry_)
+{
+  uint16_t word;
+
+  value_  = dspp_acc_mask(value_);
+  word    = dspp_acc_to_word(value_);
+  *carry_ = ((word & 0x8000) != 0);
+  word    = (uint16_t)((word << 1) | (*carry_ ? 1 : 0));
+
+  return dspp_acc_mask(((uint32_t)word << 16) |
+                       (value_ & DSPP_ACC_LOW_NIBBLE));
 }
 
 /* DSP IREAD (includes EI, I) */
@@ -976,8 +1091,8 @@ dsp_state_write_payload(opera_state_writer_t *writer_,
     if(!opera_state_write_i32(writer_,state_->CPUSupply[i]))
       return false;
 
-  if(!opera_state_write_u32(writer_,state_->runtime.Y) ||
-     !opera_state_write_u32(writer_,state_->runtime.BOP) ||
+  if(!opera_state_write_u32(writer_,dspp_acc_mask(state_->runtime.Y)) ||
+     !opera_state_write_u32(writer_,dspp_acc_mask(state_->runtime.BOP)) ||
      !opera_state_write_u32(writer_,state_->runtime.RBSR) ||
      !opera_state_write_i32(writer_,state_->runtime.fExact) ||
      !opera_state_write_u32(writer_,state_->runtime.alu_flags.raw) ||
@@ -1136,6 +1251,8 @@ dsp_state_read_payload(opera_state_reader_t *reader_,
      !opera_state_read_u16(reader_,&state_->runtime.branch_delay.bfm_target) ||
      !opera_state_read_u8(reader_,&b))
     return false;
+  state_->runtime.Y        = dspp_acc_mask(state_->runtime.Y);
+  state_->runtime.BOP      = dspp_acc_mask(state_->runtime.BOP);
   state_->runtime.sleeping = (b != 0);
 
   if(branch_delay_kind > DSP_BRANCH_DELAY_AFTER_BFM_TARGET)
@@ -1563,8 +1680,8 @@ opera_dsp_loop(void)
 #define DSP_LOAD_RUNTIME()                         \
       do                                           \
         {                                          \
-          Y            = DSP.runtime.Y;            \
-          BOP          = DSP.runtime.BOP;          \
+          Y            = dspp_acc_mask(DSP.runtime.Y);   \
+          BOP          = dspp_acc_mask(DSP.runtime.BOP); \
           RBSR         = DSP.runtime.RBSR;         \
           fExact       = DSP.runtime.fExact;       \
           flags        = DSP.runtime.alu_flags;    \
@@ -1575,8 +1692,8 @@ opera_dsp_loop(void)
 #define DSP_SAVE_RUNTIME()                         \
       do                                           \
         {                                          \
-          DSP.runtime.Y            = Y;            \
-          DSP.runtime.BOP          = BOP;          \
+          DSP.runtime.Y            = dspp_acc_mask(Y);   \
+          DSP.runtime.BOP          = dspp_acc_mask(BOP); \
           DSP.runtime.RBSR         = RBSR;         \
           DSP.runtime.fExact       = fExact;       \
           DSP.runtime.alu_flags    = flags;        \
@@ -1658,7 +1775,7 @@ opera_dsp_loop(void)
                 case 0:         /* NOP TODO */
                   break;
                 case 1:         /* branch accum */
-                  dsp_branch_delay_take(&branch_delay,(Y >> 16));
+                  dsp_branch_delay_take(&branch_delay,dspp_acc_to_word(Y));
                   break;
                 case 2:         /* set rbase */
                   DSP.RBASEx4 = ((inst.cif.BCH_ADDR & 0x3F) << 2);
@@ -1800,49 +1917,54 @@ opera_dsp_loop(void)
                   if(inst.aif.M2SEL == 0)
                     {
                       if((inst.aif.ALU == 3) || (inst.aif.ALU == 5))  // ACSBU signal
-                        AOP = (flags.carry ? ((int)DSP.flags.MULT1<<16) & ALUSIZEMASK : 0);
+                        AOP = (flags.carry ?
+                               dspp_operand_to_acc((uint16_t)DSP.flags.MULT1) : 0);
                       else
-                        AOP = (((int)DSP.flags.MULT1 * (((int32_t)Y >> 15) & ~1)) & ALUSIZEMASK);
+                        AOP = dspp_multiply_to_acc(DSP.flags.MULT1,
+                                                   (int16_t)dspp_acc_to_word(Y));
                     }
                   else
                     {
-                      AOP = (((int)DSP.flags.MULT1 * (int)DSP.flags.MULT2 * 2) & ALUSIZEMASK);
+                      AOP = dspp_multiply_to_acc(DSP.flags.MULT1,
+                                                 DSP.flags.MULT2);
                     }
                   break;
                 case 1:
-                  AOP = (DSP.flags.ALU1 << 16);
+                  AOP = dspp_operand_to_acc((uint16_t)DSP.flags.ALU1);
                   break;
                 case 0:
-                  AOP = Y;
+                  AOP = dspp_acc_mask(Y);
                   break;
                 case 2:
-                  AOP = (DSP.flags.ALU2 << 16);
+                  AOP = dspp_operand_to_acc((uint16_t)DSP.flags.ALU2);
                   break;
                 }
 
               /* ACSBU signal */
               if((inst.aif.ALU == 3) || (inst.aif.ALU == 5))
                 {
-                  BOP = (flags.carry << 16);
+                  BOP = (flags.carry ? DSPP_ACC_CARRY_BIT : 0);
                 }
               else
                 {
                   switch(inst.aif.MUXB)
                     {
                     case 0:
-                      BOP = Y;
+                      BOP = dspp_acc_mask(Y);
                       break;
                     case 1:
-                      BOP = (DSP.flags.ALU1 << 16);
+                      BOP = dspp_operand_to_acc((uint16_t)DSP.flags.ALU1);
                       break;
                     case 2:
-                      BOP = (DSP.flags.ALU2 << 16);
+                      BOP = dspp_operand_to_acc((uint16_t)DSP.flags.ALU2);
                       break;
                     case 3:
                       if(inst.aif.M2SEL == 0) // ACSBU == 0 here always
-                        BOP = (((int)DSP.flags.MULT1 * (((int32_t)Y >> 15)) & ~1) & ALUSIZEMASK);
+                        BOP = dspp_multiply_to_acc(DSP.flags.MULT1,
+                                                   (int16_t)dspp_acc_to_word(Y));
                       else
-                        BOP = (((int)DSP.flags.MULT1 * (int)DSP.flags.MULT2 * 2) & ALUSIZEMASK);
+                        BOP = dspp_multiply_to_acc(DSP.flags.MULT1,
+                                                   DSP.flags.MULT2);
                       break;
                     }
                 }
@@ -1858,117 +1980,111 @@ opera_dsp_loop(void)
                   //*
                 case 1:
                   Y = (0 - BOP);
-                  flags.carry    = SUB_CFLAG(0,BOP,Y);
-                  flags.overflow = SUB_VFLAG(0,BOP,Y);
+                  flags.carry    = dspp_acc_sub_carry(0,BOP,Y);
+                  flags.overflow = dspp_acc_sub_overflow(0,BOP,Y);
                   break;
                 case 2:
                 case 3:
                   Y = (AOP + BOP);
-                  flags.carry    = ADD_CFLAG(AOP,BOP,Y);
-                  flags.overflow = ADD_VFLAG(AOP,BOP,Y);
+                  flags.carry    = dspp_acc_add_carry(AOP,BOP,Y);
+                  flags.overflow = dspp_acc_add_overflow(AOP,BOP,Y);
                   break;
                 case 4:
                 case 5:
                   Y = (AOP - BOP);
-                  flags.carry    = SUB_CFLAG(AOP,BOP,Y);
-                  flags.overflow = SUB_VFLAG(AOP,BOP,Y);
+                  flags.carry    = dspp_acc_sub_carry(AOP,BOP,Y);
+                  flags.overflow = dspp_acc_sub_overflow(AOP,BOP,Y);
                   break;
                 case 6:
-                  Y = (AOP + 0x1000);
-                  flags.carry    = ADD_CFLAG(AOP,0x1000,Y);
-                  flags.overflow = ADD_VFLAG(AOP,0x1000,Y);
+                  Y = (AOP + DSPP_ACC_UNIT);
+                  flags.carry    = dspp_acc_add_carry(AOP,DSPP_ACC_UNIT,Y);
+                  flags.overflow = dspp_acc_add_overflow(AOP,DSPP_ACC_UNIT,Y);
                   break;
                 case 7:
-                  Y = (AOP - 0x1000);
-                  flags.carry    = SUB_CFLAG(AOP,0x1000,Y);
-                  flags.overflow = SUB_VFLAG(AOP,0x1000,Y);
+                  Y = (AOP - DSPP_ACC_UNIT);
+                  flags.carry    = dspp_acc_sub_carry(AOP,DSPP_ACC_UNIT,Y);
+                  flags.overflow = dspp_acc_sub_overflow(AOP,DSPP_ACC_UNIT,Y);
                   break;
                 case 8:		// A
                   Y = AOP;
                   break;
                 case 9:		// NOT A
-                  Y = (AOP ^ ALUSIZEMASK);
+                  Y = (AOP ^ DSPP_ACC_MASK);
                   break;
                 case 10:	// A AND B
                   Y = (AOP & BOP);
                   break;
                 case 11:	// A NAND B
-                  Y = ((AOP & BOP) ^ ALUSIZEMASK);
+                  Y = ((AOP & BOP) ^ DSPP_ACC_MASK);
                   break;
                 case 12:	// A OR B
                   Y= (AOP | BOP);
                   break;
                 case 13:	// A NOR B
-                  Y = ((AOP | BOP) ^ ALUSIZEMASK);
+                  Y = ((AOP | BOP) ^ DSPP_ACC_MASK);
                   break;
                 case 14:	// A XOR B
                   Y = (AOP ^ BOP);
                   break;
                 case 15:	// A XNOR B
-                  Y = (AOP ^ BOP ^ ALUSIZEMASK);
+                  Y = (AOP ^ BOP ^ DSPP_ACC_MASK);
                   break;
                 }
 
-              flags.zero     = ((Y & 0xFFFF0000) ? 0 : 1);
-              flags.negative = ((Y >> 31) ? 1 : 0);
-              fExact         = ((Y & 0x0000F000) ? 0 : 1);
+              Y              = dspp_acc_mask(Y);
+              flags.zero     = dspp_acc_zero(Y);
+              flags.negative = dspp_acc_negative(Y);
+              fExact         = dspp_acc_exact(Y);
 
               //and BarrelShifter
               switch(DSP.flags.BS)
                 {
                 case 1:
                 case 17:
-                  Y = Y << 1;
+                  Y = dspp_acc_mask(Y << 1);
                   break;
                 case 2:
                 case 18:
-                  Y = Y << 2;
+                  Y = dspp_acc_mask(Y << 2);
                   break;
                 case 3:
                 case 19:
-                  Y = Y << 3;
+                  Y = dspp_acc_mask(Y << 3);
                   break;
                 case 4:
                 case 20:
-                  Y = Y << 4;
+                  Y = dspp_acc_mask(Y << 4);
                   break;
                 case 5:
                 case 21:
-                  Y = Y << 5;
+                  Y = dspp_acc_mask(Y << 5);
                   break;
                 case 6:
                 case 22:
-                  Y = Y << 8;
+                  Y = dspp_acc_mask(Y << 8);
                   break;
 
                   //arithmetic shifts
                 case 9:
-                  Y  = ((int32_t)Y >> 16);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_arithmetic_shift_right(Y,16);
                   break;
                 case 10:
-                  Y  = ((int32_t)Y >> 8);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_arithmetic_shift_right(Y,8);
                   break;
                 case 11:
-                  Y  = ((int32_t)Y >> 5);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_arithmetic_shift_right(Y,5);
                   break;
                 case 12:
-                  Y  = ((int32_t)Y >> 4);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_arithmetic_shift_right(Y,4);
                   break;
                 case 13:
-                  Y  = ((int32_t)Y >> 3);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_arithmetic_shift_right(Y,3);
                   break;
                 case 14:
-                  Y  = ((int32_t)Y >> 2);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_arithmetic_shift_right(Y,2);
                   break;
                 case 15:
-                  Y  = ((int32_t)Y >> 1);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_arithmetic_shift_right(Y,1);
                   break;
 
                   // logocal shift
@@ -1977,55 +2093,40 @@ opera_dsp_loop(void)
                   if(1 & flags.overflow)
                     {
                       if(1 & flags.negative)
-                        Y = 0x7FFFF000;
+                        Y = DSPP_ACC_POS_CLIP;
                       else
-                        Y = 0x80000000;
+                        Y = DSPP_ACC_NEG_CLIP;
                     }
                   break;
                 case 8:         // Load operand load sameself again (ari)
                 case 24:        // same, but logicalshift
-                  {
-                    //int temp=flags.carry;
-                    flags.carry = ((signed)Y < 0); // shift out bit to Carry
-                    //Y=Y<<1;
-                    //Y|=temp<<16;
-                    Y = (((Y << 1) & 0xFFFE0000)   |
-                         (flags.carry ? 1<<16 : 0) |
-                         (Y & 0xF000));
-                  }
+                  Y = dspp_acc_rotate_high_word_left(Y,&flags.carry);
                   break;
                 case 25:
-                  Y  = ((uint32_t)Y >> 16);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_logical_shift_right(Y,16);
                   break;
                 case 26:
-                  Y  = ((uint32_t)Y >> 8);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_logical_shift_right(Y,8);
                   break;
                 case 27:
-                  Y  = ((uint32_t)Y >> 5);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_logical_shift_right(Y,5);
                   break;
                 case 28:
-                  Y  = ((uint32_t)Y >> 4);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_logical_shift_right(Y,4);
                   break;
                 case 29:
-                  Y  = ((uint32_t)Y >> 3);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_logical_shift_right(Y,3);
                   break;
                 case 30:
-                  Y  = ((uint32_t)Y >> 2);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_logical_shift_right(Y,2);
                   break;
                 case 31:
-                  Y  = ((uint32_t)Y >> 1);
-                  Y &= ALUSIZEMASK;
+                  Y = dspp_acc_logical_shift_right(Y,1);
                   break;
                 }
 
               if(DSP.flags.WRITEBACK)
-                dsp_write(DSP.flags.WRITEBACK,((int32_t)Y) >> 16,DSP_WRITE_WRITEBACK);
+                dsp_write(DSP.flags.WRITEBACK,dspp_acc_to_word(Y),DSP_WRITE_WRITEBACK);
             }
 
           if(redirect_after_slot)
