@@ -54,6 +54,7 @@
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
 #define DSP_DREG_PC              0x0EE
+#define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
 
@@ -276,6 +277,9 @@ static bool     dsp_fast_add(uint32_t        *Y_,
 static bool     dsp_fast_directout(uint32_t        *Y_,
                                    dsp_alu_flags_t *flags_,
                                    int             *fExact_);
+static bool     dsp_fast_subtract(uint32_t        *Y_,
+                                  dsp_alu_flags_t *flags_,
+                                  int             *fExact_);
 
 static
 INLINE
@@ -553,6 +557,29 @@ dsp_fast_add_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_subtract_match(uint32_t pc_)
+{
+  ITAG_t src1;
+  ITAG_t src2;
+  ITAG_t dst;
+
+  if(pc_ > (DSP_NMEM_EXEC_WORDS - 4))
+    return false;
+
+  if(DSP.NMem[pc_] != DSP_SUBTRACT_INSN)
+    return false;
+
+  src1.raw = DSP.NMem[pc_ + 1];
+  src2.raw = DSP.NMem[pc_ + 2];
+  dst.raw  = DSP.NMem[pc_ + 3];
+
+  return (dsp_fast_direct_source_operand(src1) &&
+          dsp_fast_direct_source_operand(src2) &&
+          dsp_fast_direct_dest_operand(dst));
+}
+
+static
+bool
 dsp_fast_directout_match(uint32_t pc_)
 {
   ITAG_t mix_left;
@@ -599,6 +626,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_add;
+        else if(dsp_fast_subtract_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_subtract;
       }
 
   DSP_FAST_DIRTY = false;
@@ -689,6 +718,76 @@ dsp_fast_add(uint32_t        *Y_,
                                  src1.nrof.OP_ADDR,
                                  src2.nrof.OP_ADDR,
                                  Y_,flags_,fExact_);
+
+  DSP.dregs.PC = pc + 4;
+
+  return true;
+}
+
+static
+void
+dsp_fast_subtract_clip_write_direct(uint16_t         insn_,
+                                    uint32_t         dst_addr_,
+                                    uint32_t         src1_addr_,
+                                    uint32_t         src2_addr_,
+                                    uint32_t        *Y_,
+                                    dsp_alu_flags_t *flags_,
+                                    int             *fExact_)
+{
+  uint32_t a;
+  uint32_t b;
+  uint32_t y;
+
+  DSP.flags.req.raw    = DSP.INSTTRAS[insn_].req.raw;
+  DSP.flags.BS         = DSP.INSTTRAS[insn_].BS;
+  DSP.flags.WRITEBACK  = dst_addr_;
+  DSP.flags.ALU1       = dsp_read(src1_addr_);
+  DSP.flags.ALU2       = dsp_read(src2_addr_);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a - b);
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  if(1 & flags_->overflow)
+    y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+
+  *Y_ = y;
+  dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+}
+
+static
+bool
+dsp_fast_subtract(uint32_t        *Y_,
+                  dsp_alu_flags_t *flags_,
+                  int             *fExact_)
+{
+  uint32_t pc;
+  ITAG_t src1;
+  ITAG_t src2;
+  ITAG_t dst;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_subtract_match(pc))
+    return false;
+
+  src1.raw = DSP.NMem[pc + 1];
+  src2.raw = DSP.NMem[pc + 2];
+  dst.raw  = DSP.NMem[pc + 3];
+
+  dsp_fast_subtract_clip_write_direct(DSP_SUBTRACT_INSN,
+                                      dst.nrof.OP_ADDR,
+                                      src1.nrof.OP_ADDR,
+                                      src2.nrof.OP_ADDR,
+                                      Y_,flags_,fExact_);
 
   DSP.dregs.PC = pc + 4;
 
