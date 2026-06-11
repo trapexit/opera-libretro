@@ -120,6 +120,7 @@
 #define DSP_SAMPLER3D_100_WORDS  98
 #define DSP_SAMPLERENV_36_WORDS  34
 #define DSP_SAMPLERMOD_18_WORDS  16
+#define DSP_SAWENVSVFENV_82_WORDS 80
 #define DSP_SAWENV_35_WORDS      33
 #define DSP_SUBTRACT_INSN        0x6647
 
@@ -647,6 +648,11 @@ static bool     dsp_fast_samplermod_18(uint32_t        *Y_,
                                        int             *fExact_,
                                        uint32_t        *RBSR_,
                                        bool            *work_);
+static bool     dsp_fast_sawenvsvfenv_82(uint32_t        *Y_,
+                                         dsp_alu_flags_t *flags_,
+                                         int             *fExact_,
+                                         uint32_t        *RBSR_,
+                                         bool            *work_);
 static bool     dsp_fast_sawenv_35(uint32_t        *Y_,
                                    dsp_alu_flags_t *flags_,
                                    int             *fExact_,
@@ -2419,6 +2425,92 @@ dsp_fast_samplermod_18_match(uint32_t pc_)
   uint32_t base;
 
   return dsp_fast_samplermod_18_base_for_pc(pc_,&base);
+}
+
+static
+bool
+dsp_fast_sawenvsvfenv_82_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_SAWENVSVFENV_82_WORDS] = {
+    0x00004640,0x00008016,0x0000800B,0x0000D410,
+    0x00004627,0x0000880C,0x00008000,0x00004D40,
+    0x00008009,0x00008012,0x00007C40,0x00008015,
+    0x00008013,0x00008011,0x00008418,0x00008000,
+    0x00004480,0x00008019,0x00008000,0x00009800,
+    0x0000C000,0x00009800,0x00008000,0x00008000,
+    0x00001D27,0x0000804C,0x00008000,0x00008000,
+    0x0000803D,0x00004640,0x00008033,0x00008028,
+    0x0000D42D,0x00004627,0x00008829,0x00008000,
+    0x00004D40,0x00008026,0x0000802F,0x00007C40,
+    0x00008032,0x00008030,0x0000802E,0x00008435,
+    0x00008000,0x00004480,0x00008000,0x00008000,
+    0x00009800,0x0000C000,0x00009800,0x00008000,
+    0x00008000,0x00004620,0x00008800,0x00008000,
+    0x00004C80,0x00008000,0x00008045,0x00008000,
+    0x00007D27,0x00008048,0x00008042,0x0000884E,
+    0x00005C27,0x00008000,0x00008049,0x00008000,
+    0x00004447,0x00008000,0x00008000,0x00004D27,
+    0x00008000,0x00008800,0x00005C80,0x00008000,
+    0x00008000,0x00004C80,0x00008000,0x00008000
+  };
+  static uint32_t const masks[DSP_SAWENVSVFENV_82_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0002FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0002FC00,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0002FC00,
+    0x0002FC00,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0001FC00,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0000FFFF,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0002FC00,
+    0x0000FFFF,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0002FC00,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_SAWENVSVFENV_82_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_sawenvsvfenv_82_base_for_pc(uint32_t const  pc_,
+                                    uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x10,0x18,0x2D,0x35
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_sawenvsvfenv_82_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_sawenvsvfenv_82_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_sawenvsvfenv_82_base_for_pc(pc_,&base);
 }
 
 static
@@ -5033,6 +5125,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_samplerenv_36;
         else if(dsp_fast_samplermod_18_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_samplermod_18;
+        else if(dsp_fast_sawenvsvfenv_82_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_sawenvsvfenv_82;
         else if(dsp_fast_sawenv_35_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_sawenv_35;
         else if(dsp_fast_benchmark_6_match(pc))
@@ -5803,6 +5897,28 @@ dsp_fast_samplermod_18(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_SAMPLERMOD_18_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_sawenvsvfenv_82(uint32_t        *Y_,
+                         dsp_alu_flags_t *flags_,
+                         int             *fExact_,
+                         uint32_t        *RBSR_,
+                         bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_sawenvsvfenv_82_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_SAWENVSVFENV_82_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
