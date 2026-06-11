@@ -75,6 +75,7 @@
 #define DSP_DREG_PC              0x0EE
 #define DSP_ENVELOPE_27_WORDS    25
 #define DSP_ENVFOLLOWER_15_WORDS 13
+#define DSP_EZFLIX225_219_WORDS 217
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
 #define DSP_MIXER8X2_WORDS       54
@@ -404,6 +405,11 @@ static bool     dsp_fast_envfollower_15(uint32_t        *Y_,
                                         int             *fExact_,
                                         uint32_t        *RBSR_,
                                         bool            *work_);
+static bool     dsp_fast_ezflix225_219(uint32_t        *Y_,
+                                       dsp_alu_flags_t *flags_,
+                                       int             *fExact_,
+                                       uint32_t        *RBSR_,
+                                       bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -2575,6 +2581,162 @@ dsp_fast_envfollower_15_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_ezflix225_219_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_EZFLIX225_219_WORDS] = {
+    0x00004640,0x00008006,0x00008007,0x0000B411,
+    0x00009812,0x0000C010,0x00009800,0x00008000,
+    0x00002400,0x00008022,0x00002400,0x00008027,
+    0x00002400,0x0000804A,0x00002400,0x0000806D,
+    0x000084D9,0x00002400,0x00008020,0x0000B426,
+    0x00004440,0x0000C010,0x0000801C,0x00008000,
+    0x00004120,0x0000C02D,0x00008021,0x00006620,
+    0x00008028,0x0000C073,0x00008023,0x00002470,
+    0x00008800,0x00009C2E,0x00008024,0x00009C34,
+    0x00008000,0x000084D9,0x00004400,0x00008094,
+    0x00008030,0x00004DA0,0x0000C008,0x0000C00F,
+    0x00004120,0x0000C033,0x00008036,0x000046AA,
+    0x00008038,0x0000CF00,0x00004120,0x0000C03B,
+    0x0000803E,0x0000983D,0x00008451,0x000046AC,
+    0x00008040,0x0000C0F0,0x00004120,0x0000C043,
+    0x00008046,0x00009845,0x00008457,0x000046A0,
+    0x0000804B,0x0000C00F,0x00004120,0x0000C050,
+    0x00008048,0x00009847,0x0000845F,0x000098A2,
+    0x00008467,0x00004400,0x000080B7,0x00008053,
+    0x00004DA0,0x0000C008,0x0000C00F,0x00004120,
+    0x0000C056,0x00008059,0x000046AA,0x0000805B,
+    0x0000CF00,0x00004120,0x0000C05E,0x00008061,
+    0x00009860,0x00008474,0x000046AC,0x00008063,
+    0x0000C0F0,0x00004120,0x0000C066,0x00008069,
+    0x00009868,0x0000847A,0x000046A0,0x0000806E,
+    0x0000C00F,0x00004120,0x0000C09A,0x0000806B,
+    0x0000986A,0x00008482,0x000098C5,0x0000848A,
+    0x00004400,0x00008000,0x00008076,0x00004DA0,
+    0x0000C008,0x0000C00F,0x00004120,0x0000C079,
+    0x0000807C,0x000046AA,0x0000807E,0x0000CF00,
+    0x00004120,0x0000C081,0x00008084,0x00009883,
+    0x0000849B,0x000046AC,0x00008086,0x0000C0F0,
+    0x00004120,0x0000C089,0x0000808C,0x0000988B,
+    0x000084A1,0x000046A0,0x00008095,0x0000C00F,
+    0x00004120,0x0000C000,0x0000808E,0x0000988D,
+    0x000084A9,0x00009800,0x000084B1,0x0000240C,
+    0x0000C002,0x00000070,0x0000E891,0x00004400,
+    0x00008000,0x0000809D,0x00004DA0,0x0000C008,
+    0x0000C00F,0x00004120,0x0000C0A0,0x000080A3,
+    0x000046AA,0x000080A5,0x0000CF00,0x00004120,
+    0x0000C0A8,0x000080AB,0x000098AA,0x000084BE,
+    0x000046AC,0x000080AD,0x0000C0F0,0x00004120,
+    0x0000C0B0,0x000080B3,0x000098B2,0x000084C4,
+    0x000046A0,0x000080B8,0x0000C00F,0x00004120,
+    0x0000C0BD,0x000080B5,0x000098B4,0x000084CC,
+    0x00009800,0x000084D4,0x00004400,0x00008000,
+    0x000080C0,0x00004DA0,0x0000C008,0x0000C00F,
+    0x00004120,0x0000C0C3,0x000080C6,0x000046AA,
+    0x000080C8,0x0000CF00,0x00004120,0x0000C0CB,
+    0x000080CE,0x000098CD,0x00008400,0x000046AC,
+    0x000080D0,0x0000C0F0,0x00004120,0x0000C0D3,
+    0x000080D6,0x000098D5,0x00008400,0x000046A0,
+    0x00008000,0x0000C00F,0x00004120,0x0000C000,
+    0x000080D8,0x000098D7,0x00008400,0x00009800,
+    0x00008400
+  };
+  static uint32_t const masks[DSP_EZFLIX225_219_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0001FC00,
+    0x0002FC00,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0002FC00,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0002FC00,
+    0x0001FC00,0x0000FFFF,0x0000FC00,0x0001FC00,
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0000FC00,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0001FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0002FC00,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0002FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0002FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0002FC00,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_EZFLIX225_219_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_ezflix225_219_base_for_pc(uint32_t const  pc_,
+                                   uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x11,0x26,0x91
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_ezflix225_219_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_ezflix225_219_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_ezflix225_219_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -2792,6 +2954,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_envelope_27;
         else if(dsp_fast_envfollower_15_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_envfollower_15;
+        else if(dsp_fast_ezflix225_219_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_ezflix225_219;
         else if(dsp_fast_directout_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
@@ -3739,6 +3903,28 @@ dsp_fast_envfollower_15(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_ENVFOLLOWER_15_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_ezflix225_219(uint32_t        *Y_,
+                       dsp_alu_flags_t *flags_,
+                       int             *fExact_,
+                       uint32_t        *RBSR_,
+                       bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_ezflix225_219_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_EZFLIX225_219_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
