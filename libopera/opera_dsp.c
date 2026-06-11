@@ -122,6 +122,7 @@
 #define DSP_SAMPLERMOD_18_WORDS  16
 #define DSP_SAWENVSVFENV_82_WORDS 80
 #define DSP_SAWENV_35_WORDS      33
+#define DSP_SAWFILTEREDNOISE_29_WORDS 27
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -658,6 +659,11 @@ static bool     dsp_fast_sawenv_35(uint32_t        *Y_,
                                    int             *fExact_,
                                    uint32_t        *RBSR_,
                                    bool            *work_);
+static bool     dsp_fast_sawfilterednoise_29(uint32_t        *Y_,
+                                             dsp_alu_flags_t *flags_,
+                                             int             *fExact_,
+                                             uint32_t        *RBSR_,
+                                             bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -2575,6 +2581,39 @@ dsp_fast_sawenv_35_match(uint32_t pc_)
   uint32_t base;
 
   return dsp_fast_sawenv_35_base_for_pc(pc_,&base);
+}
+
+static
+bool
+dsp_fast_sawfilterednoise_29_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_SAWFILTEREDNOISE_29_WORDS] = {
+    0x00004620,0x00008800,0x00008000,0x00006D20,
+    0x00008000,0x00008000,0x00008009,0x00008000,
+    0x00007D27,0x00008014,0x0000800E,0x00008817,
+    0x00005C27,0x00008000,0x00008015,0x00008000,
+    0x00004447,0x000080EA,0x00008000,0x00004D27,
+    0x00008000,0x00008800,0x00007C80,0x00008000,
+    0x00008000,0x00008000,0x00008000
+  };
+  static uint32_t const masks[DSP_SAWFILTEREDNOISE_29_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0002FC00,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0002FC00,
+    0x0000FFFF,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0002FC00,0x0002FC00,0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_SAWFILTEREDNOISE_29_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_sawfilterednoise_29_match(uint32_t pc_)
+{
+  return dsp_fast_sawfilterednoise_29_base_match(pc_);
 }
 
 static
@@ -5129,6 +5168,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_sawenvsvfenv_82;
         else if(dsp_fast_sawenv_35_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_sawenv_35;
+        else if(dsp_fast_sawfilterednoise_29_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_sawfilterednoise_29;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
@@ -5941,6 +5982,27 @@ dsp_fast_sawenv_35(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_SAWENV_35_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_sawfilterednoise_29(uint32_t        *Y_,
+                             dsp_alu_flags_t *flags_,
+                             int             *fExact_,
+                             uint32_t        *RBSR_,
+                             bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_sawfilterednoise_29_base_match(pc))
+    return false;
+
+  return dsp_fast_interpret_block(pc,pc + DSP_SAWFILTEREDNOISE_29_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
