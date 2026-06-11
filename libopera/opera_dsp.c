@@ -116,6 +116,7 @@
 #define DSP_RANDOMHOLD_13_WORDS  11
 #define DSP_REDNOISE_21_WORDS    19
 #define DSP_ROMTAIL_25_WORDS     23
+#define DSP_SAMPLER_11_WORDS     9
 #define DSP_SAMPLER3D_100_WORDS  98
 #define DSP_SUBTRACT_INSN        0x6647
 
@@ -628,6 +629,11 @@ static bool     dsp_fast_sampler3d_100(uint32_t        *Y_,
                                        int             *fExact_,
                                        uint32_t        *RBSR_,
                                        bool            *work_);
+static bool     dsp_fast_sampler_11(uint32_t        *Y_,
+                                    dsp_alu_flags_t *flags_,
+                                    int             *fExact_,
+                                    uint32_t        *RBSR_,
+                                    bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -2225,6 +2231,58 @@ dsp_fast_sampler3d_100_match(uint32_t pc_)
   uint32_t base;
 
   return dsp_fast_sampler3d_100_base_for_pc(pc_,&base);
+}
+
+static
+bool
+dsp_fast_sampler_11_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_SAMPLER_11_WORDS] = {
+    0x00008100,0x00009004,0x0000C000,0x00009008,
+    0x00008000,0x00008800,0x00004C80,0x00008000,
+    0x00008000
+  };
+  static uint32_t const masks[DSP_SAMPLER_11_WORDS] = {
+    0x0000FFC0,0x0000FFFF,0x0002FC00,0x0000FFFF,
+    0x0002FC00,0x0002FC00,0x0000FFFF,0x0002FC00,
+    0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_SAMPLER_11_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_sampler_11_base_for_pc(uint32_t const  pc_,
+                               uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x06
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_sampler_11_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_sampler_11_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_sampler_11_base_for_pc(pc_,&base);
 }
 
 static
@@ -4769,6 +4827,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_romtail_25;
         else if(dsp_fast_sampler3d_100_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_sampler3d_100;
+        else if(dsp_fast_sampler_11_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_sampler_11;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
@@ -5471,6 +5531,28 @@ dsp_fast_sampler3d_100(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_SAMPLER3D_100_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_sampler_11(uint32_t        *Y_,
+                    dsp_alu_flags_t *flags_,
+                    int             *fExact_,
+                    uint32_t        *RBSR_,
+                    bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_sampler_11_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_SAMPLER_11_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
