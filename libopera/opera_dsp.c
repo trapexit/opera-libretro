@@ -87,6 +87,7 @@
 #define DSP_FIXEDSTEREO8_19_WORDS 17
 #define DSP_FIXEDSTEREOSAMPLE_16_1IC_WORDS 14
 #define DSP_FIXEDSTEREOSAMPLE_16_270_WORDS 14
+#define DSP_HALFMONO8_49_WORDS   47
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
 #define DSP_MIXER8X2_WORDS       54
@@ -476,6 +477,11 @@ static bool     dsp_fast_fixedstereosample_16_270(uint32_t        *Y_,
                                                   int             *fExact_,
                                                   uint32_t        *RBSR_,
                                                   bool            *work_);
+static bool     dsp_fast_halfmono8_49(uint32_t        *Y_,
+                                      dsp_alu_flags_t *flags_,
+                                      int             *fExact_,
+                                      uint32_t        *RBSR_,
+                                      bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -3160,6 +3166,76 @@ dsp_fast_fixedstereosample_16_270_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_halfmono8_49_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_HALFMONO8_49_WORDS] = {
+    0x00004620,0x00008000,0x0000C000,0x0000B42F,
+    0x00004620,0x0000880B,0x0000C001,0x000021A0,
+    0x0000C002,0x0000D41D,0x000046A0,0x0000801E,
+    0x0000C001,0x0000D418,0x00004480,0x00008000,
+    0x00008019,0x000021A0,0x0000DF00,0x0000000F,
+    0x00005C20,0x0000801B,0x0000E800,0x0000842B,
+    0x000066A0,0x00008022,0x0000DF00,0x00008025,
+    0x0000842B,0x000046A0,0x00008000,0x0000C001,
+    0x0000D428,0x00002486,0x00008029,0x0000000F,
+    0x00005C20,0x0000802A,0x0000E800,0x0000842B,
+    0x00004486,0x00008000,0x00008000,0x00004C80,
+    0x00008000,0x00008000,0x00008000
+  };
+  static uint32_t const masks[DSP_HALFMONO8_49_WORDS] = {
+    0x0000FFFF,0x0102FC00,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0001FC00,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0001FC00,0x0000FFFF,0x0002FC00,
+    0x0002FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0001FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0001FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0002FC00,0x0002FC00,0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_HALFMONO8_49_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_halfmono8_49_base_for_pc(uint32_t const  pc_,
+                                  uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x1D,0x18,0x2B,0x28
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_halfmono8_49_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_halfmono8_49_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_halfmono8_49_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -3401,6 +3477,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_fixedstereosample_16_1ic;
         else if(dsp_fast_fixedstereosample_16_270_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_fixedstereosample_16_270;
+        else if(dsp_fast_halfmono8_49_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_halfmono8_49;
         else if(dsp_fast_directout_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
@@ -4597,6 +4675,28 @@ dsp_fast_fixedstereosample_16_270(uint32_t        *Y_,
 
   return dsp_fast_interpret_block(base,
                                   base + DSP_FIXEDSTEREOSAMPLE_16_270_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_halfmono8_49(uint32_t        *Y_,
+                      dsp_alu_flags_t *flags_,
+                      int             *fExact_,
+                      uint32_t        *RBSR_,
+                      bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_halfmono8_49_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_HALFMONO8_49_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
