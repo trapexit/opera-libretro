@@ -53,6 +53,7 @@
 #define DSP_DIRECTOUT_INSN       0x4627
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
+#define DSP_DSPPDHDR_WORDS       35
 #define DSP_DREG_PC              0x0EE
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
@@ -266,7 +267,9 @@ static dsp_t DSP;
 
 typedef bool (*dsp_fast_handler_t)(uint32_t       *Y_,
                                    dsp_alu_flags_t *flags_,
-                                   int            *fExact_);
+                                   int            *fExact_,
+                                   uint32_t       *RBSR_,
+                                   bool           *work_);
 
 static dsp_fast_handler_t DSP_FAST_TABLE[DSP_NMEM_EXEC_WORDS];
 static bool               DSP_FAST_DIRTY   = true;
@@ -274,27 +277,60 @@ static int                DSP_FAST_ENABLED = 1;
 
 static uint16_t dsp_read(uint32_t addr_);
 static void     dsp_write(uint32_t addr_, uint16_t val_);
-static bool     dsp_fast_add(uint32_t        *Y_,
-                             dsp_alu_flags_t *flags_,
-                             int             *fExact_);
-static bool     dsp_fast_directout(uint32_t        *Y_,
+static uint16_t dsp_operand_load1(void);
+static void     dsp_operand_load(int requests_);
+static void     dsp_interpret_step(uint32_t        *Y_,
                                    dsp_alu_flags_t *flags_,
-                                   int             *fExact_);
+                                   int             *fExact_,
+                                   uint32_t        *RBSR_,
+                                   bool            *work_);
+static bool     dsp_fast_add(uint32_t        *Y_,
+                              dsp_alu_flags_t *flags_,
+                              int             *fExact_,
+                              uint32_t        *RBSR_,
+                              bool            *work_);
+static bool     dsp_fast_directout(uint32_t        *Y_,
+                                    dsp_alu_flags_t *flags_,
+                                   int             *fExact_,
+                                   uint32_t        *RBSR_,
+                                   bool            *work_);
+static bool     dsp_fast_dsppdhdr(uint32_t        *Y_,
+                                  dsp_alu_flags_t *flags_,
+                                  int             *fExact_,
+                                  uint32_t        *RBSR_,
+                                  bool            *work_);
+static bool     dsp_fast_interpret_block(uint32_t         start_,
+                                         uint32_t         end_,
+                                         uint32_t        *Y_,
+                                         dsp_alu_flags_t *flags_,
+                                         int             *fExact_,
+                                         uint32_t        *RBSR_,
+                                         bool            *work_);
 static bool     dsp_fast_mixer2x2(uint32_t        *Y_,
-                                  dsp_alu_flags_t *flags_,
-                                  int             *fExact_);
+                                   dsp_alu_flags_t *flags_,
+                                  int             *fExact_,
+                                  uint32_t        *RBSR_,
+                                  bool            *work_);
 static bool     dsp_fast_mixer4x2(uint32_t        *Y_,
-                                  dsp_alu_flags_t *flags_,
-                                  int             *fExact_);
+                                   dsp_alu_flags_t *flags_,
+                                  int             *fExact_,
+                                  uint32_t        *RBSR_,
+                                  bool            *work_);
 static bool     dsp_fast_mixer8x2(uint32_t        *Y_,
-                                  dsp_alu_flags_t *flags_,
-                                  int             *fExact_);
+                                   dsp_alu_flags_t *flags_,
+                                  int             *fExact_,
+                                  uint32_t        *RBSR_,
+                                  bool            *work_);
 static bool     dsp_fast_multiply(uint32_t        *Y_,
-                                  dsp_alu_flags_t *flags_,
-                                  int             *fExact_);
+                                   dsp_alu_flags_t *flags_,
+                                  int             *fExact_,
+                                  uint32_t        *RBSR_,
+                                  bool            *work_);
 static bool     dsp_fast_subtract(uint32_t        *Y_,
-                                  dsp_alu_flags_t *flags_,
-                                  int             *fExact_);
+                                   dsp_alu_flags_t *flags_,
+                                  int             *fExact_,
+                                  uint32_t        *RBSR_,
+                                  bool            *work_);
 
 static
 INLINE
@@ -638,6 +674,84 @@ dsp_fast_add_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_dsppdhdr_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_DSPPDHDR_WORDS] = {
+    0x0000A80E,0x0000D81F,0x00002400,0x0000A004,
+    0x0000A808,0x00004486,0x0000A4A6,0x00008417,
+    0x00004480,0x0000A705,0x000041A0,0x0000DF00,
+    0x0000A006,0x0000841D,0x00004640,0x0000A809,
+    0x0000F000,0x00009006,0x0000A007,0x00004620,
+    0x0000A804,0x0000F000,0x0000A81D,0x00004480,
+    0x0000A705,0x000041A0,0x0000DF00,0x0000A007,
+    0x0000841F,0x00004486,0x0000A4A7,0x00007D40,
+    0x000024C6,0x00005C40,0x0000A4E9
+  };
+  static uint32_t const masks[DSP_DSPPDHDR_WORDS] = {
+    0x0001FC00,0x0001FC00,0x0000FFFF,0x0000FFFF,
+    0x0001FC00,0x0000FFFF,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0001FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0001FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF
+  };
+  uint32_t i;
+
+  if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_DSPPDHDR_WORDS))
+    return false;
+
+  for(i = 0; i < DSP_DSPPDHDR_WORDS; i++)
+    {
+      uint32_t const insn = DSP.NMem[pc_ + i];
+
+      if((insn & masks[i]) != (vals[i] & masks[i]))
+        return false;
+
+      if((vals[i] & 0x8000) && ((masks[i] & 0x03FF) == 0))
+        if((insn & 0x03FF) != ((pc_ + (vals[i] & 0x03FF)) & 0x03FF))
+          return false;
+    }
+
+  return true;
+}
+
+static
+bool
+dsp_fast_dsppdhdr_base_for_pc(uint32_t const  pc_,
+                              uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {0x00,0x08,0x0E,0x17,0x1D,0x1F};
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_dsppdhdr_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_dsppdhdr_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_dsppdhdr_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -819,6 +933,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_add;
+        else if(dsp_fast_dsppdhdr_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_dsppdhdr;
         else if(dsp_fast_mixer8x2_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_mixer8x2;
         else if(dsp_fast_mixer4x2_match(pc))
@@ -896,7 +1012,9 @@ static
 bool
 dsp_fast_add(uint32_t        *Y_,
              dsp_alu_flags_t *flags_,
-             int             *fExact_)
+             int             *fExact_,
+             uint32_t        *RBSR_,
+             bool            *work_)
 {
   uint32_t pc;
   ITAG_t src1;
@@ -1093,7 +1211,9 @@ static
 bool
 dsp_fast_subtract(uint32_t        *Y_,
                   dsp_alu_flags_t *flags_,
-                  int             *fExact_)
+                  int             *fExact_,
+                  uint32_t        *RBSR_,
+                  bool            *work_)
 {
   uint32_t pc;
   ITAG_t src1;
@@ -1151,7 +1271,9 @@ static
 bool
 dsp_fast_multiply(uint32_t        *Y_,
                   dsp_alu_flags_t *flags_,
-                  int             *fExact_)
+                  int             *fExact_,
+                  uint32_t        *RBSR_,
+                  bool            *work_)
 {
   uint32_t pc;
   ITAG_t src1;
@@ -1212,7 +1334,9 @@ static
 bool
 dsp_fast_mixer2x2(uint32_t        *Y_,
                   dsp_alu_flags_t *flags_,
-                  int             *fExact_)
+                  int             *fExact_,
+                  uint32_t        *RBSR_,
+                  bool            *work_)
 {
   uint32_t pc;
 
@@ -1235,7 +1359,9 @@ static
 bool
 dsp_fast_mixer4x2(uint32_t        *Y_,
                   dsp_alu_flags_t *flags_,
-                  int             *fExact_)
+                  int             *fExact_,
+                  uint32_t        *RBSR_,
+                  bool            *work_)
 {
   uint32_t pc;
 
@@ -1258,7 +1384,9 @@ static
 bool
 dsp_fast_mixer8x2(uint32_t        *Y_,
                   dsp_alu_flags_t *flags_,
-                  int             *fExact_)
+                  int             *fExact_,
+                  uint32_t        *RBSR_,
+                  bool            *work_)
 {
   uint32_t gap;
   uint32_t pc;
@@ -1284,9 +1412,33 @@ dsp_fast_mixer8x2(uint32_t        *Y_,
 
 static
 bool
+dsp_fast_dsppdhdr(uint32_t        *Y_,
+                  dsp_alu_flags_t *flags_,
+                  int             *fExact_,
+                  uint32_t        *RBSR_,
+                  bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_dsppdhdr_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_DSPPDHDR_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
 dsp_fast_directout(uint32_t        *Y_,
                    dsp_alu_flags_t *flags_,
-                   int             *fExact_)
+                   int             *fExact_,
+                   uint32_t        *RBSR_,
+                   bool            *work_)
 {
   uint32_t pc;
 
@@ -1309,7 +1461,9 @@ static
 bool
 dsp_fast_execute(uint32_t        *Y_,
                  dsp_alu_flags_t *flags_,
-                 int             *fExact_)
+                 int             *fExact_,
+                 uint32_t        *RBSR_,
+                 bool            *work_)
 {
   dsp_fast_handler_t handler;
 
@@ -1323,7 +1477,7 @@ dsp_fast_execute(uint32_t        *Y_,
   if(handler == NULL)
     return false;
 
-  if(handler(Y_,flags_,fExact_))
+  if(handler(Y_,flags_,fExact_,RBSR_,work_))
     return true;
 
   return false;
@@ -1879,6 +2033,402 @@ opera_dsp_reset(void)
   DSP.flags.nOP_MASK = ~0;
 }
 
+static
+void
+dsp_interpret_step(uint32_t        *Y_,
+                   dsp_alu_flags_t *flags_,
+                   int             *fExact_,
+                   uint32_t        *RBSR_,
+                   bool            *work_)
+{
+  uint32_t AOP = 0;
+  uint32_t BOP = 0;
+  ITAG_t inst;
+
+  inst.raw = DSP.NMem[DSP.dregs.PC++];
+  if(inst.aif.PAD)
+    { // Control instruction
+      switch((inst.raw >> 7) & 0xFF)
+        {
+        case 0:         /* NOP TODO */
+          break;
+        case 1:         /* branch accum */
+          DSP.dregs.PC = ((*Y_ >> 16) & 0x3FF);
+          break;
+        case 2:         /* set rbase */
+          DSP.RBASEx4 = ((inst.cif.BCH_ADDR & 0x3F) << 2);
+          break;
+        case 3:         /* set rmap */
+          DSP.REGi = (inst.cif.BCH_ADDR & 7);
+          break;
+        case 4:         /* RTS */
+          DSP.dregs.PC = *RBSR_;
+          break;
+        case 5:         /* set op_mask */
+          DSP.flags.nOP_MASK = ~(inst.cif.BCH_ADDR & 0x1F);
+          break;
+        case 6:         /* -not used2- ins */
+          break;
+        case 7:         /* sleep */
+          *work_ = false;
+          break;
+        case 8:
+        case 9:
+        case 10:
+        case 11:
+        case 12:
+        case 13:
+        case 14:
+        case 15:
+          /* jump */
+          DSP.dregs.PC = inst.cif.BCH_ADDR;
+          break;
+        case 16:
+        case 17:
+        case 18:
+        case 19:
+        case 20:
+        case 21:
+        case 22:
+        case 23:
+          /* jsr */
+          *RBSR_       = DSP.dregs.PC;
+          DSP.dregs.PC = inst.cif.BCH_ADDR;
+          break;
+        case 24:
+        case 25:
+        case 26:
+        case 27:
+        case 28:
+        case 29:
+        case 30:
+        case 31:
+          /* branch only if was branched */
+          DSP.dregs.PC = inst.cif.BCH_ADDR;
+          break;
+        case 32:
+        case 33:
+        case 34:
+        case 35:
+        case 36:
+        case 37:
+        case 38:
+        case 39:
+        case 40:
+        case 41:
+        case 42:
+        case 43:
+        case 44:
+        case 45:
+        case 46:
+        case 47: /* MOVEREG */
+          {
+            uint16_t op;
+            uint16_t addr;
+
+            op   = dsp_operand_load1();
+            addr = DSP.REGCONV[DSP.REGi][inst.r2of.R1] ^ DSP.RBASEx4;
+            if(inst.r2of.R1_DI)
+              addr = dsp_read(addr);
+            dsp_write(addr,op);
+          }
+          break;
+        case 48:
+        case 49:
+        case 50:
+        case 51:
+        case 52:
+        case 53:
+        case 54:
+        case 55:
+        case 56:
+        case 57:
+        case 58:
+        case 59:
+        case 60:
+        case 61:
+        case 62:
+        case 63: /* move */
+          {
+            uint16_t op;
+            uint16_t addr;
+
+            op   = dsp_operand_load1();
+            addr = inst.cif.BCH_ADDR;
+            if(inst.nrof.DI)
+              addr = dsp_read(addr);
+            dsp_write(addr,op);
+          }
+          break;
+        default: /* condition branch */
+          if(1 & DSP.BRCONDTAB[inst.br.bits][*fExact_+((flags_->raw*0x10080402)>>24)])
+            DSP.dregs.PC = inst.cif.BCH_ADDR;
+          break;
+        }
+    }
+  else
+    {
+      /* ALU instruction */
+      DSP.flags.req.raw = DSP.INSTTRAS[inst.raw].req.raw;
+      DSP.flags.BS      = DSP.INSTTRAS[inst.raw].BS;
+
+      dsp_operand_load(inst.aif.NUMOPS);
+
+      switch(inst.aif.MUXA)
+        {
+        case 3:
+          if(inst.aif.M2SEL == 0)
+            {
+              if((inst.aif.ALU == 3) || (inst.aif.ALU == 5))  // ACSBU signal
+                AOP = (flags_->carry ? ((int)DSP.flags.MULT1<<16) & ALUSIZEMASK : 0);
+              else
+                AOP = (((int)DSP.flags.MULT1 * (((int32_t)*Y_ >> 15) & ~1)) & ALUSIZEMASK);
+            }
+          else
+            {
+              AOP = (((int)DSP.flags.MULT1 * (int)DSP.flags.MULT2 * 2) & ALUSIZEMASK);
+            }
+          break;
+        case 1:
+          AOP = (DSP.flags.ALU1 << 16);
+          break;
+        case 0:
+          AOP = *Y_;
+          break;
+        case 2:
+          AOP = (DSP.flags.ALU2 << 16);
+          break;
+        }
+
+      /* ACSBU signal */
+      if((inst.aif.ALU == 3) || (inst.aif.ALU == 5))
+        {
+          BOP = (flags_->carry << 16);
+        }
+      else
+        {
+          switch(inst.aif.MUXB)
+            {
+            case 0:
+              BOP = *Y_;
+              break;
+            case 1:
+              BOP = (DSP.flags.ALU1 << 16);
+              break;
+            case 2:
+              BOP = (DSP.flags.ALU2 << 16);
+              break;
+            case 3:
+              if(inst.aif.M2SEL == 0) // ACSBU == 0 here always
+                BOP = (((int)DSP.flags.MULT1 * (((int32_t)*Y_ >> 15)) & ~1) & ALUSIZEMASK);
+              else
+                BOP = (((int)DSP.flags.MULT1 * (int)DSP.flags.MULT2 * 2) & ALUSIZEMASK);
+              break;
+            }
+        }
+
+      /* Any ALU op. change overflow and possible carry */
+      flags_->carry    = 0;
+      flags_->overflow = 0;
+      switch(inst.aif.ALU)
+        {
+        case 0:
+          *Y_ = AOP;
+          break;
+          //*
+        case 1:
+          *Y_ = (0 - BOP);
+          flags_->carry    = SUB_CFLAG(0,BOP,*Y_);
+          flags_->overflow = SUB_VFLAG(0,BOP,*Y_);
+          break;
+        case 2:
+        case 3:
+          *Y_ = (AOP + BOP);
+          flags_->carry    = ADD_CFLAG(AOP,BOP,*Y_);
+          flags_->overflow = ADD_VFLAG(AOP,BOP,*Y_);
+          break;
+        case 4:
+        case 5:
+          *Y_ = (AOP - BOP);
+          flags_->carry    = SUB_CFLAG(AOP,BOP,*Y_);
+          flags_->overflow = SUB_VFLAG(AOP,BOP,*Y_);
+          break;
+        case 6:
+          *Y_ = (AOP + 0x1000);
+          flags_->carry    = ADD_CFLAG(AOP,0x1000,*Y_);
+          flags_->overflow = ADD_VFLAG(AOP,0x1000,*Y_);
+          break;
+        case 7:
+          *Y_ = (AOP - 0x1000);
+          flags_->carry    = SUB_CFLAG(AOP,0x1000,*Y_);
+          flags_->overflow = SUB_VFLAG(AOP,0x1000,*Y_);
+          break;
+        case 8:
+          *Y_ = AOP;
+          break;
+        case 9:
+          *Y_ = (AOP ^ ALUSIZEMASK);
+          break;
+        case 10:
+          *Y_ = (AOP & BOP);
+          break;
+        case 11:
+          *Y_ = ((AOP & BOP) ^ ALUSIZEMASK);
+          break;
+        case 12:
+          *Y_= (AOP | BOP);
+          break;
+        case 13:
+          *Y_ = ((AOP | BOP) ^ ALUSIZEMASK);
+          break;
+        case 14:
+          *Y_ = (AOP ^ BOP);
+          break;
+        case 15:
+          *Y_ = (AOP ^ BOP ^ ALUSIZEMASK);
+          break;
+        }
+
+      flags_->zero     = ((*Y_ & 0xFFFF0000) ? 0 : 1);
+      flags_->negative = ((*Y_ >> 31) ? 1 : 0);
+      *fExact_         = ((*Y_ & 0x0000F000) ? 0 : 1);
+
+      //and BarrelShifter
+      switch(DSP.flags.BS)
+        {
+        case 1:
+        case 17:
+          *Y_ = *Y_ << 1;
+          break;
+        case 2:
+        case 18:
+          *Y_ = *Y_ << 2;
+          break;
+        case 3:
+        case 19:
+          *Y_ = *Y_ << 3;
+          break;
+        case 4:
+        case 20:
+          *Y_ = *Y_ << 4;
+          break;
+        case 5:
+        case 21:
+          *Y_ = *Y_ << 5;
+          break;
+        case 6:
+        case 22:
+          *Y_ = *Y_ << 8;
+          break;
+
+          //arithmetic shifts
+        case 9:
+          *Y_  = ((int32_t)*Y_ >> 16);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 10:
+          *Y_  = ((int32_t)*Y_ >> 8);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 11:
+          *Y_  = ((int32_t)*Y_ >> 5);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 12:
+          *Y_  = ((int32_t)*Y_ >> 4);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 13:
+          *Y_  = ((int32_t)*Y_ >> 3);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 14:
+          *Y_  = ((int32_t)*Y_ >> 2);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 15:
+          *Y_  = ((int32_t)*Y_ >> 1);
+          *Y_ &= ALUSIZEMASK;
+          break;
+
+          // logocal shift
+        case 7:         // CLIP ari
+        case 23:        // CLIP log
+          if(1 & flags_->overflow)
+            {
+              if(1 & flags_->negative)
+                *Y_ = 0x7FFFF000;
+              else
+                *Y_ = 0x80000000;
+            }
+          break;
+        case 8:         // Load operand load sameself again (ari)
+        case 24:        // same, but logicalshift
+          {
+            //int temp=flags.carry;
+            flags_->carry = ((signed)*Y_ < 0); // shift out bit to Carry
+            //Y=Y<<1;
+            //Y|=temp<<16;
+            *Y_ = (((*Y_ << 1) & 0xFFFE0000)   |
+                   (flags_->carry ? 1<<16 : 0) |
+                   (*Y_ & 0xF000));
+          }
+          break;
+        case 25:
+          *Y_  = ((uint32_t)*Y_ >> 16);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 26:
+          *Y_  = ((uint32_t)*Y_ >> 8);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 27:
+          *Y_  = ((uint32_t)*Y_ >> 5);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 28:
+          *Y_  = ((uint32_t)*Y_ >> 4);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 29:
+          *Y_  = ((uint32_t)*Y_ >> 3);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 30:
+          *Y_  = ((uint32_t)*Y_ >> 2);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        case 31:
+          *Y_  = ((uint32_t)*Y_ >> 1);
+          *Y_ &= ALUSIZEMASK;
+          break;
+        }
+
+      if(DSP.flags.WRITEBACK)
+        dsp_write(DSP.flags.WRITEBACK,((int32_t)*Y_) >> 16);
+    }
+}
+
+static
+bool
+dsp_fast_interpret_block(uint32_t         start_,
+                         uint32_t         end_,
+                         uint32_t        *Y_,
+                         dsp_alu_flags_t *flags_,
+                         int             *fExact_,
+                         uint32_t        *RBSR_,
+                         bool            *work_)
+{
+  if((DSP.dregs.PC < start_) || (DSP.dregs.PC >= end_))
+    return false;
+
+  do
+    dsp_interpret_step(Y_,flags_,fExact_,RBSR_,work_);
+  while(*work_ && (DSP.dregs.PC >= start_) && (DSP.dregs.PC < end_));
+
+  return true;
+}
+
 uint32_t
 opera_dsp_loop(void)
 {
@@ -1903,7 +2453,7 @@ opera_dsp_loop(void)
         {
           ITAG_t inst;
 
-          if(dsp_fast_execute(&Y,&flags,&fExact))
+          if(dsp_fast_execute(&Y,&flags,&fExact,&RBSR,&work))
             continue;
 
           inst.raw = DSP.NMem[DSP.dregs.PC++];
