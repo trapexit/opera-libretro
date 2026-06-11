@@ -50,6 +50,7 @@
 
 #define DSP_NMEM_EXEC_WORDS      1024
 #define DSP_ADD_INSN             0x6627
+#define DSP_ADPCMDUCK22S_158_WORDS 156
 #define DSP_DIRECTOUT_INSN       0x4627
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
@@ -284,6 +285,11 @@ static void     dsp_interpret_step(uint32_t        *Y_,
                                    int             *fExact_,
                                    uint32_t        *RBSR_,
                                    bool            *work_);
+static bool     dsp_fast_adpcmduck22s_158(uint32_t        *Y_,
+                                          dsp_alu_flags_t *flags_,
+                                          int             *fExact_,
+                                          uint32_t        *RBSR_,
+                                          bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -651,6 +657,34 @@ dsp_fast_nop_insn(uint16_t insn_)
 
 static
 bool
+dsp_fast_pattern_match(uint32_t const        pc_,
+                       uint32_t const        words_,
+                       uint32_t const *const vals_,
+                       uint32_t const *const masks_)
+{
+  uint32_t i;
+
+  if((words_ > DSP_NMEM_EXEC_WORDS) ||
+     (pc_ > (DSP_NMEM_EXEC_WORDS - words_)))
+    return false;
+
+  for(i = 0; i < words_; i++)
+    {
+      uint32_t const insn = DSP.NMem[pc_ + i];
+
+      if((insn & masks_[i]) != (vals_[i] & masks_[i]))
+        return false;
+
+      if((masks_[i] & 0x00010000) && ((masks_[i] & 0x03FF) == 0))
+        if((insn & 0x03FF) != ((pc_ + (vals_[i] & 0x03FF)) & 0x03FF))
+          return false;
+    }
+
+  return true;
+}
+
+static
+bool
 dsp_fast_add_match(uint32_t pc_)
 {
   ITAG_t src1;
@@ -698,24 +732,7 @@ dsp_fast_dsppdhdr_base_match(uint32_t const pc_)
     0x0001FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
     0x0000FFFF,0x0000FFFF,0x0000FFFF
   };
-  uint32_t i;
-
-  if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_DSPPDHDR_WORDS))
-    return false;
-
-  for(i = 0; i < DSP_DSPPDHDR_WORDS; i++)
-    {
-      uint32_t const insn = DSP.NMem[pc_ + i];
-
-      if((insn & masks[i]) != (vals[i] & masks[i]))
-        return false;
-
-      if((vals[i] & 0x8000) && ((masks[i] & 0x03FF) == 0))
-        if((insn & 0x03FF) != ((pc_ + (vals[i] & 0x03FF)) & 0x03FF))
-          return false;
-    }
-
-  return true;
+  return dsp_fast_pattern_match(pc_,DSP_DSPPDHDR_WORDS,vals,masks);
 }
 
 static
@@ -748,6 +765,130 @@ dsp_fast_dsppdhdr_match(uint32_t pc_)
   uint32_t base;
 
   return dsp_fast_dsppdhdr_base_for_pc(pc_,&base);
+}
+
+static
+bool
+dsp_fast_adpcmduck22s_158_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_ADPCMDUCK22S_158_WORDS] = {
+    0x00008100,0x000046A0,0x00008105,0x0000C001,
+    0x0000D460,0x00006620,0x00008000,0x0000C000,
+    0x00008309,0x00008000,0x0000E49C,0x00004620,
+    0x00008800,0x0000F000,0x0000A822,0x0000981D,
+    0x00008024,0x00002400,0x0000801F,0x0000B42C,
+    0x00004480,0x0000801E,0x00008102,0x0000208A,
+    0x0000803F,0x000066A0,0x00008102,0x0000C0FF,
+    0x0000802F,0x0000982B,0x00008023,0x00009828,
+    0x0000C000,0x0000842C,0x00004480,0x00008000,
+    0x00008000,0x00002140,0x0000D77F,0x0000D42A,
+    0x00009800,0x0000C001,0x00002486,0x00008831,
+    0x00009004,0x00008038,0x00009006,0x0000803A,
+    0x00004484,0x00008041,0x0000A00A,0x00009007,
+    0x00008036,0x00008869,0x0000984C,0x0000A007,
+    0x00009800,0x0000A004,0x00009800,0x0000A006,
+    0x00009004,0x00008047,0x00009006,0x00008049,
+    0x0000900A,0x00008000,0x00009007,0x00008045,
+    0x00008869,0x00009856,0x0000A007,0x00009800,
+    0x0000A004,0x00009800,0x0000A006,0x0000240F,
+    0x00008054,0x00005C20,0x00008053,0x0000E800,
+    0x00004D27,0x0000805B,0x00008907,0x00009800,
+    0x00008065,0x0000240F,0x0000805E,0x00005C20,
+    0x0000805D,0x0000E800,0x00004D27,0x00008062,
+    0x00008906,0x00009800,0x00008061,0x0000849C,
+    0x00007D27,0x00008000,0x00008066,0x00008906,
+    0x00007D27,0x00008000,0x00008000,0x00008907,
+    0x0000849C,0x000046A0,0x0000A80A,0x0000D000,
+    0x00006620,0x0000C000,0x0000A4C8,0x00008000,
+    0x00008000,0x00009004,0x0000A018,0x000046A0,
+    0x0000A00A,0x0000EE00,0x000021C0,0x0000C800,
+    0x00004C80,0x0000A004,0x0000A009,0x00002400,
+    0x0000A00A,0x0000C881,0x00002110,0x0000A809,
+    0x00008000,0x00004627,0x0000B4E9,0x0000248A,
+    0x0000A00A,0x000021AC,0x0000C070,0x00004420,
+    0x0000C000,0x0000A008,0x00008000,0x00008000,
+    0x00004627,0x0000B4D8,0x00008000,0x0000EC93,
+    0x00009006,0x0000C000,0x00008499,0x00004640,
+    0x0000A006,0x0000C059,0x0000E099,0x00009006,
+    0x0000C058,0x00008200,0x00002400,0x00008000
+  };
+  static uint32_t const masks[DSP_ADPCMDUCK22S_158_WORDS] = {
+    0x0000FFC0,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0001FC00,0x0000FFFF,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0001FC00,0x0002FC00,
+    0x0002FC00,0x0000FFFF,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0000FC00,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0001FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0001FC00,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0001FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0002FC00,
+    0x0001FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0001FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0001FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_ADPCMDUCK22S_158_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_adpcmduck22s_158_base_for_pc(uint32_t const  pc_,
+                                      uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x60,0x22,0x2C,0x2A,0x36,0x69,0x45,0x81,0x93,0x99
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_adpcmduck22s_158_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_adpcmduck22s_158_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_adpcmduck22s_158_base_for_pc(pc_,&base);
 }
 
 static
@@ -929,7 +1070,9 @@ dsp_fast_rebuild(void)
   if(dsp_fast_enabled())
     for(pc = 0; pc < DSP_NMEM_EXEC_WORDS; pc++)
       {
-        if(dsp_fast_directout_match(pc))
+        if(dsp_fast_adpcmduck22s_158_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_adpcmduck22s_158;
+        else if(dsp_fast_directout_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_add;
@@ -1408,6 +1551,28 @@ dsp_fast_mixer8x2(uint32_t        *Y_,
   DSP.dregs.PC = pc + DSP_MIXER8X2_WORDS + gap;
 
   return true;
+}
+
+static
+bool
+dsp_fast_adpcmduck22s_158(uint32_t        *Y_,
+                          dsp_alu_flags_t *flags_,
+                          int             *fExact_,
+                          uint32_t        *RBSR_,
+                          bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_adpcmduck22s_158_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_ADPCMDUCK22S_158_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
 }
 
 static
