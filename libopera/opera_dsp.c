@@ -54,6 +54,7 @@
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
 #define DSP_DREG_PC              0x0EE
+#define DSP_MIXER2X2_WORDS       18
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -277,6 +278,9 @@ static bool     dsp_fast_add(uint32_t        *Y_,
 static bool     dsp_fast_directout(uint32_t        *Y_,
                                    dsp_alu_flags_t *flags_,
                                    int             *fExact_);
+static bool     dsp_fast_mixer2x2(uint32_t        *Y_,
+                                  dsp_alu_flags_t *flags_,
+                                  int             *fExact_);
 static bool     dsp_fast_multiply(uint32_t        *Y_,
                                   dsp_alu_flags_t *flags_,
                                   int             *fExact_);
@@ -537,7 +541,8 @@ dsp_fast_direct_dest_operand(ITAG_t const operand_)
 
 static
 bool
-dsp_fast_multiply_insn(uint16_t insn_)
+dsp_fast_multiply_product_insn(uint16_t const insn_,
+                               uint32_t const numops_)
 {
   ITAG_t inst;
 
@@ -549,7 +554,48 @@ dsp_fast_multiply_insn(uint16_t insn_)
           (inst.aif.MUXA == 3) &&
           (inst.aif.MUXB == 0) &&
           (inst.aif.M2SEL != 0) &&
-          (inst.aif.NUMOPS == 3));
+          (inst.aif.NUMOPS == numops_));
+}
+
+static
+bool
+dsp_fast_multiply_insn(uint16_t insn_)
+{
+  return dsp_fast_multiply_product_insn(insn_,3);
+}
+
+static
+bool
+dsp_fast_multiply_accumulate_insn(uint16_t insn_)
+{
+  ITAG_t inst;
+
+  inst.raw = insn_;
+
+  return (!inst.aif.PAD &&
+          (inst.aif.BS == 7) &&
+          (inst.aif.ALU == 2) &&
+          (inst.aif.MUXA == 3) &&
+          (inst.aif.MUXB == 0) &&
+          (inst.aif.M2SEL != 0) &&
+          (inst.aif.NUMOPS == 2));
+}
+
+static
+bool
+dsp_fast_accum_mix_insn(uint16_t insn_)
+{
+  ITAG_t inst;
+
+  inst.raw = insn_;
+
+  return (!inst.aif.PAD &&
+          (inst.aif.BS == 7) &&
+          (inst.aif.ALU == 2) &&
+          (inst.aif.MUXA == 1) &&
+          (inst.aif.MUXB == 0) &&
+          (inst.aif.M2SEL == 0) &&
+          (inst.aif.NUMOPS == 2));
 }
 
 static
@@ -573,6 +619,51 @@ dsp_fast_add_match(uint32_t pc_)
   return (dsp_fast_direct_source_operand(src1) &&
           dsp_fast_direct_source_operand(src2) &&
           dsp_fast_direct_dest_operand(dst));
+}
+
+static
+bool
+dsp_fast_mixer2x2_channel_match(uint32_t const pc_,
+                                uint32_t const off_,
+                                uint32_t const mix_addr_)
+{
+  ITAG_t src1;
+  ITAG_t src2;
+  ITAG_t src3;
+  ITAG_t src4;
+  ITAG_t mix;
+  ITAG_t accum;
+
+  if(!dsp_fast_multiply_product_insn(DSP.NMem[pc_ + off_ + 0],2) ||
+     !dsp_fast_multiply_accumulate_insn(DSP.NMem[pc_ + off_ + 3]) ||
+     !dsp_fast_accum_mix_insn(DSP.NMem[pc_ + off_ + 6]))
+    return false;
+
+  src1.raw  = DSP.NMem[pc_ + off_ + 1];
+  src2.raw  = DSP.NMem[pc_ + off_ + 2];
+  src3.raw  = DSP.NMem[pc_ + off_ + 4];
+  src4.raw  = DSP.NMem[pc_ + off_ + 5];
+  mix.raw   = DSP.NMem[pc_ + off_ + 7];
+  accum.raw = DSP.NMem[pc_ + off_ + 8];
+
+  return (dsp_fast_direct_source_operand(src1) &&
+          dsp_fast_direct_source_operand(src2) &&
+          dsp_fast_direct_source_operand(src3) &&
+          dsp_fast_direct_source_operand(src4) &&
+          dsp_fast_direct_dest_operand(mix) &&
+          (mix.nrof.OP_ADDR == mix_addr_) &&
+          dsp_fast_direct_source_operand(accum));
+}
+
+static
+bool
+dsp_fast_mixer2x2_match(uint32_t pc_)
+{
+  if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_MIXER2X2_WORDS))
+    return false;
+
+  return (dsp_fast_mixer2x2_channel_match(pc_,0,DSP_DIRECTOUT_MIX_LEFT) &&
+          dsp_fast_mixer2x2_channel_match(pc_,9,DSP_DIRECTOUT_MIX_RIGHT));
 }
 
 static
@@ -669,6 +760,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_add;
+        else if(dsp_fast_mixer2x2_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_mixer2x2;
         else if(dsp_fast_multiply_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_multiply;
         else if(dsp_fast_subtract_match(pc))
@@ -771,6 +864,133 @@ dsp_fast_add(uint32_t        *Y_,
 
 static
 void
+dsp_fast_set_product_flags(uint32_t const  y_,
+                           dsp_alu_flags_t *flags_,
+                           int             *fExact_)
+{
+  flags_->carry    = 0;
+  flags_->overflow = 0;
+  flags_->zero     = ((y_ & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y_ >> 31) ? 1 : 0);
+  *fExact_         = ((y_ & 0x0000F000) ? 0 : 1);
+}
+
+static
+uint32_t
+dsp_fast_multiply_product_value(int16_t const src1_,
+                                int16_t const src2_)
+{
+  return (uint32_t)(((int64_t)src1_ * (int64_t)src2_ * 2) & ALUSIZEMASK);
+}
+
+static
+void
+dsp_fast_multiply_product_to_y(uint16_t         insn_,
+                               uint16_t         src1_op_,
+                               uint16_t         src2_op_,
+                               uint32_t        *Y_,
+                               dsp_alu_flags_t *flags_,
+                               int             *fExact_)
+{
+  ITAG_t src1;
+  ITAG_t src2;
+
+  src1.raw = src1_op_;
+  src2.raw = src2_op_;
+
+  DSP.flags.req.raw    = DSP.INSTTRAS[insn_].req.raw;
+  DSP.flags.BS         = DSP.INSTTRAS[insn_].BS;
+  DSP.flags.WRITEBACK  = 0;
+  DSP.flags.MULT1      = dsp_read(src1.nrof.OP_ADDR);
+  DSP.flags.MULT2      = dsp_read(src2.nrof.OP_ADDR);
+
+  *Y_ = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  dsp_fast_set_product_flags(*Y_,flags_,fExact_);
+}
+
+static
+void
+dsp_fast_multiply_accumulate_y_clip(uint16_t         insn_,
+                                    uint16_t         src1_op_,
+                                    uint16_t         src2_op_,
+                                    uint32_t        *Y_,
+                                    dsp_alu_flags_t *flags_,
+                                    int             *fExact_)
+{
+  ITAG_t src1;
+  ITAG_t src2;
+  uint32_t a;
+  uint32_t b;
+  uint32_t y;
+
+  src1.raw = src1_op_;
+  src2.raw = src2_op_;
+
+  DSP.flags.req.raw    = DSP.INSTTRAS[insn_].req.raw;
+  DSP.flags.BS         = DSP.INSTTRAS[insn_].BS;
+  DSP.flags.WRITEBACK  = 0;
+  DSP.flags.MULT1      = dsp_read(src1.nrof.OP_ADDR);
+  DSP.flags.MULT2      = dsp_read(src2.nrof.OP_ADDR);
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = *Y_;
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  if(1 & flags_->overflow)
+    y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+
+  *Y_ = y;
+}
+
+static
+void
+dsp_fast_add_y_to_mix_clip(uint16_t         insn_,
+                           uint16_t         mix_op_,
+                           uint16_t         accum_op_,
+                           uint32_t        *Y_,
+                           dsp_alu_flags_t *flags_,
+                           int             *fExact_)
+{
+  ITAG_t mix;
+  ITAG_t accum;
+  uint32_t a;
+  uint32_t b;
+  uint32_t y;
+
+  mix.raw   = mix_op_;
+  accum.raw = accum_op_;
+
+  DSP.flags.req.raw    = DSP.INSTTRAS[insn_].req.raw;
+  DSP.flags.BS         = DSP.INSTTRAS[insn_].BS;
+  DSP.flags.WRITEBACK  = mix.nrof.OP_ADDR;
+  DSP.flags.ALU1       = dsp_read(mix.nrof.OP_ADDR);
+  (void)dsp_read(accum.nrof.OP_ADDR);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = *Y_;
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  if(1 & flags_->overflow)
+    y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+
+  *Y_ = y;
+  dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+}
+
+static
+void
 dsp_fast_subtract_clip_write_direct(uint16_t         insn_,
                                     uint32_t         dst_addr_,
                                     uint32_t         src1_addr_,
@@ -857,13 +1077,8 @@ dsp_fast_multiply_write_direct(uint16_t         insn_,
   DSP.flags.MULT1      = dsp_read(src1_addr_);
   DSP.flags.MULT2      = dsp_read(src2_addr_);
 
-  y = (uint32_t)(((int64_t)DSP.flags.MULT1 * (int64_t)DSP.flags.MULT2 * 2) & ALUSIZEMASK);
-
-  flags_->carry    = 0;
-  flags_->overflow = 0;
-  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
-  flags_->negative = ((y >> 31) ? 1 : 0);
-  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  y = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
 
   *Y_ = y;
   dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
@@ -898,6 +1113,53 @@ dsp_fast_multiply(uint32_t        *Y_,
                                  Y_,flags_,fExact_);
 
   DSP.dregs.PC = pc + 4;
+
+  return true;
+}
+
+static
+void
+dsp_fast_mixer2x2_channel(uint32_t const   pc_,
+                          uint32_t const   off_,
+                          uint32_t        *Y_,
+                          dsp_alu_flags_t *flags_,
+                          int             *fExact_)
+{
+  dsp_fast_multiply_product_to_y(DSP.NMem[pc_ + off_ + 0],
+                                 DSP.NMem[pc_ + off_ + 1],
+                                 DSP.NMem[pc_ + off_ + 2],
+                                 Y_,flags_,fExact_);
+
+  dsp_fast_multiply_accumulate_y_clip(DSP.NMem[pc_ + off_ + 3],
+                                      DSP.NMem[pc_ + off_ + 4],
+                                      DSP.NMem[pc_ + off_ + 5],
+                                      Y_,flags_,fExact_);
+
+  dsp_fast_add_y_to_mix_clip(DSP.NMem[pc_ + off_ + 6],
+                             DSP.NMem[pc_ + off_ + 7],
+                             DSP.NMem[pc_ + off_ + 8],
+                             Y_,flags_,fExact_);
+}
+
+static
+bool
+dsp_fast_mixer2x2(uint32_t        *Y_,
+                  dsp_alu_flags_t *flags_,
+                  int             *fExact_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_mixer2x2_match(pc))
+    return false;
+
+  dsp_fast_mixer2x2_channel(pc,0,Y_,flags_,fExact_);
+  dsp_fast_mixer2x2_channel(pc,9,Y_,flags_,fExact_);
+
+  DSP.dregs.PC = pc + DSP_MIXER2X2_WORDS;
 
   return true;
 }
