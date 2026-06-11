@@ -105,6 +105,8 @@
 #define DSP_MIXER8X2_WORDS       54
 #define DSP_MONITOR_4_WORDS      2
 #define DSP_NOISE_6_WORDS        4
+#define DSP_OSCUPDOWNFP_22_PATTERN_WORDS 20
+#define DSP_OSCUPDOWNFP_22_WORDS 19
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -566,6 +568,11 @@ static bool     dsp_fast_noise_6(uint32_t        *Y_,
                                  int             *fExact_,
                                  uint32_t        *RBSR_,
                                  bool            *work_);
+static bool     dsp_fast_oscupdownfp_22(uint32_t        *Y_,
+                                        dsp_alu_flags_t *flags_,
+                                        int             *fExact_,
+                                        uint32_t        *RBSR_,
+                                        bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -4049,6 +4056,62 @@ dsp_fast_noise_6_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_oscupdownfp_22_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_OSCUPDOWNFP_22_PATTERN_WORDS] = {
+    0x00004620,0x0000B4A8,0x0000A807,0x0000D80E,
+    0x00009006,0x0000A014,0x0000840C,0x00004640,
+    0x0000A805,0x0000F000,0x00009006,0x0000A007,
+    0x00009007,0x0000A014,0x00007D40,0x000014C6,
+    0x00005C40,0x0000A4E5,0x00008200,0x00008000
+  };
+  static uint32_t const masks[DSP_OSCUPDOWNFP_22_PATTERN_WORDS] = {
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0001FC00,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_OSCUPDOWNFP_22_PATTERN_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_oscupdownfp_22_base_for_pc(uint32_t const  pc_,
+                                    uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x07,0x0E,0x0C
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_oscupdownfp_22_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_oscupdownfp_22_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_oscupdownfp_22_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_subtract_match(uint32_t pc_)
 {
   ITAG_t src1;
@@ -4164,6 +4227,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_fixedmonosample_10;
         else if(dsp_fast_noise_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_noise_6;
+        else if(dsp_fast_oscupdownfp_22_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_oscupdownfp_22;
         else if(dsp_fast_fixedmonosample_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_fixedmonosample_6;
         else if(dsp_fast_fixedstereo16swap_38_2di_match(pc))
@@ -4599,6 +4664,28 @@ dsp_fast_noise_6(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(pc,pc + DSP_NOISE_6_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_oscupdownfp_22(uint32_t        *Y_,
+                        dsp_alu_flags_t *flags_,
+                        int             *fExact_,
+                        uint32_t        *RBSR_,
+                        bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_oscupdownfp_22_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_OSCUPDOWNFP_22_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
