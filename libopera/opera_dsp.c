@@ -65,6 +65,7 @@
 #define DSP_DCSQXDHALFSTEREO_92_WORDS 90
 #define DSP_DCSQXDMONO_42_WORDS 40
 #define DSP_DCSQXDSTEREO_61_WORDS 59
+#define DSP_DCSQXDSTEREO_64_WORDS 62
 #define DSP_DIRECTOUT_INSN       0x4627
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
@@ -370,6 +371,11 @@ static bool     dsp_fast_dcsqxdmono_42(uint32_t        *Y_,
                                        uint32_t        *RBSR_,
                                        bool            *work_);
 static bool     dsp_fast_dcsqxdstereo_61(uint32_t        *Y_,
+                                         dsp_alu_flags_t *flags_,
+                                         int             *fExact_,
+                                         uint32_t        *RBSR_,
+                                         bool            *work_);
+static bool     dsp_fast_dcsqxdstereo_64(uint32_t        *Y_,
                                          dsp_alu_flags_t *flags_,
                                          int             *fExact_,
                                          uint32_t        *RBSR_,
@@ -2207,6 +2213,84 @@ dsp_fast_dcsqxdstereo_61_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_dcsqxdstereo_64_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_DCSQXDSTEREO_64_WORDS] = {
+    0x00004620,0x00008000,0x0000C000,0x0000B43B,
+    0x00004480,0x00008000,0x0000800B,0x000041A0,
+    0x0000DF00,0x0000800E,0x00004486,0x00008000,
+    0x00008025,0x00002400,0x00008013,0x0000E812,
+    0x00008000,0x00000010,0x00004C80,0x00008016,
+    0x0000801A,0x000046A0,0x00008000,0x0000C100,
+    0x0000B41D,0x00004620,0x0000801E,0x0000881F,
+    0x00008420,0x00004480,0x0000802B,0x00008000,
+    0x00008000,0x00004C80,0x00008039,0x00008000,
+    0x00002400,0x0000802A,0x0000E829,0x00008000,
+    0x00000010,0x00004C80,0x0000802D,0x00008031,
+    0x000046A0,0x00008000,0x0000C100,0x0000B434,
+    0x00004620,0x00008035,0x00008836,0x00008437,
+    0x00004480,0x00008000,0x00008000,0x00008000,
+    0x00004C80,0x00008000,0x00008000,0x00008000,
+    0x00008000,0x00008000
+  };
+  static uint32_t const masks[DSP_DCSQXDSTEREO_64_WORDS] = {
+    0x0000FFFF,0x0102FC00,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FC00,
+    0x0002FC00,0x0000FFFF,0x0000FC00,0x0001FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0002FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0001FC00,0x0000FFFF,0x0000FC00,0x0002FC00,
+    0x0001FC00,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0000FFFF,0x0000FC00,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_DCSQXDSTEREO_64_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_dcsqxdstereo_64_base_for_pc(uint32_t const  pc_,
+                                    uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x3B,0x12,0x1D,0x20,0x29,0x34,0x37
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_dcsqxdstereo_64_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_dcsqxdstereo_64_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_dcsqxdstereo_64_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -2412,6 +2496,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_dcsqxdhalfstereo_92;
         else if(dsp_fast_dcsqxdmono_42_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_dcsqxdmono_42;
+        else if(dsp_fast_dcsqxdstereo_64_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_dcsqxdstereo_64;
         else if(dsp_fast_dcsqxdstereo_61_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_dcsqxdstereo_61;
         else if(dsp_fast_directout_match(pc))
@@ -3251,6 +3337,28 @@ dsp_fast_dcsqxdstereo_61(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_DCSQXDSTEREO_61_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_dcsqxdstereo_64(uint32_t        *Y_,
+                         dsp_alu_flags_t *flags_,
+                         int             *fExact_,
+                         uint32_t        *RBSR_,
+                         bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_dcsqxdstereo_64_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_DCSQXDSTEREO_64_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
