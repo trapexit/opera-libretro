@@ -58,6 +58,8 @@
 #define DSP_ADPCMDUCK22S_158_WORDS 156
 #define DSP_ADPCMDUCK22S_242_WORDS 240
 #define DSP_ADPCMDUCK22S_250_WORDS 248
+#define DSP_BENCHMARK_6_INSN     0x6640
+#define DSP_BENCHMARK_6_WORDS    4
 #define DSP_DIRECTOUT_INSN       0x4627
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
@@ -337,6 +339,11 @@ static bool     dsp_fast_adpcmduck22s_250(uint32_t        *Y_,
                                           int             *fExact_,
                                           uint32_t        *RBSR_,
                                           bool            *work_);
+static bool     dsp_fast_benchmark_6(uint32_t        *Y_,
+                                     dsp_alu_flags_t *flags_,
+                                     int             *fExact_,
+                                     uint32_t        *RBSR_,
+                                     bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -1770,6 +1777,20 @@ dsp_fast_adpcmvarstereo_77_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_benchmark_6_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_BENCHMARK_6_WORDS] = {
+    0x00006640,0x00008104,0x000080EF,0x00008000
+  };
+  static uint32_t const masks[DSP_BENCHMARK_6_WORDS] = {
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_BENCHMARK_6_WORDS,vals,masks);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -1965,6 +1986,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_adpcmvarmono_block_92;
         else if(dsp_fast_adpcmvarstereo_77_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_adpcmvarstereo_77;
+        else if(dsp_fast_benchmark_6_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_directout_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
@@ -2642,6 +2665,57 @@ dsp_fast_adpcmvarstereo_77(uint32_t        *Y_,
 
   return dsp_fast_interpret_block(base,base + DSP_ADPCMVARSTEREO_77_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_benchmark_6(uint32_t        *Y_,
+                     dsp_alu_flags_t *flags_,
+                     int             *fExact_,
+                     uint32_t        *RBSR_,
+                     bool            *work_)
+{
+  ITAG_t dst;
+  uint32_t pc;
+  uint32_t a;
+  uint32_t b;
+  uint32_t y;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_benchmark_6_match(pc))
+    return false;
+
+  dst.raw = DSP.NMem[pc + 3];
+
+  DSP.flags.req.raw    = DSP.INSTTRAS[DSP_BENCHMARK_6_INSN].req.raw;
+  DSP.flags.BS         = DSP.INSTTRAS[DSP_BENCHMARK_6_INSN].BS;
+
+  DSP.flags.WRITEBACK  = 0x104;
+  DSP.flags.ALU1       = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK  = 0x0EF;
+  DSP.flags.ALU2       = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK  = dst.nrof.OP_ADDR;
+  DSP.dregs.PC         = pc + DSP_BENCHMARK_6_WORDS;
+  (void)dsp_read(DSP.flags.WRITEBACK);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a - b);
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  *Y_ = y;
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  return true;
 }
 
 static
