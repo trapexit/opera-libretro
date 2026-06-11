@@ -115,6 +115,7 @@
 #define DSP_PULSER_33_WORDS      31
 #define DSP_RANDOMHOLD_13_WORDS  11
 #define DSP_REDNOISE_21_WORDS    19
+#define DSP_ROMTAIL_25_WORDS     23
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -616,6 +617,11 @@ static bool     dsp_fast_rednoise_21(uint32_t        *Y_,
                                      int             *fExact_,
                                      uint32_t        *RBSR_,
                                      bool            *work_);
+static bool     dsp_fast_romtail_25(uint32_t        *Y_,
+                                    dsp_alu_flags_t *flags_,
+                                    int             *fExact_,
+                                    uint32_t        *RBSR_,
+                                    bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -2059,6 +2065,64 @@ dsp_fast_benchmark_6_match(uint32_t const pc_)
   };
 
   return dsp_fast_pattern_match(pc_,DSP_BENCHMARK_6_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_romtail_25_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_ROMTAIL_25_WORDS] = {
+    0x000046A0,0x000080EC,0x0000C008,0x0000B408,
+    0x00009C00,0x000080ED,0x00009BED,0x00008400,
+    0x00002400,0x00008000,0x0000B411,0x00005C80,
+    0x00008906,0x00008001,0x00005C80,0x00008907,
+    0x00008001,0x00006640,0x00008104,0x000080EF,
+    0x00008300,0x00008380,0x00008000
+  };
+  static uint32_t const masks[DSP_ROMTAIL_25_WORDS] = {
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0001FC00,
+    0x0002FC00,0x0000FFFF,0x0000FFFF,0x0002FC00,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_ROMTAIL_25_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_romtail_25_base_for_pc(uint32_t const  pc_,
+                                uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x08,0x11
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_romtail_25_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_romtail_25_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_romtail_25_base_for_pc(pc_,&base);
 }
 
 static
@@ -4599,6 +4663,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_adpcmvarmono_block_92;
         else if(dsp_fast_adpcmvarstereo_77_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_adpcmvarstereo_77;
+        else if(dsp_fast_romtail_25_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_romtail_25;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
@@ -5257,6 +5323,28 @@ dsp_fast_rednoise_21(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_REDNOISE_21_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_romtail_25(uint32_t        *Y_,
+                    dsp_alu_flags_t *flags_,
+                    int             *fExact_,
+                    uint32_t        *RBSR_,
+                    bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_romtail_25_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_ROMTAIL_25_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
