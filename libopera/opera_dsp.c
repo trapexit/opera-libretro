@@ -103,6 +103,7 @@
 #define DSP_MIXER4X2_WORDS       30
 #define DSP_MIXER8X2AMP_59_WORDS 57
 #define DSP_MIXER8X2_WORDS       54
+#define DSP_MONITOR_4_WORDS      2
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -554,6 +555,11 @@ static bool     dsp_fast_mixer8x2amp_59(uint32_t        *Y_,
                                         int             *fExact_,
                                         uint32_t        *RBSR_,
                                         bool            *work_);
+static bool     dsp_fast_monitor_4(uint32_t        *Y_,
+                                   dsp_alu_flags_t *flags_,
+                                   int             *fExact_,
+                                   uint32_t        *RBSR_,
+                                   bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -3972,6 +3978,27 @@ dsp_fast_mixer8x2_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_monitor_4_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_MONITOR_4_WORDS] = {
+    0x00009800,0x00008000
+  };
+  static uint32_t const masks[DSP_MONITOR_4_WORDS] = {
+    0x0002FC00,0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_MONITOR_4_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_monitor_4_match(uint32_t pc_)
+{
+  return dsp_fast_monitor_4_base_match(pc_);
+}
+
+static
+bool
 dsp_fast_multiply_match(uint32_t pc_)
 {
   ITAG_t src1;
@@ -4162,6 +4189,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_mixer4x2;
         else if(dsp_fast_mixer2x2_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_mixer2x2;
+        else if(dsp_fast_monitor_4_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_monitor_4;
         else if(dsp_fast_multiply_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_multiply;
         else if(dsp_fast_subtract_match(pc))
@@ -4675,6 +4704,27 @@ dsp_fast_mixer8x2(uint32_t        *Y_,
   DSP.dregs.PC = pc + DSP_MIXER8X2_WORDS + gap;
 
   return true;
+}
+
+static
+bool
+dsp_fast_monitor_4(uint32_t        *Y_,
+                   dsp_alu_flags_t *flags_,
+                   int             *fExact_,
+                   uint32_t        *RBSR_,
+                   bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_monitor_4_base_match(pc))
+    return false;
+
+  return dsp_fast_interpret_block(pc,pc + DSP_MONITOR_4_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
 }
 
 static
