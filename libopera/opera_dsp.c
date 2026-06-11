@@ -101,6 +101,7 @@
 #define DSP_MIXER12X2_WORDS      78
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
+#define DSP_MIXER8X2AMP_59_WORDS 57
 #define DSP_MIXER8X2_WORDS       54
 #define DSP_SUBTRACT_INSN        0x6647
 
@@ -548,6 +549,11 @@ static bool     dsp_fast_mixer12x2(uint32_t        *Y_,
                                    int             *fExact_,
                                    uint32_t        *RBSR_,
                                    bool            *work_);
+static bool     dsp_fast_mixer8x2amp_59(uint32_t        *Y_,
+                                        dsp_alu_flags_t *flags_,
+                                        int             *fExact_,
+                                        uint32_t        *RBSR_,
+                                        bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -3870,6 +3876,55 @@ dsp_fast_mixer12x2_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_mixer8x2amp_59_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_MIXER8X2AMP_59_WORDS] = {
+    0x00005C80,0x00008000,0x0000801F,0x00005C27,
+    0x00008000,0x00008022,0x00005C27,0x00008000,
+    0x00008025,0x00005C27,0x00008000,0x00008028,
+    0x00005C27,0x00008000,0x0000802B,0x00005C27,
+    0x00008000,0x0000802E,0x00005C27,0x00008000,
+    0x00008031,0x00005C27,0x00008000,0x00008034,
+    0x00008000,0x00004D27,0x00008037,0x00008906,
+    0x00008000,0x00005C80,0x00008000,0x00008000,
+    0x00005C27,0x00008000,0x00008000,0x00005C27,
+    0x00008000,0x00008000,0x00005C27,0x00008000,
+    0x00008000,0x00005C27,0x00008000,0x00008000,
+    0x00005C27,0x00008000,0x00008000,0x00005C27,
+    0x00008000,0x00008000,0x00005C27,0x00008000,
+    0x00008000,0x00008000,0x00004D27,0x00008000,
+    0x00008907
+  };
+  static uint32_t const masks[DSP_MIXER8X2AMP_59_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0002FC00,0x0002FC00,0x0000FFFF,0x0002FC00,
+    0x0002FC00,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0002FC00,0x0002FC00,0x0000FFFF,0x0002FC00,
+    0x0002FC00,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0000FC00,
+    0x0000FFFF,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0002FC00,0x0000FC00,0x0000FFFF,0x0002FC00,
+    0x0000FC00,0x0000FFFF,0x0002FC00,0x0000FC00,
+    0x0000FFFF,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0002FC00,0x0000FC00,0x0000FFFF,0x0002FC00,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_MIXER8X2AMP_59_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_mixer8x2amp_59_match(uint32_t pc_)
+{
+  return dsp_fast_mixer8x2amp_59_base_match(pc_);
+}
+
+static
+bool
 dsp_fast_mixer2x2_match(uint32_t pc_)
 {
   if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_MIXER2X2_WORDS))
@@ -4099,6 +4154,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_dsppdhdr;
         else if(dsp_fast_mixer12x2_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_mixer12x2;
+        else if(dsp_fast_mixer8x2amp_59_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_mixer8x2amp_59;
         else if(dsp_fast_mixer8x2_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_mixer8x2;
         else if(dsp_fast_mixer4x2_match(pc))
@@ -4517,6 +4574,27 @@ dsp_fast_mixer12x2(uint32_t        *Y_,
   DSP.dregs.PC = pc + DSP_MIXER12X2_WORDS;
 
   return true;
+}
+
+static
+bool
+dsp_fast_mixer8x2amp_59(uint32_t        *Y_,
+                        dsp_alu_flags_t *flags_,
+                        int             *fExact_,
+                        uint32_t        *RBSR_,
+                        bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_mixer8x2amp_59_base_match(pc))
+    return false;
+
+  return dsp_fast_interpret_block(pc,pc + DSP_MIXER8X2AMP_59_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
 }
 
 static
