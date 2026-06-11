@@ -74,6 +74,7 @@
 #define DSP_DSPPDHDR_WORDS       35
 #define DSP_DREG_PC              0x0EE
 #define DSP_ENVELOPE_27_WORDS    25
+#define DSP_ENVFOLLOWER_15_WORDS 13
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
 #define DSP_MIXER8X2_WORDS       54
@@ -398,6 +399,11 @@ static bool     dsp_fast_envelope_27(uint32_t        *Y_,
                                      int             *fExact_,
                                      uint32_t        *RBSR_,
                                      bool            *work_);
+static bool     dsp_fast_envfollower_15(uint32_t        *Y_,
+                                        dsp_alu_flags_t *flags_,
+                                        int             *fExact_,
+                                        uint32_t        *RBSR_,
+                                        bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -2515,6 +2521,60 @@ dsp_fast_envelope_27_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_envfollower_15_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_ENVFOLLOWER_15_WORDS] = {
+    0x00004640,0x00008009,0x00008005,0x0000EC08,
+    0x00005C80,0x0000880A,0x00008000,0x0000840B,
+    0x00004400,0x00008000,0x00008000,0x00002000,
+    0x00008000
+  };
+  static uint32_t const masks[DSP_ENVFOLLOWER_15_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_ENVFOLLOWER_15_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_envfollower_15_base_for_pc(uint32_t const  pc_,
+                                    uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x08,0x0B
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_envfollower_15_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_envfollower_15_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_envfollower_15_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -2730,6 +2790,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_decodeadpcm_51;
         else if(dsp_fast_envelope_27_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_envelope_27;
+        else if(dsp_fast_envfollower_15_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_envfollower_15;
         else if(dsp_fast_directout_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
@@ -3655,6 +3717,28 @@ dsp_fast_envelope_27(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_ENVELOPE_27_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_envfollower_15(uint32_t        *Y_,
+                        dsp_alu_flags_t *flags_,
+                        int             *fExact_,
+                        uint32_t        *RBSR_,
+                        bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_envfollower_15_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_ENVFOLLOWER_15_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
