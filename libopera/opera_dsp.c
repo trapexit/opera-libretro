@@ -55,6 +55,7 @@
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
 #define DSP_DREG_PC              0x0EE
 #define DSP_MIXER2X2_WORDS       18
+#define DSP_MIXER4X2_WORDS       30
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -279,6 +280,9 @@ static bool     dsp_fast_directout(uint32_t        *Y_,
                                    dsp_alu_flags_t *flags_,
                                    int             *fExact_);
 static bool     dsp_fast_mixer2x2(uint32_t        *Y_,
+                                  dsp_alu_flags_t *flags_,
+                                  int             *fExact_);
+static bool     dsp_fast_mixer4x2(uint32_t        *Y_,
                                   dsp_alu_flags_t *flags_,
                                   int             *fExact_);
 static bool     dsp_fast_multiply(uint32_t        *Y_,
@@ -623,34 +627,42 @@ dsp_fast_add_match(uint32_t pc_)
 
 static
 bool
-dsp_fast_mixer2x2_channel_match(uint32_t const pc_,
-                                uint32_t const off_,
-                                uint32_t const mix_addr_)
+dsp_fast_mixer_channel_match(uint32_t const pc_,
+                             uint32_t const off_,
+                             uint32_t const terms_,
+                             uint32_t const mix_addr_)
 {
-  ITAG_t src1;
-  ITAG_t src2;
-  ITAG_t src3;
-  ITAG_t src4;
+  uint32_t term;
   ITAG_t mix;
   ITAG_t accum;
 
-  if(!dsp_fast_multiply_product_insn(DSP.NMem[pc_ + off_ + 0],2) ||
-     !dsp_fast_multiply_accumulate_insn(DSP.NMem[pc_ + off_ + 3]) ||
-     !dsp_fast_accum_mix_insn(DSP.NMem[pc_ + off_ + 6]))
+  if(!dsp_fast_multiply_product_insn(DSP.NMem[pc_ + off_],2))
     return false;
 
-  src1.raw  = DSP.NMem[pc_ + off_ + 1];
-  src2.raw  = DSP.NMem[pc_ + off_ + 2];
-  src3.raw  = DSP.NMem[pc_ + off_ + 4];
-  src4.raw  = DSP.NMem[pc_ + off_ + 5];
-  mix.raw   = DSP.NMem[pc_ + off_ + 7];
-  accum.raw = DSP.NMem[pc_ + off_ + 8];
+  for(term = 1; term < terms_; term++)
+    if(!dsp_fast_multiply_accumulate_insn(DSP.NMem[pc_ + off_ + (term * 3)]))
+      return false;
 
-  return (dsp_fast_direct_source_operand(src1) &&
-          dsp_fast_direct_source_operand(src2) &&
-          dsp_fast_direct_source_operand(src3) &&
-          dsp_fast_direct_source_operand(src4) &&
-          dsp_fast_direct_dest_operand(mix) &&
+  if(!dsp_fast_accum_mix_insn(DSP.NMem[pc_ + off_ + (terms_ * 3)]))
+    return false;
+
+  for(term = 0; term < terms_; term++)
+    {
+      ITAG_t src1;
+      ITAG_t src2;
+
+      src1.raw = DSP.NMem[pc_ + off_ + (term * 3) + 1];
+      src2.raw = DSP.NMem[pc_ + off_ + (term * 3) + 2];
+
+      if(!dsp_fast_direct_source_operand(src1) ||
+         !dsp_fast_direct_source_operand(src2))
+        return false;
+    }
+
+  mix.raw   = DSP.NMem[pc_ + off_ + (terms_ * 3) + 1];
+  accum.raw = DSP.NMem[pc_ + off_ + (terms_ * 3) + 2];
+
+  return (dsp_fast_direct_dest_operand(mix) &&
           (mix.nrof.OP_ADDR == mix_addr_) &&
           dsp_fast_direct_source_operand(accum));
 }
@@ -662,8 +674,19 @@ dsp_fast_mixer2x2_match(uint32_t pc_)
   if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_MIXER2X2_WORDS))
     return false;
 
-  return (dsp_fast_mixer2x2_channel_match(pc_,0,DSP_DIRECTOUT_MIX_LEFT) &&
-          dsp_fast_mixer2x2_channel_match(pc_,9,DSP_DIRECTOUT_MIX_RIGHT));
+  return (dsp_fast_mixer_channel_match(pc_,0,2,DSP_DIRECTOUT_MIX_LEFT) &&
+          dsp_fast_mixer_channel_match(pc_,9,2,DSP_DIRECTOUT_MIX_RIGHT));
+}
+
+static
+bool
+dsp_fast_mixer4x2_match(uint32_t pc_)
+{
+  if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_MIXER4X2_WORDS))
+    return false;
+
+  return (dsp_fast_mixer_channel_match(pc_,0,4,DSP_DIRECTOUT_MIX_LEFT) &&
+          dsp_fast_mixer_channel_match(pc_,15,4,DSP_DIRECTOUT_MIX_RIGHT));
 }
 
 static
@@ -760,6 +783,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_add;
+        else if(dsp_fast_mixer4x2_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_mixer4x2;
         else if(dsp_fast_mixer2x2_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_mixer2x2;
         else if(dsp_fast_multiply_match(pc))
@@ -1119,25 +1144,29 @@ dsp_fast_multiply(uint32_t        *Y_,
 
 static
 void
-dsp_fast_mixer2x2_channel(uint32_t const   pc_,
-                          uint32_t const   off_,
-                          uint32_t        *Y_,
-                          dsp_alu_flags_t *flags_,
-                          int             *fExact_)
+dsp_fast_mixer_channel(uint32_t const   pc_,
+                       uint32_t const   off_,
+                       uint32_t const   terms_,
+                       uint32_t        *Y_,
+                       dsp_alu_flags_t *flags_,
+                       int             *fExact_)
 {
-  dsp_fast_multiply_product_to_y(DSP.NMem[pc_ + off_ + 0],
+  uint32_t term;
+
+  dsp_fast_multiply_product_to_y(DSP.NMem[pc_ + off_],
                                  DSP.NMem[pc_ + off_ + 1],
                                  DSP.NMem[pc_ + off_ + 2],
                                  Y_,flags_,fExact_);
 
-  dsp_fast_multiply_accumulate_y_clip(DSP.NMem[pc_ + off_ + 3],
-                                      DSP.NMem[pc_ + off_ + 4],
-                                      DSP.NMem[pc_ + off_ + 5],
-                                      Y_,flags_,fExact_);
+  for(term = 1; term < terms_; term++)
+    dsp_fast_multiply_accumulate_y_clip(DSP.NMem[pc_ + off_ + (term * 3)],
+                                        DSP.NMem[pc_ + off_ + (term * 3) + 1],
+                                        DSP.NMem[pc_ + off_ + (term * 3) + 2],
+                                        Y_,flags_,fExact_);
 
-  dsp_fast_add_y_to_mix_clip(DSP.NMem[pc_ + off_ + 6],
-                             DSP.NMem[pc_ + off_ + 7],
-                             DSP.NMem[pc_ + off_ + 8],
+  dsp_fast_add_y_to_mix_clip(DSP.NMem[pc_ + off_ + (terms_ * 3)],
+                             DSP.NMem[pc_ + off_ + (terms_ * 3) + 1],
+                             DSP.NMem[pc_ + off_ + (terms_ * 3) + 2],
                              Y_,flags_,fExact_);
 }
 
@@ -1156,10 +1185,33 @@ dsp_fast_mixer2x2(uint32_t        *Y_,
   if(!dsp_fast_mixer2x2_match(pc))
     return false;
 
-  dsp_fast_mixer2x2_channel(pc,0,Y_,flags_,fExact_);
-  dsp_fast_mixer2x2_channel(pc,9,Y_,flags_,fExact_);
+  dsp_fast_mixer_channel(pc,0,2,Y_,flags_,fExact_);
+  dsp_fast_mixer_channel(pc,9,2,Y_,flags_,fExact_);
 
   DSP.dregs.PC = pc + DSP_MIXER2X2_WORDS;
+
+  return true;
+}
+
+static
+bool
+dsp_fast_mixer4x2(uint32_t        *Y_,
+                  dsp_alu_flags_t *flags_,
+                  int             *fExact_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_mixer4x2_match(pc))
+    return false;
+
+  dsp_fast_mixer_channel(pc,0,4,Y_,flags_,fExact_);
+  dsp_fast_mixer_channel(pc,15,4,Y_,flags_,fExact_);
+
+  DSP.dregs.PC = pc + DSP_MIXER4X2_WORDS;
 
   return true;
 }
