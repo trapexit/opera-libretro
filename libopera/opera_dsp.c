@@ -48,6 +48,12 @@
 #define TOPBIT       0x80000000
 #define SYSTEM_TICKS 568        /* ceil(((25000000 / 44100) + 1)) */
 
+#define DSP_NMEM_EXEC_WORDS      1024
+#define DSP_DIRECTOUT_INSN       0x4627
+#define DSP_DIRECTOUT_MIX_LEFT   0x106
+#define DSP_DIRECTOUT_MIX_RIGHT  0x107
+#define DSP_DREG_PC              0x0EE
+
 #pragma pack(push,1)
 
 struct CIFTAG_s
@@ -252,6 +258,20 @@ typedef union dsp_alu_flags_u dsp_alu_flags_t;
 #pragma pack(pop)
 
 static dsp_t DSP;
+
+typedef bool (*dsp_fast_handler_t)(uint32_t       *Y_,
+                                   dsp_alu_flags_t *flags_,
+                                   int            *fExact_);
+
+static dsp_fast_handler_t DSP_FAST_TABLE[DSP_NMEM_EXEC_WORDS];
+static bool               DSP_FAST_DIRTY   = true;
+static int                DSP_FAST_ENABLED = 1;
+
+static uint16_t dsp_read(uint32_t addr_);
+static void     dsp_write(uint32_t addr_, uint16_t val_);
+static bool     dsp_fast_directout(uint32_t        *Y_,
+                                   dsp_alu_flags_t *flags_,
+                                   int             *fExact_);
 
 static
 INLINE
@@ -466,6 +486,172 @@ dsp_write(uint32_t addr_,
     }
 }
 
+static
+bool
+dsp_fast_enabled(void)
+{
+  return (DSP_FAST_ENABLED != 0);
+}
+
+static
+void
+dsp_fast_invalidate(void)
+{
+  DSP_FAST_DIRTY = true;
+}
+
+static
+bool
+dsp_fast_direct_operand(ITAG_t const operand_)
+{
+  return ((operand_.nrof.TYPE == 4) && !operand_.nrof.DI);
+}
+
+static
+bool
+dsp_fast_direct_source_operand(ITAG_t const operand_)
+{
+  return (dsp_fast_direct_operand(operand_) &&
+          (operand_.nrof.OP_ADDR != DSP_DREG_PC) &&
+          (operand_.nrof.WB1 == 0));
+}
+
+static
+bool
+dsp_fast_directout_match(uint32_t pc_)
+{
+  ITAG_t mix_left;
+  ITAG_t in_left;
+  ITAG_t mix_right;
+  ITAG_t in_right;
+
+  if(pc_ > (DSP_NMEM_EXEC_WORDS - 6))
+    return false;
+
+  if((DSP.NMem[pc_ + 0] != DSP_DIRECTOUT_INSN) ||
+     (DSP.NMem[pc_ + 3] != DSP_DIRECTOUT_INSN))
+    return false;
+
+  mix_left.raw  = DSP.NMem[pc_ + 1];
+  in_left.raw   = DSP.NMem[pc_ + 2];
+  mix_right.raw = DSP.NMem[pc_ + 4];
+  in_right.raw  = DSP.NMem[pc_ + 5];
+
+  if(!dsp_fast_direct_operand(mix_left) ||
+     !dsp_fast_direct_source_operand(in_left) ||
+     !dsp_fast_direct_operand(mix_right) ||
+     !dsp_fast_direct_source_operand(in_right))
+    return false;
+
+  return ((mix_left.nrof.OP_ADDR == DSP_DIRECTOUT_MIX_LEFT) &&
+          (mix_left.nrof.WB1 != 0) &&
+          (mix_right.nrof.OP_ADDR == DSP_DIRECTOUT_MIX_RIGHT) &&
+          (mix_right.nrof.WB1 != 0));
+}
+
+static
+void
+dsp_fast_rebuild(void)
+{
+  uint32_t pc;
+
+  memset(DSP_FAST_TABLE,0,sizeof(DSP_FAST_TABLE));
+
+  if(dsp_fast_enabled())
+    for(pc = 0; pc < DSP_NMEM_EXEC_WORDS; pc++)
+      if(dsp_fast_directout_match(pc))
+        DSP_FAST_TABLE[pc] = dsp_fast_directout;
+
+  DSP_FAST_DIRTY = false;
+}
+
+static
+void
+dsp_fast_add_clip_write(uint16_t         dst_op_,
+                        uint16_t         src_op_,
+                        uint32_t        *Y_,
+                        dsp_alu_flags_t *flags_,
+                        int             *fExact_)
+{
+  ITAG_t dst;
+  ITAG_t src;
+  uint32_t a;
+  uint32_t b;
+  uint32_t y;
+
+  dst.raw = dst_op_;
+  src.raw = src_op_;
+
+  DSP.flags.req.raw    = DSP.INSTTRAS[DSP_DIRECTOUT_INSN].req.raw;
+  DSP.flags.BS         = DSP.INSTTRAS[DSP_DIRECTOUT_INSN].BS;
+  DSP.flags.WRITEBACK  = dst.nrof.OP_ADDR;
+  DSP.flags.ALU1       = dsp_read(dst.nrof.OP_ADDR);
+  DSP.flags.ALU2       = dsp_read(src.nrof.OP_ADDR);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  if(1 & flags_->overflow)
+    y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+
+  *Y_ = y;
+  dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+}
+
+static
+bool
+dsp_fast_directout(uint32_t        *Y_,
+                   dsp_alu_flags_t *flags_,
+                   int             *fExact_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_directout_match(pc))
+    return false;
+
+  dsp_fast_add_clip_write(DSP.NMem[pc + 1],DSP.NMem[pc + 2],Y_,flags_,fExact_);
+  dsp_fast_add_clip_write(DSP.NMem[pc + 4],DSP.NMem[pc + 5],Y_,flags_,fExact_);
+
+  DSP.dregs.PC = pc + 6;
+
+  return true;
+}
+
+static
+bool
+dsp_fast_execute(uint32_t        *Y_,
+                 dsp_alu_flags_t *flags_,
+                 int             *fExact_)
+{
+  dsp_fast_handler_t handler;
+
+  if(DSP_FAST_DIRTY)
+    dsp_fast_rebuild();
+
+  if(!dsp_fast_enabled() || (DSP.dregs.PC >= DSP_NMEM_EXEC_WORDS))
+    return false;
+
+  handler = DSP_FAST_TABLE[DSP.dregs.PC];
+  if(handler == NULL)
+    return false;
+
+  if(handler(Y_,flags_,fExact_))
+    return true;
+
+  return false;
+}
+
 uint32_t
 opera_dsp_state_size_v1(void)
 {
@@ -563,7 +749,13 @@ uint32_t
 opera_dsp_state_load_v1(const void     *buf_,
                         uint32_t const  size_)
 {
-  return opera_state_load_sized(&DSP,"DSPP",buf_,size_,sizeof(DSP));
+  uint32_t rv;
+
+  rv = opera_state_load_sized(&DSP,"DSPP",buf_,size_,sizeof(DSP));
+  if(rv != 0)
+    dsp_fast_invalidate();
+
+  return rv;
 }
 
 static
@@ -654,6 +846,7 @@ opera_dsp_state_load(const void     *buf_,
     return 0;
 
   DSP = state;
+  dsp_fast_invalidate();
 
   return opera_state_reader_used(&reader);
 }
@@ -995,6 +1188,8 @@ opera_dsp_init(void)
 
   for(i = 0; i < 16; i++)
     DSP.CPUSupply[i] = 0;
+
+  dsp_fast_invalidate();
 }
 
 void
@@ -1030,6 +1225,9 @@ opera_dsp_loop(void)
       do
         {
           ITAG_t inst;
+
+          if(dsp_fast_execute(&Y,&flags,&fExact))
+            continue;
 
           inst.raw = DSP.NMem[DSP.dregs.PC++];
           if(inst.aif.PAD)
@@ -1417,13 +1615,29 @@ opera_dsp_mem_write(uint16_t addr_,
                      uint16_t val_)
 {
   //mwriteh(addr,val);
-  DSP.NMem[addr_ & 0x3FF] = val_;
+  addr_ &= 0x3FF;
+  if(DSP.NMem[addr_] != val_)
+    {
+      DSP.NMem[addr_] = val_;
+      dsp_fast_invalidate();
+    }
 }
 
 void
 opera_dsp_set_running(int val_)
 {
   DSP.flags.Running = (val_ & 1);
+}
+
+void
+opera_dsp_set_fast(int val_)
+{
+  val_ = (val_ & 1);
+  if(DSP_FAST_ENABLED == val_)
+    return;
+
+  DSP_FAST_ENABLED = val_;
+  dsp_fast_invalidate();
 }
 
 /* CPU writes to EI,I of DSP */

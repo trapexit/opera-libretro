@@ -36,7 +36,7 @@ struct opera_lr_opts_t
   bool hide_lightgun_crosshairs;
   char const *madam_matrix_engine;
   bool kprint;
-  bool dsp_threaded;
+  bool dsp_fast;
   bool swi_hle;
   uint32_t hack_flags;
 };

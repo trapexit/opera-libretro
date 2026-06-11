@@ -1,6 +1,5 @@
 DEBUG = 0
 HAVE_CHD = 1
-THREADED_DSP = 1
 HAVE_CDROM = 0
 
 ifeq ($(platform),)
@@ -55,9 +54,9 @@ ifneq (,$(findstring unix,$(platform)))
     TARGET := $(TARGET_NAME)_libretro.so
     fpic := -fPIC
     ifneq ($(findstring SunOS,$(shell uname -s)),)
-        SHARED := -shared -lpthread -lm -z defs
+        SHARED := -shared -lm -z defs
     else
-        SHARED := -lpthread -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
+        SHARED := -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
         ifneq ($(findstring Linux,$(shell uname -s)),)
             HAVE_CDROM = 1
         endif
@@ -111,7 +110,7 @@ ifneq (,$(findstring unix,$(platform)))
 else ifeq ($(platform), classic_armv7_a7)
 	TARGET := $(TARGET_NAME)_libretro.so
 	fpic := -fPIC
-	SHARED := -lpthread -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
+	SHARED := -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
 	CFLAGS += -Ofast \
 	-flto=4 -fwhole-program -fuse-linker-plugin \
 	-fdata-sections -ffunction-sections -Wl,--gc-sections \
@@ -307,7 +306,6 @@ else ifeq ($(platform), libnx)
 else ifeq ($(platform), emscripten)
    TARGET := $(TARGET_NAME)_libretro_$(platform).bc
    STATIC_LINKING = 1
-   THREADED_DSP = 0
 
 # Windows MSVC 2003 Xbox 1
 else ifeq ($(platform), xbox1_msvc2003)

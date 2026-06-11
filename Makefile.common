@@ -101,14 +101,6 @@ else
 FLAGS += -DINLINE="_inline"
 endif
 
-ifeq ($(THREADED_DSP), 1)
-FLAGS += -DTHREADED_DSP
-    ifneq ($(STATIC_LINKING), 1)
-    SOURCES_C += \
-            $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
-    endif
-endif
-
 ifeq ($(HAVE_CHD), 1)
 FLAGS += \
 	-DHAVE_CHD \

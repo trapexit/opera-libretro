@@ -223,14 +223,12 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       },
       "disabled"
     },
-#if THREADED_DSP
     {
-      "opera_dsp_threaded",
-      "Threaded DSP",
+      "opera_dsp_fast",
+      "DSP Fast Path",
       NULL,
-      "Run the DSP (audio processor) on a separate CPU thread."
-      " Improves performance on multi-core systems."
-      " !EXPERIMENTAL!",
+      "Use optimized fast paths for recognized DSP audio programs."
+      " Falls back to the interpreter for unsupported programs.",
       NULL,
       "audio",
       {
@@ -238,9 +236,8 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
         { "enabled",  NULL },
         { NULL, NULL },
       },
-      "disabled"
+      "enabled"
     },
-#endif
     {
       "opera_nvram_storage",
       "NVRAM Storage",
@@ -545,21 +542,18 @@ static struct retro_core_option_definition option_defs_us[] =
       },
       "disabled"
     },
-#if THREADED_DSP
     {
-      "opera_dsp_threaded",
-      "Threaded DSP",
-      "Run the DSP (audio processor) on a separate CPU thread."
-      " Improves performance on multi-core systems."
-      " !EXPERIMENTAL!",
+      "opera_dsp_fast",
+      "DSP Fast Path",
+      "Use optimized fast paths for recognized DSP audio programs."
+      " Falls back to the interpreter for unsupported programs.",
       {
         { "disabled", NULL },
         { "enabled",  NULL },
         { NULL, NULL },
       },
-      "disabled"
+      "enabled"
     },
-#endif
     {
       "opera_nvram_storage",
       "NVRAM Storage",

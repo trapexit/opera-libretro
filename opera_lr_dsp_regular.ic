@@ -34,9 +34,3 @@ opera_lr_dsp_destroy(void)
 {
 
 }
-
-void
-opera_lr_dsp_init(const bool threaded_)
-{
-
-}

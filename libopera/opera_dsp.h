@@ -45,6 +45,7 @@ void     opera_dsp_imem_write(uint16_t addr_, uint16_t val_);
 void     opera_dsp_mem_write(uint16_t addr_, uint16_t val_);
 
 void     opera_dsp_set_running(int val_);
+void     opera_dsp_set_fast(int val_);
 
 void     opera_dsp_arm_semaphore_write(uint32_t val_);
 uint32_t opera_dsp_arm_semaphore_read(void);

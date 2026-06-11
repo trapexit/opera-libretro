@@ -28,6 +28,7 @@
 #include "libopera/opera_cdrom.h"
 #include "libopera/opera_clock.h"
 #include "libopera/opera_core.h"
+#include "libopera/opera_dsp.h"
 #include "libopera/opera_madam.h"
 #include "libopera/opera_mem.h"
 #include "libopera/opera_region.h"
@@ -626,17 +627,17 @@ opera_lr_opts_set_kprint(opera_lr_opts_t const *opts_)
 
 static
 void
-opera_lr_opts_get_dsp_threaded(opera_lr_opts_t *opts_)
+opera_lr_opts_get_dsp_fast(opera_lr_opts_t *opts_)
 {
-  opts_->dsp_threaded = getval_is_enabled("dsp_threaded",false);
+  opts_->dsp_fast = getval_is_enabled("dsp_fast",true);
 }
 
 static
 void
-opera_lr_opts_set_dsp_threaded(opera_lr_opts_t const *opts_)
+opera_lr_opts_set_dsp_fast(opera_lr_opts_t const *opts_)
 {
-  opera_lr_dsp_init(opts_->dsp_threaded);
-  g_OPTS.dsp_threaded = opts_->dsp_threaded;
+  opera_dsp_set_fast(opts_->dsp_fast);
+  g_OPTS.dsp_fast = opts_->dsp_fast;
 }
 
 static
@@ -702,7 +703,7 @@ opera_lr_opts_get(opera_lr_opts_t *opts_)
   opera_lr_opts_get_active_devices(opts_);
   opera_lr_opts_get_cd_speed(opts_);
   opera_lr_opts_get_cpu_overclock(opts_);
-  opera_lr_opts_get_dsp_threaded(opts_);
+  opera_lr_opts_get_dsp_fast(opts_);
   opera_lr_opts_get_hacks(opts_);
   opera_lr_opts_get_hide_lightgun_crosshairs(opts_);
   opera_lr_opts_get_high_resolution(opts_);
@@ -730,7 +731,7 @@ opera_lr_opts_set(opera_lr_opts_t const *opts_)
   opera_lr_opts_set_active_devices(opts_);
   opera_lr_opts_set_cd_speed(opts_);
   opera_lr_opts_set_cpu_overclock(opts_);
-  opera_lr_opts_set_dsp_threaded(opts_);
+  opera_lr_opts_set_dsp_fast(opts_);
   opera_lr_opts_set_hacks(opts_);
   opera_lr_opts_set_hide_lightgun_crosshairs(opts_);
   opera_lr_opts_set_high_resolution(opts_);
