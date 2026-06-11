@@ -94,6 +94,7 @@
 #define DSP_HALFSTEREOSAMPLE_44_WORDS 42
 #define DSP_HEAD_32_33_WORDS     30
 #define DSP_HEAD_32_394_WORDS    30
+#define DSP_HEAD_32_VD8_WORDS    30
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
 #define DSP_MIXER8X2_WORDS       54
@@ -514,6 +515,11 @@ static bool     dsp_fast_head_32_33(uint32_t        *Y_,
                                     uint32_t        *RBSR_,
                                     bool            *work_);
 static bool     dsp_fast_head_32_394(uint32_t        *Y_,
+                                     dsp_alu_flags_t *flags_,
+                                     int             *fExact_,
+                                     uint32_t        *RBSR_,
+                                     bool            *work_);
+static bool     dsp_fast_head_32_vd8(uint32_t        *Y_,
                                      dsp_alu_flags_t *flags_,
                                      int             *fExact_,
                                      uint32_t        *RBSR_,
@@ -3596,6 +3602,41 @@ dsp_fast_head_32_394_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_head_32_vd8_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_HEAD_32_VD8_WORDS] = {
+    0x00008000,0x00009BEF,0x0000E800,0x00004620,
+    0x00008905,0x0000C001,0x00007C80,0x00008106,
+    0x0000800C,0x000083FE,0x00007C80,0x00008107,
+    0x00008000,0x000083FF,0x00009B02,0x00008105,
+    0x00009906,0x0000C000,0x00009907,0x0000C000,
+    0x00002470,0x0000881A,0x0000EC1E,0x00004620,
+    0x0000881D,0x0000C001,0x00009800,0x00008000,
+    0x00009BEE,0x00008000
+  };
+  static uint32_t const masks[DSP_HEAD_32_VD8_WORDS] = {
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0002FC00,0x0001FC00,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0000FC00,0x0002FC00,
+    0x0000FFFF,0x0000FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_HEAD_32_VD8_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_head_32_vd8_match(uint32_t pc_)
+{
+  return dsp_fast_head_32_vd8_base_match(pc_);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -3851,6 +3892,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_head_32_33;
         else if(dsp_fast_head_32_394_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_head_32_394;
+        else if(dsp_fast_head_32_vd8_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_head_32_vd8;
         else if(dsp_fast_directout_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
@@ -5199,6 +5242,27 @@ dsp_fast_head_32_394(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(pc,pc + DSP_HEAD_32_394_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_head_32_vd8(uint32_t        *Y_,
+                     dsp_alu_flags_t *flags_,
+                     int             *fExact_,
+                     uint32_t        *RBSR_,
+                     bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_head_32_vd8_base_match(pc))
+    return false;
+
+  return dsp_fast_interpret_block(pc,pc + DSP_HEAD_32_VD8_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
