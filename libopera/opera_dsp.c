@@ -98,6 +98,7 @@
 #define DSP_IMPULSE_12_WORDS     10
 #define DSP_MAXIMUM_11_WORDS     9
 #define DSP_MINIMUM_11_WORDS     9
+#define DSP_MIXER12X2_WORDS      78
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
 #define DSP_MIXER8X2_WORDS       54
@@ -542,6 +543,11 @@ static bool     dsp_fast_minimum_11(uint32_t        *Y_,
                                     int             *fExact_,
                                     uint32_t        *RBSR_,
                                     bool            *work_);
+static bool     dsp_fast_mixer12x2(uint32_t        *Y_,
+                                   dsp_alu_flags_t *flags_,
+                                   int             *fExact_,
+                                   uint32_t        *RBSR_,
+                                   bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -3853,6 +3859,17 @@ dsp_fast_mixer_channel_match(uint32_t const pc_,
 
 static
 bool
+dsp_fast_mixer12x2_match(uint32_t pc_)
+{
+  if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_MIXER12X2_WORDS))
+    return false;
+
+  return (dsp_fast_mixer_channel_match(pc_,0,12,DSP_DIRECTOUT_MIX_LEFT) &&
+          dsp_fast_mixer_channel_match(pc_,39,12,DSP_DIRECTOUT_MIX_RIGHT));
+}
+
+static
+bool
 dsp_fast_mixer2x2_match(uint32_t pc_)
 {
   if(pc_ > (DSP_NMEM_EXEC_WORDS - DSP_MIXER2X2_WORDS))
@@ -4080,6 +4097,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_add;
         else if(dsp_fast_dsppdhdr_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_dsppdhdr;
+        else if(dsp_fast_mixer12x2_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_mixer12x2;
         else if(dsp_fast_mixer8x2_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_mixer8x2;
         else if(dsp_fast_mixer4x2_match(pc))
@@ -4473,6 +4492,31 @@ dsp_fast_mixer_channel(uint32_t const   pc_,
                              DSP.NMem[pc_ + off_ + (terms_ * 3) + 1],
                              DSP.NMem[pc_ + off_ + (terms_ * 3) + 2],
                              Y_,flags_,fExact_);
+}
+
+static
+bool
+dsp_fast_mixer12x2(uint32_t        *Y_,
+                   dsp_alu_flags_t *flags_,
+                   int             *fExact_,
+                   uint32_t        *RBSR_,
+                   bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_mixer12x2_match(pc))
+    return false;
+
+  dsp_fast_mixer_channel(pc,0,12,Y_,flags_,fExact_);
+  dsp_fast_mixer_channel(pc,39,12,Y_,flags_,fExact_);
+
+  DSP.dregs.PC = pc + DSP_MIXER12X2_WORDS;
+
+  return true;
 }
 
 static
