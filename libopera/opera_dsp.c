@@ -76,6 +76,7 @@
 #define DSP_ENVELOPE_27_WORDS    25
 #define DSP_ENVFOLLOWER_15_WORDS 13
 #define DSP_EZFLIX225_219_WORDS 217
+#define DSP_FILTEREDNOISE_22_WORDS 20
 #define DSP_FIXEDMONO8_21_WORDS  19
 #define DSP_MIXER2X2_WORDS       18
 #define DSP_MIXER4X2_WORDS       30
@@ -411,6 +412,11 @@ static bool     dsp_fast_ezflix225_219(uint32_t        *Y_,
                                        int             *fExact_,
                                        uint32_t        *RBSR_,
                                        bool            *work_);
+static bool     dsp_fast_filterednoise_22(uint32_t        *Y_,
+                                          dsp_alu_flags_t *flags_,
+                                          int             *fExact_,
+                                          uint32_t        *RBSR_,
+                                          bool            *work_);
 static bool     dsp_fast_fixedmono8_21(uint32_t        *Y_,
                                        dsp_alu_flags_t *flags_,
                                        int             *fExact_,
@@ -2743,6 +2749,35 @@ dsp_fast_ezflix225_219_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_filterednoise_22_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_FILTEREDNOISE_22_WORDS] = {
+    0x00008000,0x00007D27,0x0000800D,0x00008007,
+    0x00008810,0x00005C27,0x00008000,0x0000800E,
+    0x00008000,0x00004447,0x000080EA,0x00008000,
+    0x00004D27,0x00008000,0x00008800,0x00007C80,
+    0x00008000,0x00008000,0x00008000,0x00008000
+  };
+  static uint32_t const masks[DSP_FILTEREDNOISE_22_WORDS] = {
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0002FC00,0x0000FFFF,0x0002FC00,0x0000FC00,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0002FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0002FC00,0x0002FC00,0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_FILTEREDNOISE_22_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_filterednoise_22_match(uint32_t pc_)
+{
+  return dsp_fast_filterednoise_22_base_match(pc_);
+}
+
+static
+bool
 dsp_fast_fixedmono8_21_base_match(uint32_t const pc_)
 {
   static uint32_t const vals[DSP_FIXEDMONO8_21_WORDS] = {
@@ -3018,6 +3053,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_envfollower_15;
         else if(dsp_fast_ezflix225_219_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_ezflix225_219;
+        else if(dsp_fast_filterednoise_22_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_filterednoise_22;
         else if(dsp_fast_fixedmono8_21_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_fixedmono8_21;
         else if(dsp_fast_directout_match(pc))
@@ -3989,6 +4026,26 @@ dsp_fast_ezflix225_219(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_EZFLIX225_219_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_filterednoise_22(uint32_t        *Y_,
+                          dsp_alu_flags_t *flags_,
+                          int             *fExact_,
+                          uint32_t        *RBSR_,
+                          bool            *work_)
+{
+  uint32_t const base = DSP.dregs.PC;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  if(!dsp_fast_filterednoise_22_base_match(base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_FILTEREDNOISE_22_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
