@@ -127,6 +127,7 @@
 #define DSP_SAWTOOTH_8_WORDS     6
 #define DSP_SQUARE_12_WORDS      10
 #define DSP_SQUARE_LFO_16_WORDS  14
+#define DSP_SUBMIXER2X2_20_WORDS 18
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -688,6 +689,11 @@ static bool     dsp_fast_square_lfo_16(uint32_t        *Y_,
                                        int             *fExact_,
                                        uint32_t        *RBSR_,
                                        bool            *work_);
+static bool     dsp_fast_submixer2x2_20(uint32_t        *Y_,
+                                        dsp_alu_flags_t *flags_,
+                                        int             *fExact_,
+                                        uint32_t        *RBSR_,
+                                        bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -2804,6 +2810,35 @@ dsp_fast_square_lfo_16_match(uint32_t pc_)
   uint32_t base;
 
   return dsp_fast_square_lfo_16_base_for_pc(pc_,&base);
+}
+
+static
+bool
+dsp_fast_submixer2x2_20_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_SUBMIXER2X2_20_WORDS] = {
+    0x00005C80,0x00008000,0x0000800B,0x00005C27,
+    0x00008000,0x0000800E,0x00008000,0x00002080,
+    0x00008000,0x00005C80,0x00008000,0x00008000,
+    0x00005C27,0x00008000,0x00008000,0x00008000,
+    0x00002080,0x00008000
+  };
+  static uint32_t const masks[DSP_SUBMIXER2X2_20_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0000FFFF,
+    0x0002FC00,0x0002FC00,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0002FC00,0x0000FC00,
+    0x0000FFFF,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_SUBMIXER2X2_20_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_submixer2x2_20_match(uint32_t pc_)
+{
+  return dsp_fast_submixer2x2_20_base_match(pc_);
 }
 
 static
@@ -5368,6 +5403,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_square_12;
         else if(dsp_fast_square_lfo_16_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_square_lfo_16;
+        else if(dsp_fast_submixer2x2_20_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_submixer2x2_20;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
@@ -6287,6 +6324,27 @@ dsp_fast_square_lfo_16(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_SQUARE_LFO_16_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_submixer2x2_20(uint32_t        *Y_,
+                        dsp_alu_flags_t *flags_,
+                        int             *fExact_,
+                        uint32_t        *RBSR_,
+                        bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_submixer2x2_20_base_match(pc))
+    return false;
+
+  return dsp_fast_interpret_block(pc,pc + DSP_SUBMIXER2X2_20_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
