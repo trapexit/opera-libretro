@@ -49,6 +49,7 @@
 #define SYSTEM_TICKS 568        /* ceil(((25000000 / 44100) + 1)) */
 
 #define DSP_NMEM_EXEC_WORDS      1024
+#define DSP_ADD_INSN             0x6627
 #define DSP_DIRECTOUT_INSN       0x4627
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
@@ -269,6 +270,9 @@ static int                DSP_FAST_ENABLED = 1;
 
 static uint16_t dsp_read(uint32_t addr_);
 static void     dsp_write(uint32_t addr_, uint16_t val_);
+static bool     dsp_fast_add(uint32_t        *Y_,
+                             dsp_alu_flags_t *flags_,
+                             int             *fExact_);
 static bool     dsp_fast_directout(uint32_t        *Y_,
                                    dsp_alu_flags_t *flags_,
                                    int             *fExact_);
@@ -518,6 +522,37 @@ dsp_fast_direct_source_operand(ITAG_t const operand_)
 
 static
 bool
+dsp_fast_direct_dest_operand(ITAG_t const operand_)
+{
+  return (dsp_fast_direct_operand(operand_) &&
+          (operand_.nrof.WB1 != 0));
+}
+
+static
+bool
+dsp_fast_add_match(uint32_t pc_)
+{
+  ITAG_t src1;
+  ITAG_t src2;
+  ITAG_t dst;
+
+  if(pc_ > (DSP_NMEM_EXEC_WORDS - 4))
+    return false;
+
+  if(DSP.NMem[pc_] != DSP_ADD_INSN)
+    return false;
+
+  src1.raw = DSP.NMem[pc_ + 1];
+  src2.raw = DSP.NMem[pc_ + 2];
+  dst.raw  = DSP.NMem[pc_ + 3];
+
+  return (dsp_fast_direct_source_operand(src1) &&
+          dsp_fast_direct_source_operand(src2) &&
+          dsp_fast_direct_dest_operand(dst));
+}
+
+static
+bool
 dsp_fast_directout_match(uint32_t pc_)
 {
   ITAG_t mix_left;
@@ -559,34 +594,35 @@ dsp_fast_rebuild(void)
 
   if(dsp_fast_enabled())
     for(pc = 0; pc < DSP_NMEM_EXEC_WORDS; pc++)
-      if(dsp_fast_directout_match(pc))
-        DSP_FAST_TABLE[pc] = dsp_fast_directout;
+      {
+        if(dsp_fast_directout_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_directout;
+        else if(dsp_fast_add_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_add;
+      }
 
   DSP_FAST_DIRTY = false;
 }
 
 static
 void
-dsp_fast_add_clip_write(uint16_t         dst_op_,
-                        uint16_t         src_op_,
-                        uint32_t        *Y_,
-                        dsp_alu_flags_t *flags_,
-                        int             *fExact_)
+dsp_fast_add_clip_write_direct(uint16_t         insn_,
+                               uint32_t         dst_addr_,
+                               uint32_t         src1_addr_,
+                               uint32_t         src2_addr_,
+                               uint32_t        *Y_,
+                               dsp_alu_flags_t *flags_,
+                               int             *fExact_)
 {
-  ITAG_t dst;
-  ITAG_t src;
   uint32_t a;
   uint32_t b;
   uint32_t y;
 
-  dst.raw = dst_op_;
-  src.raw = src_op_;
-
-  DSP.flags.req.raw    = DSP.INSTTRAS[DSP_DIRECTOUT_INSN].req.raw;
-  DSP.flags.BS         = DSP.INSTTRAS[DSP_DIRECTOUT_INSN].BS;
-  DSP.flags.WRITEBACK  = dst.nrof.OP_ADDR;
-  DSP.flags.ALU1       = dsp_read(dst.nrof.OP_ADDR);
-  DSP.flags.ALU2       = dsp_read(src.nrof.OP_ADDR);
+  DSP.flags.req.raw    = DSP.INSTTRAS[insn_].req.raw;
+  DSP.flags.BS         = DSP.INSTTRAS[insn_].BS;
+  DSP.flags.WRITEBACK  = dst_addr_;
+  DSP.flags.ALU1       = dsp_read(src1_addr_);
+  DSP.flags.ALU2       = dsp_read(src2_addr_);
 
   a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
   b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
@@ -603,6 +639,60 @@ dsp_fast_add_clip_write(uint16_t         dst_op_,
 
   *Y_ = y;
   dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+}
+
+static
+void
+dsp_fast_add_clip_write(uint16_t         dst_op_,
+                        uint16_t         src_op_,
+                        uint32_t        *Y_,
+                        dsp_alu_flags_t *flags_,
+                        int             *fExact_)
+{
+  ITAG_t dst;
+  ITAG_t src;
+
+  dst.raw = dst_op_;
+  src.raw = src_op_;
+
+  dsp_fast_add_clip_write_direct(DSP_DIRECTOUT_INSN,
+                                 dst.nrof.OP_ADDR,
+                                 dst.nrof.OP_ADDR,
+                                 src.nrof.OP_ADDR,
+                                 Y_,flags_,fExact_);
+}
+
+static
+bool
+dsp_fast_add(uint32_t        *Y_,
+             dsp_alu_flags_t *flags_,
+             int             *fExact_)
+{
+  uint32_t pc;
+  ITAG_t src1;
+  ITAG_t src2;
+  ITAG_t dst;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_add_match(pc))
+    return false;
+
+  src1.raw = DSP.NMem[pc + 1];
+  src2.raw = DSP.NMem[pc + 2];
+  dst.raw  = DSP.NMem[pc + 3];
+
+  dsp_fast_add_clip_write_direct(DSP_ADD_INSN,
+                                 dst.nrof.OP_ADDR,
+                                 src1.nrof.OP_ADDR,
+                                 src2.nrof.OP_ADDR,
+                                 Y_,flags_,fExact_);
+
+  DSP.dregs.PC = pc + 4;
+
+  return true;
 }
 
 static
