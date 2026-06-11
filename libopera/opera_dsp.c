@@ -60,6 +60,7 @@
 #define DSP_ADPCMDUCK22S_250_WORDS 248
 #define DSP_BENCHMARK_6_INSN     0x6640
 #define DSP_BENCHMARK_6_WORDS    4
+#define DSP_DCSQXDHALFMONO_59_WORDS 57
 #define DSP_DIRECTOUT_INSN       0x4627
 #define DSP_DIRECTOUT_MIX_LEFT   0x106
 #define DSP_DIRECTOUT_MIX_RIGHT  0x107
@@ -344,6 +345,11 @@ static bool     dsp_fast_benchmark_6(uint32_t        *Y_,
                                      int             *fExact_,
                                      uint32_t        *RBSR_,
                                      bool            *work_);
+static bool     dsp_fast_dcsqxdhalfmono_59(uint32_t        *Y_,
+                                           dsp_alu_flags_t *flags_,
+                                           int             *fExact_,
+                                           uint32_t        *RBSR_,
+                                           bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -1791,6 +1797,82 @@ dsp_fast_benchmark_6_match(uint32_t const pc_)
 
 static
 bool
+dsp_fast_dcsqxdhalfmono_59_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_DCSQXDHALFMONO_59_WORDS] = {
+    0x00004620,0x00008808,0x0000C001,0x00008000,
+    0x000021A0,0x0000C001,0x0000D433,0x000046A0,
+    0x00008000,0x0000C002,0x0000D412,0x00004480,
+    0x00008000,0x00008013,0x000041A0,0x0000DF00,
+    0x00008014,0x00008415,0x00004486,0x00008000,
+    0x0000801A,0x00000000,0x0000E819,0x00008000,
+    0x00000010,0x00004C80,0x0000801D,0x00008021,
+    0x000046A0,0x00008000,0x0000C100,0x0000B424,
+    0x00004627,0x00008025,0x00008826,0x00008427,
+    0x00004480,0x00008000,0x00008000,0x00004120,
+    0x0000C000,0x00008102,0x0000000F,0x00005C20,
+    0x0000802F,0x0000E800,0x00008000,0x00009834,
+    0x00008102,0x00008435,0x00008000,0x00002400,
+    0x00008000,0x00004C80,0x00008000,0x00008000,
+    0x00008000
+  };
+  static uint32_t const masks[DSP_DCSQXDHALFMONO_59_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0002FC00,0x0002FC00,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0001FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0001FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FC00,0x0002FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FFFF,0x0000FFFF,0x0000FFFF,
+    0x0002FC00,0x0000FFFF,0x0000FFFF,0x0000FC00,
+    0x0000FFFF,0x0001FC00,0x0000FFFF,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0002FC00,0x0002FC00,
+    0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_DCSQXDHALFMONO_59_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_dcsqxdhalfmono_59_base_for_pc(uint32_t const  pc_,
+                                      uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x33,0x12,0x15,0x19,0x24,0x27,0x35
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_dcsqxdhalfmono_59_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_dcsqxdhalfmono_59_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_dcsqxdhalfmono_59_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_mixer_channel_match(uint32_t const pc_,
                              uint32_t const off_,
                              uint32_t const terms_,
@@ -1988,6 +2070,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_adpcmvarstereo_77;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
+        else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_dcsqxdhalfmono_59;
         else if(dsp_fast_directout_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_directout;
         else if(dsp_fast_add_match(pc))
@@ -2716,6 +2800,28 @@ dsp_fast_benchmark_6(uint32_t        *Y_,
     dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
 
   return true;
+}
+
+static
+bool
+dsp_fast_dcsqxdhalfmono_59(uint32_t        *Y_,
+                           dsp_alu_flags_t *flags_,
+                           int             *fExact_,
+                           uint32_t        *RBSR_,
+                           bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_dcsqxdhalfmono_59_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_DCSQXDHALFMONO_59_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
 }
 
 static
