@@ -7883,8 +7883,20 @@ dsp_fast_oscupdownfp_23(uint32_t        *Y_,
                         uint32_t        *RBSR_,
                         bool            *work_)
 {
+  uint32_t a;
+  uint32_t addr;
+  uint32_t addr2;
   uint32_t base;
+  uint32_t b;
+  ITAG_t branch_down;
+  ITAG_t branch_move;
+  ITAG_t jump_common;
+  ITAG_t jump_final;
+  ITAG_t mov;
+  ITAG_t operand;
   uint32_t pc;
+  uint16_t val;
+  uint32_t y;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -7893,8 +7905,203 @@ dsp_fast_oscupdownfp_23(uint32_t        *Y_,
   if(!dsp_fast_oscupdownfp_23_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_OSCUPDOWNFP_23_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  branch_down.raw = DSP.NMem[base + 2];
+  branch_move.raw = DSP.NMem[base + 3];
+  jump_final.raw  = DSP.NMem[base + 4];
+  jump_common.raw = DSP.NMem[base + 7];
+  if((branch_down.cif.BCH_ADDR != ((base + 0x08) & 0x3FF)) ||
+     (branch_move.cif.BCH_ADDR != ((base + 0x05) & 0x3FF)) ||
+     (jump_final.cif.BCH_ADDR != ((base + 0x0F) & 0x3FF)) ||
+     (jump_common.cif.BCH_ADDR != ((base + 0x0D) & 0x3FF)))
+    return false;
+
+  if(pc == (base + 0x0F))
+    goto final_tail;
+  if(pc == (base + 0x0D))
+    goto common_move;
+  if(pc == (base + 0x08))
+    goto down_step;
+  if(pc == (base + 0x05))
+    goto move_to_reg6;
+  if(pc != base)
+    return false;
+
+  operand.raw = DSP.NMem[base + 1];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 0]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 0]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 2;
+  DSP.flags.WRITEBACK = DSP.REGCONV[DSP.REGi][operand.r2of.R2] ^ DSP.RBASEx4;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+  addr = DSP.flags.WRITEBACK;
+
+  DSP.flags.WRITEBACK = DSP.REGCONV[DSP.REGi][operand.r2of.R1] ^ DSP.RBASEx4;
+  DSP.flags.ALU2 = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK = addr;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  DSP.dregs.PC = base + 3;
+  if(1 & DSP.BRCONDTAB[branch_down.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch_down.cif.BCH_ADDR;
+      goto down_step;
+    }
+
+  DSP.dregs.PC = base + 4;
+  if(1 & DSP.BRCONDTAB[branch_move.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch_move.cif.BCH_ADDR;
+      goto move_to_reg6;
+    }
+
+  DSP.dregs.PC = jump_final.cif.BCH_ADDR;
+  goto final_tail;
+
+move_to_reg6:
+  mov.raw     = DSP.NMem[base + 5];
+  operand.raw = DSP.NMem[base + 6];
+
+  DSP.dregs.PC = base + 7;
+  addr = DSP.REGCONV[DSP.REGi][operand.r2of.R1] ^ DSP.RBASEx4;
+  val = dsp_read(addr);
+  if(operand.r2of.R1_DI)
+    val = dsp_read(val);
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  DSP.dregs.PC = jump_common.cif.BCH_ADDR;
+  goto common_move;
+
+down_step:
+  operand.raw = DSP.NMem[base + 9];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 8]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 8]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 10;
+  DSP.flags.WRITEBACK = DSP.REGCONV[DSP.REGi][operand.r2of.R1] ^ DSP.RBASEx4;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+  addr = DSP.flags.WRITEBACK;
+
+  operand.raw = DSP.NMem[base + 10];
+  DSP.flags.ALU2 = (uint16_t)(operand.iof.IMMEDIATE << (operand.iof.JUSTIFY & 3));
+  DSP.flags.WRITEBACK = addr;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a - b;
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  mov.raw     = DSP.NMem[base + 11];
+  operand.raw = DSP.NMem[base + 12];
+
+  DSP.dregs.PC = base + 13;
+  addr = DSP.REGCONV[DSP.REGi][operand.r2of.R1] ^ DSP.RBASEx4;
+  val = dsp_read(addr);
+  if(operand.r2of.R1_DI)
+    val = dsp_read(val);
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+common_move:
+  mov.raw     = DSP.NMem[base + 13];
+  operand.raw = DSP.NMem[base + 14];
+
+  DSP.dregs.PC = base + 15;
+  addr = DSP.REGCONV[DSP.REGi][operand.r2of.R1] ^ DSP.RBASEx4;
+  val = dsp_read(addr);
+  if(operand.r2of.R1_DI)
+    val = dsp_read(val);
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+final_tail:
+  operand.raw = DSP.NMem[base + 16];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 15]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 15]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 17;
+  addr = DSP.REGCONV[DSP.REGi][operand.r3of.R3] ^ DSP.RBASEx4;
+  DSP.flags.MULT1 = dsp_read(addr);
+
+  addr = DSP.REGCONV[DSP.REGi][operand.r3of.R2] ^ DSP.RBASEx4;
+  DSP.flags.MULT2 = dsp_read(addr);
+
+  DSP.flags.WRITEBACK = DSP.REGCONV[DSP.REGi][operand.r3of.R1] ^ DSP.RBASEx4;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK = 0;
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  y = a - b;
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  operand.raw = DSP.NMem[base + 18];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 17]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 17]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 19;
+  addr = DSP.REGCONV[DSP.REGi][operand.r2of.R2] ^ DSP.RBASEx4;
+  DSP.flags.MULT1 = dsp_read(addr);
+
+  addr2 = DSP.REGCONV[DSP.REGi][operand.r2of.R1] ^ DSP.RBASEx4;
+  DSP.flags.MULT2 = dsp_read(addr2);
+  DSP.flags.WRITEBACK = 0;
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = *Y_;
+  y = a - b;
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  DSP.dregs.PC = *RBSR_;
+  return true;
 }
 
 static
