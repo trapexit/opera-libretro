@@ -7614,7 +7614,10 @@ dsp_fast_noise_6(uint32_t        *Y_,
                  uint32_t        *RBSR_,
                  bool            *work_)
 {
+  ITAG_t dst;
   uint32_t pc;
+  ITAG_t src;
+  uint32_t y;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -7623,8 +7626,33 @@ dsp_fast_noise_6(uint32_t        *Y_,
   if(!dsp_fast_noise_6_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_NOISE_6_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  src.raw = DSP.NMem[pc + 2];
+  dst.raw = DSP.NMem[pc + 3];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[pc + 0]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[pc + 0]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc + 2;
+  DSP.flags.WRITEBACK = 0x0EA;
+  DSP.flags.MULT1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = pc + 3;
+  DSP.flags.WRITEBACK = src.nrof.OP_ADDR;
+  DSP.flags.MULT2 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = pc + DSP_NOISE_6_WORDS;
+  DSP.flags.WRITEBACK = dst.nrof.OP_ADDR;
+  (void)dsp_read(DSP.flags.WRITEBACK);
+
+  y = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+
+  *Y_ = y;
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  return true;
 }
 
 static
