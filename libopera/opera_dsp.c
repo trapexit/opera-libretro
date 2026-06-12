@@ -14302,40 +14302,22 @@ dsp_fast_halfmonosample_23_tail(uint32_t const  base,
 }
 
 static
-bool
-dsp_fast_halfmonosample_23(uint32_t        *Y_,
-                           dsp_alu_flags_t *flags_,
-                           int             *fExact_,
-                           uint32_t        *RBSR_,
-                           bool            *work_)
+void
+dsp_fast_halfmonosample_23_body(uint32_t const  base,
+                                uint32_t       *Y_,
+                                dsp_alu_flags_t *flags_,
+                                int             *fExact_)
 {
-  uint32_t base;
   ITAG_t branch;
+  ITAG_t dst;
   ITAG_t imm;
   ITAG_t jump;
-  uint32_t pc;
   ITAG_t src;
   ITAG_t src1;
   ITAG_t src2;
-  ITAG_t dst;
   uint32_t a;
   uint32_t b;
   uint32_t y;
-
-  if(DSP.flags.nOP_MASK != 0xFFFF)
-    return false;
-
-  pc = DSP.dregs.PC;
-  if(!dsp_fast_halfmonosample_23_base_for_pc(pc,&base))
-    return false;
-
-  if(pc == (base + 0x09))
-    {
-      dsp_fast_halfmonosample_23_tail(base,Y_,flags_,fExact_);
-      return true;
-    }
-  if(pc != base)
-    return false;
 
   src.raw = DSP.NMem[base + 1];
   imm.raw = DSP.NMem[base + 2];
@@ -14371,7 +14353,7 @@ dsp_fast_halfmonosample_23(uint32_t        *Y_,
     {
       DSP.dregs.PC = branch.cif.BCH_ADDR;
       dsp_fast_halfmonosample_23_tail(base,Y_,flags_,fExact_);
-      return true;
+      return;
     }
 
   src1.raw = DSP.NMem[base + 5];
@@ -14403,13 +14385,11 @@ dsp_fast_halfmonosample_23(uint32_t        *Y_,
 
   jump.raw = DSP.NMem[base + 8];
   DSP.dregs.PC = jump.cif.BCH_ADDR;
-
-  return true;
 }
 
 static
 bool
-dsp_fast_halfmonosample_28(uint32_t        *Y_,
+dsp_fast_halfmonosample_23(uint32_t        *Y_,
                            dsp_alu_flags_t *flags_,
                            int             *fExact_,
                            uint32_t        *RBSR_,
@@ -14422,11 +14402,96 @@ dsp_fast_halfmonosample_28(uint32_t        *Y_,
     return false;
 
   pc = DSP.dregs.PC;
+  if(!dsp_fast_halfmonosample_23_base_for_pc(pc,&base))
+    return false;
+
+  if(pc == (base + 0x09))
+    {
+      dsp_fast_halfmonosample_23_tail(base,Y_,flags_,fExact_);
+      return true;
+    }
+  if(pc != base)
+    return false;
+
+  dsp_fast_halfmonosample_23_body(base,Y_,flags_,fExact_);
+
+  return true;
+}
+
+static
+bool
+dsp_fast_halfmonosample_28(uint32_t        *Y_,
+                           dsp_alu_flags_t *flags_,
+                           int             *fExact_,
+                           uint32_t        *RBSR_,
+                           bool            *work_)
+{
+  uint32_t a;
+  uint32_t base;
+  uint32_t b;
+  ITAG_t branch;
+  ITAG_t imm;
+  uint32_t pc;
+  ITAG_t src;
+  uint32_t y;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
   if(!dsp_fast_halfmonosample_28_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_HALFMONOSAMPLE_28_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x0D))
+    {
+      dsp_fast_halfmonosample_23_tail(base + 4,Y_,flags_,fExact_);
+      return true;
+    }
+  if(pc == (base + 0x19))
+    {
+      DSP.dregs.PC = base + DSP_HALFMONOSAMPLE_28_WORDS;
+      return true;
+    }
+  if(pc != base)
+    return false;
+
+  src.raw = DSP.NMem[base + 1];
+  imm.raw = DSP.NMem[base + 2];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 0]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 0]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 2;
+  DSP.flags.WRITEBACK = src.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = base + 3;
+  DSP.flags.ALU2 = (uint16_t)(imm.iof.IMMEDIATE << (imm.iof.JUSTIFY & 3));
+  DSP.flags.WRITEBACK = 0;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  branch.raw = DSP.NMem[base + 3];
+  DSP.dregs.PC = base + 4;
+  if(1 & DSP.BRCONDTAB[branch.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch.cif.BCH_ADDR;
+      return true;
+    }
+
+  dsp_fast_halfmonosample_23_body(base + 4,Y_,flags_,fExact_);
+
+  return true;
 }
 
 static
