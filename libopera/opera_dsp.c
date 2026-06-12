@@ -13860,51 +13860,17 @@ dsp_fast_fixedstereo16swap_38_channel(uint32_t const  base,
 
 static
 bool
-dsp_fast_fixedstereo16swap_38_2di(uint32_t        *Y_,
-                                  dsp_alu_flags_t *flags_,
-                                  int             *fExact_,
-                                  uint32_t        *RBSR_,
-                                  bool            *work_)
+dsp_fast_fixedstereo16swap_38_tail(uint32_t const  base,
+                                   uint32_t const  words,
+                                   uint32_t       *Y_,
+                                   dsp_alu_flags_t *flags_,
+                                   int             *fExact_)
 {
   uint32_t a;
-  uint32_t const base = DSP.dregs.PC;
   uint32_t b;
   ITAG_t branch;
   ITAG_t imm;
-  ITAG_t src;
   uint32_t y;
-
-  if(DSP.flags.nOP_MASK != 0xFFFF)
-    return false;
-
-  if(!dsp_fast_fixedstereo16swap_38_2di_base_match(base))
-    return false;
-
-  src.raw = DSP.NMem[base + 1];
-  imm.raw = DSP.NMem[base + 2];
-
-  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 0]].req.raw;
-  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 0]].BS;
-  DSP.flags.WRITEBACK = 0;
-
-  DSP.dregs.PC = base + 2;
-  DSP.flags.WRITEBACK = src.nrof.OP_ADDR;
-  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
-
-  DSP.dregs.PC = base + 3;
-  DSP.flags.ALU2 = (uint16_t)(imm.iof.IMMEDIATE << (imm.iof.JUSTIFY & 3));
-  DSP.flags.WRITEBACK = 0;
-
-  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
-  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
-  y = (a + b);
-
-  flags_->carry    = ADD_CFLAG(a,b,y);
-  flags_->overflow = ADD_VFLAG(a,b,y);
-  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
-  flags_->negative = ((y >> 31) ? 1 : 0);
-  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
-  *Y_              = y;
 
   imm.raw = DSP.NMem[base + 4];
 
@@ -13941,9 +13907,61 @@ dsp_fast_fixedstereo16swap_38_2di(uint32_t        *Y_,
 
   dsp_fast_fixedstereo16swap_38_channel(base,21,Y_,flags_,fExact_);
 
-  DSP.dregs.PC = base + DSP_FIXEDSTEREO16SWAP_38_2DI_WORDS;
+  DSP.dregs.PC = base + words;
 
   return true;
+}
+
+static
+bool
+dsp_fast_fixedstereo16swap_38_2di(uint32_t        *Y_,
+                                  dsp_alu_flags_t *flags_,
+                                  int             *fExact_,
+                                  uint32_t        *RBSR_,
+                                  bool            *work_)
+{
+  uint32_t a;
+  uint32_t const base = DSP.dregs.PC;
+  uint32_t b;
+  ITAG_t imm;
+  ITAG_t src;
+  uint32_t y;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  if(!dsp_fast_fixedstereo16swap_38_2di_base_match(base))
+    return false;
+
+  src.raw = DSP.NMem[base + 1];
+  imm.raw = DSP.NMem[base + 2];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 0]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 0]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 2;
+  DSP.flags.WRITEBACK = src.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = base + 3;
+  DSP.flags.ALU2 = (uint16_t)(imm.iof.IMMEDIATE << (imm.iof.JUSTIFY & 3));
+  DSP.flags.WRITEBACK = 0;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  return dsp_fast_fixedstereo16swap_38_tail(base,
+                                            DSP_FIXEDSTEREO16SWAP_38_2DI_WORDS,
+                                            Y_,flags_,fExact_);
 }
 
 static
@@ -13954,7 +13972,12 @@ dsp_fast_fixedstereo16swap_38_4bf(uint32_t        *Y_,
                                   uint32_t        *RBSR_,
                                   bool            *work_)
 {
+  uint32_t a;
   uint32_t const base = DSP.dregs.PC;
+  uint32_t b;
+  ITAG_t imm;
+  ITAG_t src;
+  uint32_t y;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -13962,9 +13985,35 @@ dsp_fast_fixedstereo16swap_38_4bf(uint32_t        *Y_,
   if(!dsp_fast_fixedstereo16swap_38_4bf_base_match(base))
     return false;
 
-  return dsp_fast_interpret_block(base,
-                                  base + DSP_FIXEDSTEREO16SWAP_38_4BF_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  src.raw = DSP.NMem[base + 1];
+  imm.raw = DSP.NMem[base + 2];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 0]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 0]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 2;
+  DSP.flags.WRITEBACK = src.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = base + 3;
+  DSP.flags.ALU2 = (uint16_t)(imm.iof.IMMEDIATE << (imm.iof.JUSTIFY & 3));
+  DSP.flags.WRITEBACK = 0;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a & b);
+
+  flags_->carry    = 0;
+  flags_->overflow = 0;
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  return dsp_fast_fixedstereo16swap_38_tail(base,
+                                            DSP_FIXEDSTEREO16SWAP_38_4BF_WORDS,
+                                            Y_,flags_,fExact_);
 }
 
 static
