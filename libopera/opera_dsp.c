@@ -145,6 +145,7 @@
 #define DSP_TRIANGLE_LFO_23_WORDS 21
 #define DSP_VARMONO16_26_WORDS   24
 #define DSP_VARMONO16_27_WORDS   25
+#define DSP_VARMONO8_50_WORDS    48
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -796,6 +797,11 @@ static bool     dsp_fast_varmono16_27(uint32_t        *Y_,
                                       int             *fExact_,
                                       uint32_t        *RBSR_,
                                       bool            *work_);
+static bool     dsp_fast_varmono8_50(uint32_t        *Y_,
+                                     dsp_alu_flags_t *flags_,
+                                     int             *fExact_,
+                                     uint32_t        *RBSR_,
+                                     bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -4156,6 +4162,76 @@ dsp_fast_varmono16_27_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_varmono8_50_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_VARMONO8_50_WORDS] = {
+    0x00004620,0x00008814,0x00008000,0x0000A813,
+    0x0000D826,0x00002400,0x00008019,0x0000A80C,
+    0x00004486,0x0000800E,0x00008011,0x0000841C,
+    0x00004480,0x0000801D,0x0000801E,0x000041A0,
+    0x0000DF00,0x00008016,0x00008423,0x00004640,
+    0x00008827,0x0000F000,0x00009828,0x00008021,
+    0x00004620,0x00008800,0x0000F000,0x0000A823,
+    0x00004480,0x00008000,0x00008024,0x000041A0,
+    0x0000DF00,0x00008025,0x00008426,0x00004486,
+    0x00008000,0x0000802B,0x00007D40,0x0000802C,
+    0x00008029,0x00008000,0x00005C40,0x00008000,
+    0x00008000,0x00004C80,0x00008000,0x00008000
+  };
+  static uint32_t const masks[DSP_VARMONO8_50_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0001FC00,
+    0x0001FC00,0x0000FFFF,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0001FC00,
+    0x0000FFFF,0x0002FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0001FC00,0x0000FFFF,
+    0x0000FC00,0x0000FFFF,0x0000FC00,0x0002FC00,
+    0x0000FFFF,0x0000FC00,0x0000FFFF,0x0001FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FFFF,0x0000FC00,0x0001FC00,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0000FC00,
+    0x0000FC00,0x0000FFFF,0x0002FC00,0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_VARMONO8_50_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_varmono8_50_base_for_pc(uint32_t const  pc_,
+                                uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x13,0x26,0x0C,0x1C,0x23
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_varmono8_50_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_varmono8_50_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_varmono8_50_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_dcsqxdhalfmono_59_base_match(uint32_t const pc_)
 {
   static uint32_t const vals[DSP_DCSQXDHALFMONO_59_WORDS] = {
@@ -6752,6 +6828,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_varmono16_26;
         else if(dsp_fast_varmono16_27_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_varmono16_27;
+        else if(dsp_fast_varmono8_50_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_varmono8_50;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
@@ -8059,6 +8137,28 @@ dsp_fast_varmono16_27(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_VARMONO16_27_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_varmono8_50(uint32_t        *Y_,
+                     dsp_alu_flags_t *flags_,
+                     int             *fExact_,
+                     uint32_t        *RBSR_,
+                     bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_varmono8_50_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_VARMONO8_50_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
