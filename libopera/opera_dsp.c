@@ -8138,8 +8138,16 @@ dsp_fast_sampler_11(uint32_t        *Y_,
                     uint32_t        *RBSR_,
                     bool            *work_)
 {
+  uint32_t addr;
   uint32_t base;
+  ITAG_t dst;
+  ITAG_t imm;
+  ITAG_t jsr;
+  ITAG_t mov;
   uint32_t pc;
+  ITAG_t src;
+  uint16_t val;
+  uint32_t y;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -8148,8 +8156,71 @@ dsp_fast_sampler_11(uint32_t        *Y_,
   if(!dsp_fast_sampler_11_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_SAMPLER_11_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x06))
+    goto sample_tail;
+  if(pc != base)
+    return false;
+
+  jsr.raw = DSP.NMem[base + 5];
+  if((jsr.cif.BCH_ADDR >= base) &&
+     (jsr.cif.BCH_ADDR < (base + DSP_SAMPLER_11_WORDS)) &&
+     (jsr.cif.BCH_ADDR != (base + 0x06)))
+    return false;
+
+  src.raw = DSP.NMem[base + 0];
+  DSP.dregs.PC = base + 1;
+  DSP.RBASEx4 = ((src.cif.BCH_ADDR & 0x3F) << 2);
+
+  mov.raw = DSP.NMem[base + 1];
+  imm.raw = DSP.NMem[base + 2];
+
+  DSP.dregs.PC = base + 3;
+  val = (uint16_t)(imm.iof.IMMEDIATE << (imm.iof.JUSTIFY & 3));
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  mov.raw = DSP.NMem[base + 3];
+  src.raw = DSP.NMem[base + 4];
+
+  DSP.dregs.PC = base + 5;
+  val = dsp_read(src.nrof.OP_ADDR);
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  *RBSR_ = base + 0x06;
+  DSP.dregs.PC = jsr.cif.BCH_ADDR;
+  if(DSP.dregs.PC != (base + 0x06))
+    return true;
+
+sample_tail:
+  src.raw = DSP.NMem[base + 7];
+  dst.raw = DSP.NMem[base + 8];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[base + 6]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[base + 6]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = base + 8;
+  DSP.flags.WRITEBACK = src.nrof.OP_ADDR;
+  DSP.flags.MULT1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = base + DSP_SAMPLER_11_WORDS;
+  DSP.flags.WRITEBACK = dst.nrof.OP_ADDR;
+  (void)dsp_read(DSP.flags.WRITEBACK);
+
+  y = (uint32_t)(((int64_t)DSP.flags.MULT1 *
+                  (int64_t)(((int32_t)*Y_ >> 15) & ~1)) & ALUSIZEMASK);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+
+  *Y_ = y;
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  return true;
 }
 
 static
