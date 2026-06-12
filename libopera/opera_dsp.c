@@ -9361,7 +9361,12 @@ dsp_fast_directout_8_3hkpjlr(uint32_t        *Y_,
                              uint32_t        *RBSR_,
                              bool            *work_)
 {
+  uint32_t a;
+  uint32_t b;
   uint32_t pc;
+  ITAG_t src0;
+  ITAG_t src1;
+  uint32_t y;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -9370,8 +9375,62 @@ dsp_fast_directout_8_3hkpjlr(uint32_t        *Y_,
   if(!dsp_fast_directout_8_3hkpjlr_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_DIRECTOUT_8_3HK_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  src0.raw = DSP.NMem[pc + 2];
+  src1.raw = DSP.NMem[pc + 5];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[pc + 0]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[pc + 0]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc + 2;
+  DSP.flags.WRITEBACK = 0x106;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = pc + 3;
+  DSP.flags.WRITEBACK = src0.nrof.OP_ADDR;
+  DSP.flags.ALU2 = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK = 0x106;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  *Y_ = y;
+  dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[pc + 3]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[pc + 3]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc + 5;
+  DSP.flags.WRITEBACK = 0x107;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = pc + DSP_DIRECTOUT_8_3HK_WORDS;
+  DSP.flags.WRITEBACK = src1.nrof.OP_ADDR;
+  DSP.flags.ALU2 = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK = 0x107;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  *Y_ = y;
+  dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  return true;
 }
 
 static
