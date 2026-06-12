@@ -13979,7 +13979,14 @@ dsp_fast_head_32_33(uint32_t        *Y_,
                     uint32_t        *RBSR_,
                     bool            *work_)
 {
+  uint32_t a;
+  uint32_t b;
+  ITAG_t branch;
+  ITAG_t inst;
+  ITAG_t operand;
   uint32_t pc;
+  uint16_t val;
+  uint32_t y;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -13988,8 +13995,187 @@ dsp_fast_head_32_33(uint32_t        *Y_,
   if(!dsp_fast_head_32_33_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_HEAD_32_33_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  DSP.dregs.PC = pc + 1;
+
+  inst.raw    = DSP.NMem[pc + 1];
+  operand.raw = DSP.NMem[pc + 2];
+  DSP.dregs.PC = pc + 3;
+  val = dsp_read(operand.nrof.OP_ADDR);
+  dsp_write(inst.cif.BCH_ADDR,val);
+
+  inst.raw    = DSP.NMem[pc + 3];
+  operand.raw = DSP.NMem[pc + 4];
+  DSP.flags.req.raw   = DSP.INSTTRAS[inst.raw].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[inst.raw].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc + 5;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  operand.raw = DSP.NMem[pc + 5];
+  DSP.dregs.PC = pc + 6;
+  DSP.flags.ALU2 = (uint16_t)(operand.iof.IMMEDIATE << (operand.iof.JUSTIFY & 3));
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  inst.raw = DSP.NMem[pc + 6];
+  DSP.flags.req.raw   = DSP.INSTTRAS[inst.raw].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[inst.raw].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  operand.raw = DSP.NMem[pc + 7];
+  DSP.dregs.PC = pc + 8;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  DSP.flags.MULT1 = dsp_read(DSP.flags.WRITEBACK);
+
+  operand.raw = DSP.NMem[pc + 8];
+  DSP.dregs.PC = pc + 9;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  DSP.flags.MULT2 = dsp_read(DSP.flags.WRITEBACK);
+
+  operand.raw = DSP.NMem[pc + 9];
+  DSP.dregs.PC = pc + 10;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  (void)dsp_read(DSP.flags.WRITEBACK);
+
+  y = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+  *Y_ = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  inst.raw = DSP.NMem[pc + 10];
+  DSP.flags.req.raw   = DSP.INSTTRAS[inst.raw].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[inst.raw].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  operand.raw = DSP.NMem[pc + 11];
+  DSP.dregs.PC = pc + 12;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  DSP.flags.MULT1 = dsp_read(DSP.flags.WRITEBACK);
+
+  operand.raw = DSP.NMem[pc + 12];
+  DSP.dregs.PC = pc + 13;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  DSP.flags.MULT2 = dsp_read(DSP.flags.WRITEBACK);
+
+  operand.raw = DSP.NMem[pc + 13];
+  DSP.dregs.PC = pc + 14;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  (void)dsp_read(DSP.flags.WRITEBACK);
+
+  y = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+  *Y_ = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  inst.raw    = DSP.NMem[pc + 14];
+  operand.raw = DSP.NMem[pc + 15];
+  DSP.dregs.PC = pc + 16;
+  val = dsp_read(operand.nrof.OP_ADDR);
+  dsp_write(inst.cif.BCH_ADDR,val);
+
+  inst.raw    = DSP.NMem[pc + 16];
+  operand.raw = DSP.NMem[pc + 17];
+  DSP.dregs.PC = pc + 18;
+  val = (uint16_t)(operand.iof.IMMEDIATE << (operand.iof.JUSTIFY & 3));
+  dsp_write(inst.cif.BCH_ADDR,val);
+
+  inst.raw    = DSP.NMem[pc + 18];
+  operand.raw = DSP.NMem[pc + 19];
+  DSP.dregs.PC = pc + 20;
+  val = (uint16_t)(operand.iof.IMMEDIATE << (operand.iof.JUSTIFY & 3));
+  dsp_write(inst.cif.BCH_ADDR,val);
+
+  inst.raw    = DSP.NMem[pc + 20];
+  operand.raw = DSP.NMem[pc + 21];
+  DSP.flags.req.raw   = DSP.INSTTRAS[inst.raw].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[inst.raw].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc + 22;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = 0x1000;
+  y = a - b;
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  branch.raw = DSP.NMem[pc + 22];
+  DSP.dregs.PC = pc + 23;
+  if(1 & DSP.BRCONDTAB[branch.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch.cif.BCH_ADDR;
+      return true;
+    }
+
+  inst.raw    = DSP.NMem[pc + 23];
+  operand.raw = DSP.NMem[pc + 24];
+  DSP.flags.req.raw   = DSP.INSTTRAS[inst.raw].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[inst.raw].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc + 25;
+  DSP.flags.WRITEBACK = operand.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  operand.raw = DSP.NMem[pc + 25];
+  DSP.dregs.PC = pc + 26;
+  DSP.flags.ALU2 = (uint16_t)(operand.iof.IMMEDIATE << (operand.iof.JUSTIFY & 3));
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  inst.raw    = DSP.NMem[pc + 26];
+  operand.raw = DSP.NMem[pc + 27];
+  DSP.dregs.PC = pc + 28;
+  val = dsp_read(operand.nrof.OP_ADDR);
+  dsp_write(inst.cif.BCH_ADDR,val);
+
+  inst.raw    = DSP.NMem[pc + 28];
+  operand.raw = DSP.NMem[pc + 29];
+  DSP.dregs.PC = pc + DSP_HEAD_32_33_WORDS;
+  val = dsp_read(operand.nrof.OP_ADDR);
+  dsp_write(inst.cif.BCH_ADDR,val);
+
+  return true;
 }
 
 static
