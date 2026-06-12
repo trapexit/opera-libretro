@@ -131,6 +131,7 @@
 #define DSP_SAWFILTEREDNOISE_29_WORDS 27
 #define DSP_SAWFILTEREDSAW_35_WORDS 33
 #define DSP_SAWTOOTH_8_WORDS     6
+#define DSP_SPLITEXEC_7_WORDS    5
 #define DSP_SQUARE_12_WORDS      10
 #define DSP_SQUARE_LFO_16_WORDS  14
 #define DSP_SUBMIXER2X2_20_WORDS 18
@@ -730,6 +731,11 @@ static bool     dsp_fast_sawfilteredsaw_35(uint32_t        *Y_,
                                            uint32_t        *RBSR_,
                                            bool            *work_);
 static bool     dsp_fast_sawtooth_8(uint32_t        *Y_,
+                                    dsp_alu_flags_t *flags_,
+                                    int             *fExact_,
+                                    uint32_t        *RBSR_,
+                                    bool            *work_);
+static bool     dsp_fast_splitexec_7(uint32_t        *Y_,
                                      dsp_alu_flags_t *flags_,
                                      int             *fExact_,
                                      uint32_t        *RBSR_,
@@ -2854,6 +2860,29 @@ bool
 dsp_fast_sawtooth_8_match(uint32_t pc_)
 {
   return dsp_fast_sawtooth_8_base_match(pc_);
+}
+
+static
+bool
+dsp_fast_splitexec_7_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_SPLITEXEC_7_WORDS] = {
+    0x000046A0,0x00008105,0x00008000,0x00000000,
+    0x0000B405
+  };
+  static uint32_t const masks[DSP_SPLITEXEC_7_WORDS] = {
+    0x0000FFFF,0x0000FFFF,0x0002FC00,0x0000FFFF,
+    0x0001FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_SPLITEXEC_7_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_splitexec_7_match(uint32_t pc_)
+{
+  return dsp_fast_splitexec_7_base_match(pc_);
 }
 
 static
@@ -7054,6 +7083,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_sawfilteredsaw_35;
         else if(dsp_fast_sawtooth_8_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_sawtooth_8;
+        else if(dsp_fast_splitexec_7_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_splitexec_7;
         else if(dsp_fast_square_12_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_square_12;
         else if(dsp_fast_square_lfo_16_match(pc))
@@ -7985,6 +8016,27 @@ dsp_fast_sawtooth_8(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(pc,pc + DSP_SAWTOOTH_8_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_splitexec_7(uint32_t        *Y_,
+                     dsp_alu_flags_t *flags_,
+                     int             *fExact_,
+                     uint32_t        *RBSR_,
+                     bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_splitexec_7_base_match(pc))
+    return false;
+
+  return dsp_fast_interpret_block(pc,pc + DSP_SPLITEXEC_7_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
