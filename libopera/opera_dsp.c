@@ -9323,7 +9323,12 @@ dsp_fast_directin_6(uint32_t        *Y_,
                     uint32_t        *RBSR_,
                     bool            *work_)
 {
+  ITAG_t dst0;
+  ITAG_t dst1;
   uint32_t pc;
+  ITAG_t src0;
+  ITAG_t src1;
+  uint16_t val;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -9332,8 +9337,20 @@ dsp_fast_directin_6(uint32_t        *Y_,
   if(!dsp_fast_directin_6_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_DIRECTIN_6_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  dst0.raw = DSP.NMem[pc + 0];
+  src0.raw = DSP.NMem[pc + 1];
+  dst1.raw = DSP.NMem[pc + 2];
+  src1.raw = DSP.NMem[pc + 3];
+
+  DSP.dregs.PC = pc + 2;
+  val = dsp_read(src0.nrof.OP_ADDR);
+  dsp_write(dst0.nrof.OP_ADDR,val);
+
+  DSP.dregs.PC = pc + DSP_DIRECTIN_6_WORDS;
+  val = dsp_read(src1.nrof.OP_ADDR);
+  dsp_write(dst1.nrof.OP_ADDR,val);
+
+  return true;
 }
 
 static
