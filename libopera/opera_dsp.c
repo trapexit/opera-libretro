@@ -7707,7 +7707,17 @@ dsp_fast_probe_8(uint32_t        *Y_,
                  uint32_t        *RBSR_,
                  bool            *work_)
 {
+  uint32_t a;
+  uint16_t addr;
+  uint32_t b;
+  ITAG_t branch;
+  ITAG_t dst;
+  ITAG_t gate_src;
+  ITAG_t imm;
   uint32_t pc;
+  ITAG_t src;
+  uint16_t val;
+  uint32_t y;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -7716,8 +7726,52 @@ dsp_fast_probe_8(uint32_t        *Y_,
   if(!dsp_fast_probe_8_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_PROBE_8_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  branch.raw = DSP.NMem[pc + 3];
+  if(branch.cif.BCH_ADDR != ((pc + DSP_PROBE_8_WORDS) & 0x3FF))
+    return false;
+
+  gate_src.raw = DSP.NMem[pc + 1];
+  imm.raw = DSP.NMem[pc + 2];
+  dst.raw = DSP.NMem[pc + 4];
+  src.raw = DSP.NMem[pc + 5];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[pc + 0]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[pc + 0]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc + 2;
+  DSP.flags.WRITEBACK = gate_src.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = pc + 3;
+  DSP.flags.WRITEBACK = (uint16_t)(imm.iof.IMMEDIATE << (imm.iof.JUSTIFY & 3));
+  DSP.flags.ALU2 = DSP.flags.WRITEBACK;
+  DSP.flags.WRITEBACK = 0;
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = (a & b);
+
+  flags_->carry    = 0;
+  flags_->overflow = 0;
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  DSP.dregs.PC = pc + 4;
+  if(1 & DSP.BRCONDTAB[branch.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch.cif.BCH_ADDR;
+      return true;
+    }
+
+  DSP.dregs.PC = pc + DSP_PROBE_8_WORDS;
+  addr = dsp_read(src.nrof.OP_ADDR);
+  val = src.nrof.DI ? dsp_read(addr) : addr;
+  dsp_write(dst.nrof.OP_ADDR,val);
+
+  return true;
 }
 
 static
