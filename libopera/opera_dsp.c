@@ -134,6 +134,7 @@
 #define DSP_SVFILTER_22_WORDS    20
 #define DSP_TAIL_16_1_WORDS      14
 #define DSP_TAIL_16_3_WORDS      14
+#define DSP_TAPOUTPUT_6_WORDS    4
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -730,6 +731,11 @@ static bool     dsp_fast_tail_16_3(uint32_t        *Y_,
                                    int             *fExact_,
                                    uint32_t        *RBSR_,
                                    bool            *work_);
+static bool     dsp_fast_tapoutput_6(uint32_t        *Y_,
+                                     dsp_alu_flags_t *flags_,
+                                     int             *fExact_,
+                                     uint32_t        *RBSR_,
+                                     bool            *work_);
 static bool     dsp_fast_add(uint32_t        *Y_,
                               dsp_alu_flags_t *flags_,
                               int             *fExact_,
@@ -3123,6 +3129,27 @@ dsp_fast_tail_16_3_match(uint32_t pc_)
   uint32_t base;
 
   return dsp_fast_tail_16_3_base_for_pc(pc_,&base);
+}
+
+static
+bool
+dsp_fast_tapoutput_6_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_TAPOUTPUT_6_WORDS] = {
+    0x00009800,0x00008106,0x00009800,0x00008107
+  };
+  static uint32_t const masks[DSP_TAPOUTPUT_6_WORDS] = {
+    0x0002FC00,0x0000FFFF,0x0002FC00,0x0000FFFF
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_TAPOUTPUT_6_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_tapoutput_6_match(uint32_t pc_)
+{
+  return dsp_fast_tapoutput_6_base_match(pc_);
 }
 
 static
@@ -5701,6 +5728,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_tail_16_1;
         else if(dsp_fast_tail_16_3_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_tail_16_3;
+        else if(dsp_fast_tapoutput_6_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_tapoutput_6;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
@@ -6769,6 +6798,27 @@ dsp_fast_tail_16_3(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_TAIL_16_3_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_tapoutput_6(uint32_t        *Y_,
+                     dsp_alu_flags_t *flags_,
+                     int             *fExact_,
+                     uint32_t        *RBSR_,
+                     bool            *work_)
+{
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_tapoutput_6_base_match(pc))
+    return false;
+
+  return dsp_fast_interpret_block(pc,pc + DSP_TAPOUTPUT_6_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
