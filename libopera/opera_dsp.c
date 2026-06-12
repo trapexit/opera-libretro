@@ -8678,7 +8678,10 @@ dsp_fast_monitor_4(uint32_t        *Y_,
                    uint32_t        *RBSR_,
                    bool            *work_)
 {
+  ITAG_t dst;
   uint32_t pc;
+  ITAG_t src;
+  uint16_t val;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -8687,8 +8690,14 @@ dsp_fast_monitor_4(uint32_t        *Y_,
   if(!dsp_fast_monitor_4_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_MONITOR_4_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  dst.raw = DSP.NMem[pc + 0];
+  src.raw = DSP.NMem[pc + 1];
+
+  DSP.dregs.PC = pc + DSP_MONITOR_4_WORDS;
+  val = dsp_read(src.nrof.OP_ADDR);
+  dsp_write(dst.nrof.OP_ADDR,val);
+
+  return true;
 }
 
 static
