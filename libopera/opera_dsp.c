@@ -9108,8 +9108,45 @@ dsp_fast_submixer8x2_56(uint32_t        *Y_,
   if(!dsp_fast_submixer8x2_56_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_SUBMIXER8X2_56_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  dsp_fast_submixer_product_to_y(pc + 0,pc + 1,pc + 2,
+                                 Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 3,pc + 4,pc + 5,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 6,pc + 7,pc + 8,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 9,pc + 10,pc + 11,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 12,pc + 13,pc + 14,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 15,pc + 16,pc + 17,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 18,pc + 19,pc + 20,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 21,pc + 22,pc + 23,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_copy_y(pc + 25,pc + 26,
+                           Y_,flags_,fExact_);
+
+  dsp_fast_submixer_product_to_y(pc + 27,pc + 28,pc + 29,
+                                 Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 30,pc + 31,pc + 32,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 33,pc + 34,pc + 35,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 36,pc + 37,pc + 38,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 39,pc + 40,pc + 41,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 42,pc + 43,pc + 44,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 45,pc + 46,pc + 47,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 48,pc + 49,pc + 50,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_copy_y(pc + 52,pc + 53,
+                           Y_,flags_,fExact_);
+
+  return true;
 }
 
 static
