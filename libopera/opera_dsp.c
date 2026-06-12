@@ -8940,6 +8940,116 @@ dsp_fast_submixer2x2_20(uint32_t        *Y_,
 }
 
 static
+void
+dsp_fast_submixer_product_to_y(uint32_t         insn_pc_,
+                              uint32_t         src1_pc_,
+                              uint32_t         src2_pc_,
+                              uint32_t        *Y_,
+                              dsp_alu_flags_t *flags_,
+                              int             *fExact_)
+{
+  ITAG_t src1;
+  ITAG_t src2;
+  uint32_t y;
+
+  src1.raw = DSP.NMem[src1_pc_];
+  src2.raw = DSP.NMem[src2_pc_];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[insn_pc_]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[insn_pc_]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = src1_pc_ + 1;
+  DSP.flags.WRITEBACK = src1.nrof.OP_ADDR;
+  DSP.flags.MULT1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = src2_pc_ + 1;
+  DSP.flags.WRITEBACK = src2.nrof.OP_ADDR;
+  DSP.flags.MULT2 = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK = 0;
+
+  y = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+  *Y_ = y;
+}
+
+static
+void
+dsp_fast_submixer_accum_clip(uint32_t         insn_pc_,
+                             uint32_t         src1_pc_,
+                             uint32_t         src2_pc_,
+                             uint32_t        *Y_,
+                             dsp_alu_flags_t *flags_,
+                             int             *fExact_)
+{
+  uint32_t a;
+  uint32_t b;
+  ITAG_t src1;
+  ITAG_t src2;
+  uint32_t y;
+
+  src1.raw = DSP.NMem[src1_pc_];
+  src2.raw = DSP.NMem[src2_pc_];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[insn_pc_]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[insn_pc_]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = src1_pc_ + 1;
+  DSP.flags.WRITEBACK = src1.nrof.OP_ADDR;
+  DSP.flags.MULT1 = dsp_read(DSP.flags.WRITEBACK);
+
+  DSP.dregs.PC = src2_pc_ + 1;
+  DSP.flags.WRITEBACK = src2.nrof.OP_ADDR;
+  DSP.flags.MULT2 = dsp_read(DSP.flags.WRITEBACK);
+  DSP.flags.WRITEBACK = 0;
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = *Y_;
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  if(1 & flags_->overflow)
+    y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+
+  *Y_ = y;
+}
+
+static
+void
+dsp_fast_submixer_copy_y(uint32_t         insn_pc_,
+                         uint32_t         dst_pc_,
+                         uint32_t        *Y_,
+                         dsp_alu_flags_t *flags_,
+                         int             *fExact_)
+{
+  ITAG_t dst;
+  uint32_t y;
+
+  dst.raw = DSP.NMem[dst_pc_];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[insn_pc_]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[insn_pc_]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = dst_pc_ + 1;
+  DSP.flags.WRITEBACK = dst.nrof.OP_ADDR;
+  (void)dsp_read(DSP.flags.WRITEBACK);
+
+  y = *Y_;
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+  *Y_ = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+}
+
+static
 bool
 dsp_fast_submixer4x2_32(uint32_t        *Y_,
                         dsp_alu_flags_t *flags_,
@@ -8956,8 +9066,29 @@ dsp_fast_submixer4x2_32(uint32_t        *Y_,
   if(!dsp_fast_submixer4x2_32_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_SUBMIXER4X2_32_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  dsp_fast_submixer_product_to_y(pc + 0,pc + 1,pc + 2,
+                                 Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 3,pc + 4,pc + 5,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 6,pc + 7,pc + 8,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 9,pc + 10,pc + 11,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_copy_y(pc + 13,pc + 14,
+                           Y_,flags_,fExact_);
+
+  dsp_fast_submixer_product_to_y(pc + 15,pc + 16,pc + 17,
+                                 Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 18,pc + 19,pc + 20,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 21,pc + 22,pc + 23,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_accum_clip(pc + 24,pc + 25,pc + 26,
+                               Y_,flags_,fExact_);
+  dsp_fast_submixer_copy_y(pc + 28,pc + 29,
+                           Y_,flags_,fExact_);
+
+  return true;
 }
 
 static
