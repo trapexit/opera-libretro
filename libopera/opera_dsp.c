@@ -144,6 +144,7 @@
 #define DSP_TRIANGLE_246_WORDS   244
 #define DSP_TRIANGLE_LFO_23_WORDS 21
 #define DSP_VARMONO16_26_WORDS   24
+#define DSP_VARMONO16_27_WORDS   25
 #define DSP_SUBTRACT_INSN        0x6647
 
 #pragma pack(push,1)
@@ -786,6 +787,11 @@ static bool     dsp_fast_triangle_lfo_23(uint32_t        *Y_,
                                          uint32_t        *RBSR_,
                                          bool            *work_);
 static bool     dsp_fast_varmono16_26(uint32_t        *Y_,
+                                      dsp_alu_flags_t *flags_,
+                                      int             *fExact_,
+                                      uint32_t        *RBSR_,
+                                      bool            *work_);
+static bool     dsp_fast_varmono16_27(uint32_t        *Y_,
                                       dsp_alu_flags_t *flags_,
                                       int             *fExact_,
                                       uint32_t        *RBSR_,
@@ -4090,6 +4096,66 @@ dsp_fast_varmono16_26_match(uint32_t pc_)
 
 static
 bool
+dsp_fast_varmono16_27_base_match(uint32_t const pc_)
+{
+  static uint32_t const vals[DSP_VARMONO16_27_WORDS] = {
+    0x00004620,0x0000880A,0x00008000,0x0000A809,
+    0x0000B806,0x00008410,0x0000980C,0x0000800F,
+    0x0000840E,0x00004640,0x00008815,0x0000F000,
+    0x00009811,0x0000800E,0x00009814,0x00008000,
+    0x00004D40,0x00008012,0x00008000,0x00005C40,
+    0x00008000,0x00008000,0x00004C80,0x00008000,
+    0x00008000
+  };
+  static uint32_t const masks[DSP_VARMONO16_27_WORDS] = {
+    0x0000FFFF,0x0002FC00,0x0002FC00,0x0001FC00,
+    0x0001FC00,0x0001FC00,0x0002FC00,0x0002FC00,
+    0x0001FC00,0x0000FFFF,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0002FC00,0x0000FC00,0x0000FC00,
+    0x0000FFFF,0x0000FC00,0x0000FC00,0x0000FFFF,
+    0x0000FC00,0x0000FC00,0x0000FFFF,0x0002FC00,
+    0x0002FC00
+  };
+
+  return dsp_fast_pattern_match(pc_,DSP_VARMONO16_27_WORDS,vals,masks);
+}
+
+static
+bool
+dsp_fast_varmono16_27_base_for_pc(uint32_t const  pc_,
+                                 uint32_t       *base_)
+{
+  static uint32_t const offsets[] = {
+    0x00,0x09,0x06,0x10,0x0E
+  };
+  uint32_t i;
+
+  for(i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+    if(pc_ >= offsets[i])
+      {
+        uint32_t const base = pc_ - offsets[i];
+
+        if(dsp_fast_varmono16_27_base_match(base))
+          {
+            *base_ = base;
+            return true;
+          }
+      }
+
+  return false;
+}
+
+static
+bool
+dsp_fast_varmono16_27_match(uint32_t pc_)
+{
+  uint32_t base;
+
+  return dsp_fast_varmono16_27_base_for_pc(pc_,&base);
+}
+
+static
+bool
 dsp_fast_dcsqxdhalfmono_59_base_match(uint32_t const pc_)
 {
   static uint32_t const vals[DSP_DCSQXDHALFMONO_59_WORDS] = {
@@ -6684,6 +6750,8 @@ dsp_fast_rebuild(void)
           DSP_FAST_TABLE[pc] = dsp_fast_triangle_lfo_23;
         else if(dsp_fast_varmono16_26_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_varmono16_26;
+        else if(dsp_fast_varmono16_27_match(pc))
+          DSP_FAST_TABLE[pc] = dsp_fast_varmono16_27;
         else if(dsp_fast_benchmark_6_match(pc))
           DSP_FAST_TABLE[pc] = dsp_fast_benchmark_6;
         else if(dsp_fast_dcsqxdhalfmono_59_match(pc))
@@ -7969,6 +8037,28 @@ dsp_fast_varmono16_26(uint32_t        *Y_,
     return false;
 
   return dsp_fast_interpret_block(base,base + DSP_VARMONO16_26_WORDS,
+                                  Y_,flags_,fExact_,RBSR_,work_);
+}
+
+static
+bool
+dsp_fast_varmono16_27(uint32_t        *Y_,
+                      dsp_alu_flags_t *flags_,
+                      int             *fExact_,
+                      uint32_t        *RBSR_,
+                      bool            *work_)
+{
+  uint32_t base;
+  uint32_t pc;
+
+  if(DSP.flags.nOP_MASK != 0xFFFF)
+    return false;
+
+  pc = DSP.dregs.PC;
+  if(!dsp_fast_varmono16_27_base_for_pc(pc,&base))
+    return false;
+
+  return dsp_fast_interpret_block(base,base + DSP_VARMONO16_27_WORDS,
                                   Y_,flags_,fExact_,RBSR_,work_);
 }
 
