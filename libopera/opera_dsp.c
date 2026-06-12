@@ -8241,7 +8241,10 @@ dsp_fast_tapoutput_6(uint32_t        *Y_,
                      uint32_t        *RBSR_,
                      bool            *work_)
 {
+  ITAG_t dst0;
+  ITAG_t dst1;
   uint32_t pc;
+  uint16_t val;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -8250,8 +8253,18 @@ dsp_fast_tapoutput_6(uint32_t        *Y_,
   if(!dsp_fast_tapoutput_6_base_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_TAPOUTPUT_6_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  dst0.raw = DSP.NMem[pc + 0];
+  dst1.raw = DSP.NMem[pc + 2];
+
+  DSP.dregs.PC = pc + 2;
+  val = dsp_read(0x106);
+  dsp_write(dst0.nrof.OP_ADDR,val);
+
+  DSP.dregs.PC = pc + DSP_TAPOUTPUT_6_WORDS;
+  val = dsp_read(0x107);
+  dsp_write(dst1.nrof.OP_ADDR,val);
+
+  return true;
 }
 
 static
