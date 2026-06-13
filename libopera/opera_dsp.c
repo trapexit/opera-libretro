@@ -19307,6 +19307,9 @@ dsp_fast_ezflix225_219(uint32_t        *Y_,
   uint32_t base;
   uint32_t pc;
 
+  (void)RBSR_;
+  (void)work_;
+
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
 
@@ -19314,8 +19317,117 @@ dsp_fast_ezflix225_219(uint32_t        *Y_,
   if(!dsp_fast_ezflix225_219_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_EZFLIX225_219_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x91))
+    goto path_145;
+  if(pc == (base + 0x26))
+    goto path_38;
+  if(pc == (base + 0x11))
+    goto path_17;
+  if(pc != base)
+    return false;
+
+  dsp_fast_execute_alu_at(base + 0,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 3,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_move_at(base + 4);
+  dsp_fast_execute_move_at(base + 6);
+  dsp_fast_execute_alu_at(base + 8,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 10,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 12,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 14,Y_,flags_,fExact_);
+  dsp_fast_control_target_at(base + 16);
+  return true;
+
+path_17:
+  dsp_fast_execute_alu_at(base + 17,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 19,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 20,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 24,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 27,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 31,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 33);
+  dsp_fast_execute_move_at(base + 35);
+  dsp_fast_control_target_at(base + 37);
+  return true;
+
+path_38:
+  dsp_fast_execute_alu_at(base + 38,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 41,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 44,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 47,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 50,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 53);
+  dsp_fast_execute_alu_at(base + 55,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 58,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 61);
+  dsp_fast_execute_alu_at(base + 63,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 66,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 69);
+  dsp_fast_execute_move_at(base + 71);
+  dsp_fast_execute_alu_at(base + 73,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 76,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 79,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 82,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 85,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 88);
+  dsp_fast_execute_alu_at(base + 90,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 93,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 96);
+  dsp_fast_execute_alu_at(base + 98,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 101,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 104);
+  dsp_fast_execute_move_at(base + 106);
+  dsp_fast_execute_alu_at(base + 108,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 111,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 114,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 117,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 120,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 123);
+  dsp_fast_execute_alu_at(base + 125,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 128,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 131);
+  dsp_fast_execute_alu_at(base + 133,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 136,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 139);
+  dsp_fast_execute_move_at(base + 141);
+  dsp_fast_execute_alu_at(base + 143,Y_,flags_,fExact_);
+
+path_145:
+  dsp_fast_execute_alu_at(base + 145,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 146,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 147,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 150,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 153,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 156,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 159,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 162);
+  dsp_fast_execute_alu_at(base + 164,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 167,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 170);
+  dsp_fast_execute_alu_at(base + 172,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 175,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 178);
+  dsp_fast_execute_move_at(base + 180);
+  dsp_fast_execute_alu_at(base + 182,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 185,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 188,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 191,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 194,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 197);
+  dsp_fast_execute_alu_at(base + 199,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 202,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 205);
+  dsp_fast_execute_alu_at(base + 207,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 210,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 213);
+  dsp_fast_execute_move_at(base + 215);
+
+  return true;
 }
 
 static
