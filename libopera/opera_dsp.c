@@ -13794,7 +13794,11 @@ dsp_fast_triangle_240(uint32_t        *Y_,
                       bool            *work_)
 {
   uint32_t base;
+  ITAG_t inst;
   uint32_t pc;
+
+  (void)RBSR_;
+  (void)work_;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -13803,8 +13807,199 @@ dsp_fast_triangle_240(uint32_t        *Y_,
   if(!dsp_fast_triangle_240_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_TRIANGLE_240_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0xDC))
+    goto path_220;
+  if(pc == (base + 0xD6))
+    goto path_214;
+  if(pc == (base + 0xC4))
+    goto path_196;
+  if(pc == (base + 0xB1))
+    goto path_177;
+  if(pc == (base + 0xA7))
+    goto path_167;
+  if(pc == (base + 0x9F))
+    goto path_159;
+  if(pc == (base + 0x95))
+    goto path_149;
+  if(pc == (base + 0x84))
+    goto path_132;
+  if(pc == (base + 0x7B))
+    goto path_123;
+  if(pc == (base + 0x74))
+    goto path_116;
+  if(pc == (base + 0x6D))
+    goto path_109;
+  if(pc == (base + 0x49))
+    goto path_73;
+  if(pc == (base + 0x47))
+    goto path_71;
+  if(pc == (base + 0x3A))
+    goto path_58;
+  if(pc == (base + 0x2F))
+    goto path_47;
+  if(pc != base)
+    return false;
+
+  inst.raw = DSP.NMem[base + 0];
+  DSP.RBASEx4 = ((inst.cif.BCH_ADDR & 0x3F) << 2);
+
+  dsp_fast_execute_alu_at(base + 1,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 4,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 8,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 9,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 14,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 15,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 17,Y_,flags_,fExact_);
+  dsp_fast_execute_movereg_at(base + 22);
+  dsp_fast_execute_alu_at(base + 24,Y_,flags_,fExact_);
+  dsp_fast_execute_move_at(base + 30);
+  dsp_fast_execute_move_at(base + 32);
+  dsp_fast_execute_move_at(base + 34);
+  dsp_fast_execute_move_at(base + 36);
+  dsp_fast_execute_move_at(base + 38);
+  dsp_fast_execute_move_at(base + 40);
+  dsp_fast_execute_move_at(base + 42);
+  dsp_fast_execute_move_at(base + 44);
+  dsp_fast_control_target_at(base + 46);
+  return true;
+
+path_47:
+  if(dsp_fast_branch_taken_at(base + 47,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_move_at(base + 48);
+  dsp_fast_execute_move_at(base + 50);
+  dsp_fast_execute_move_at(base + 52);
+  dsp_fast_execute_move_at(base + 54);
+  dsp_fast_control_target_at(base + 57);
+  return true;
+
+path_58:
+  dsp_fast_execute_alu_at(base + 58,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 60,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 61,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 65,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 66,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 70,flags_,fExact_))
+    return true;
+
+path_71:
+path_73:
+  dsp_fast_execute_alu_at(base + 73,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 77,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_move_at(base + 78);
+  dsp_fast_execute_alu_at(base + 82,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 86,flags_,fExact_))
+    return true;
+
+  dsp_fast_control_target_at(base + 108);
+  return true;
+
+path_109:
+  dsp_fast_execute_alu_at(base + 109,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 113,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_move_at(base + 114);
+
+path_116:
+  dsp_fast_execute_alu_at(base + 116,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 120,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_move_at(base + 121);
+
+path_123:
+  dsp_fast_execute_alu_at(base + 123,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 127,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_move_at(base + 128);
+
+path_132:
+  dsp_fast_execute_movereg_at(base + 132);
+  dsp_fast_execute_movereg_at(base + 134);
+  dsp_fast_execute_movereg_at(base + 136);
+  dsp_fast_execute_movereg_at(base + 138);
+  dsp_fast_execute_alu_at(base + 140,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 144,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 148,flags_,fExact_))
+    return true;
+
+path_149:
+  dsp_fast_execute_alu_at(base + 149,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 153,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_movereg_at(base + 154);
+  dsp_fast_execute_move_at(base + 157);
+
+path_159:
+  dsp_fast_execute_alu_at(base + 159,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 163,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 164,Y_,flags_,fExact_);
+
+path_167:
+  dsp_fast_execute_alu_at(base + 167,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 171,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 172,Y_,flags_,fExact_);
+
+path_177:
+  dsp_fast_execute_alu_at(base + 177,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 182,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 185,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 187,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 190,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 192,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 193,Y_,flags_,fExact_);
+
+path_196:
+  dsp_fast_execute_alu_at(base + 196,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 198,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 200,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 202,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 207,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 210,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_movereg_at(base + 211);
+  dsp_fast_control_target_at(base + 213);
+  return true;
+
+path_214:
+  dsp_fast_execute_alu_at(base + 214,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 217,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_movereg_at(base + 218);
+
+path_220:
+  dsp_fast_execute_alu_at(base + 220,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 224,Y_,flags_,fExact_);
+  dsp_fast_execute_movereg_at(base + 226);
+  dsp_fast_execute_move_at(base + 228);
+  dsp_fast_execute_move_at(base + 230);
+  dsp_fast_execute_move_at(base + 232);
+  dsp_fast_execute_move_at(base + 234);
+  dsp_fast_execute_move_at(base + 236);
+
+  return true;
 }
 
 static
