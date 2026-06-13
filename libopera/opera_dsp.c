@@ -14763,8 +14763,13 @@ dsp_fast_adpcmmono_51(uint32_t        *Y_,
                       uint32_t        *RBSR_,
                       bool            *work_)
 {
+  uint16_t addr;
   uint32_t base;
+  ITAG_t inst;
   uint32_t pc;
+  uint16_t val;
+
+  (void)work_;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -14773,8 +14778,141 @@ dsp_fast_adpcmmono_51(uint32_t        *Y_,
   if(!dsp_fast_adpcmmono_51_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_ADPCMMONO_51_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x2E))
+    goto path_46;
+  if(pc == (base + 0x2D))
+    goto path_45;
+  if(pc == (base + 0x2B))
+    goto path_43;
+  if(pc == (base + 0x28))
+    goto path_40;
+  if(pc == (base + 0x24))
+    goto path_36;
+  if(pc == (base + 0x10))
+    goto path_16;
+  if(pc != base)
+    return false;
+
+  inst.raw = DSP.NMem[base + 0];
+  DSP.RBASEx4 = ((inst.cif.BCH_ADDR & 0x3F) << 2);
+
+  dsp_fast_execute_alu_at(base + 1,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 3,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x10))
+        goto path_16;
+      return true;
+    }
+
+  inst.raw = DSP.NMem[base + 4];
+  DSP.dregs.PC = base + 5;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][inst.r2of.R1] ^ DSP.RBASEx4;
+  if(inst.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  inst.raw = DSP.NMem[base + 6];
+  DSP.dregs.PC = base + 7;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][inst.r2of.R1] ^ DSP.RBASEx4;
+  if(inst.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  inst.raw = DSP.NMem[base + 8];
+  DSP.dregs.PC = base + 9;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][inst.r2of.R1] ^ DSP.RBASEx4;
+  if(inst.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  inst.raw = DSP.NMem[base + 10];
+  DSP.dregs.PC = base + 11;
+  val = dsp_operand_load1();
+  addr = inst.cif.BCH_ADDR;
+  if(inst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  dsp_fast_execute_alu_at(base + 12,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 14];
+  DSP.dregs.PC = base + 15;
+  val = dsp_operand_load1();
+  addr = inst.cif.BCH_ADDR;
+  if(inst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+path_16:
+  dsp_fast_execute_alu_at(base + 16,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 19,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 23,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x24))
+        goto path_36;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 24,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 26,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x28))
+        goto path_40;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 27,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 30,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x2B))
+        goto path_43;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 32,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 34,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 35];
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+  if(DSP.dregs.PC == (base + 0x2D))
+    goto path_45;
+  return true;
+
+path_36:
+  dsp_fast_execute_alu_at(base + 36,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 39];
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+  if(DSP.dregs.PC == (base + 0x2D))
+    goto path_45;
+  return true;
+
+path_40:
+  dsp_fast_execute_alu_at(base + 40,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 42];
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+  if(DSP.dregs.PC == (base + 0x2D))
+    goto path_45;
+  return true;
+
+path_43:
+  dsp_fast_execute_alu_at(base + 43,Y_,flags_,fExact_);
+
+path_45:
+  inst.raw = DSP.NMem[base + 45];
+  *RBSR_       = base + 46;
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+  return true;
+
+path_46:
+  dsp_fast_execute_alu_at(base + 46,Y_,flags_,fExact_);
+  DSP.dregs.PC = base + DSP_ADPCMMONO_51_WORDS;
+
+  return true;
 }
 
 static
