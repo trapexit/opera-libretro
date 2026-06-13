@@ -17420,7 +17420,11 @@ dsp_fast_halfstereo8_45(uint32_t        *Y_,
                         bool            *work_)
 {
   uint32_t base;
+  ITAG_t inst;
   uint32_t pc;
+
+  (void)RBSR_;
+  (void)work_;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -17429,8 +17433,45 @@ dsp_fast_halfstereo8_45(uint32_t        *Y_,
   if(!dsp_fast_halfstereo8_45_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_HALFSTEREO8_45_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x16))
+    goto tail;
+  if(pc != base)
+    return false;
+
+  dsp_fast_execute_alu_at(base + 0,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 3,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 4,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 7,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x16))
+        goto tail;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 8,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 12,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 15,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 18,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 21];
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+
+  return true;
+
+tail:
+  dsp_fast_execute_alu_at(base + 22,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 25,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 27,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 28,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 31,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 34,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 36,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 37,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 40,Y_,flags_,fExact_);
+
+  return true;
 }
 
 static
