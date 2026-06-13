@@ -7445,6 +7445,230 @@ dsp_fast_load_alu_operands(uint32_t const pc_)
 
 static
 void
+dsp_fast_execute_alu_at(uint32_t const  pc_,
+                        uint32_t       *Y_,
+                        dsp_alu_flags_t *flags_,
+                        int            *fExact_)
+{
+  uint32_t aop;
+  uint32_t bop;
+  ITAG_t inst;
+  uint32_t y;
+
+  inst.raw = DSP.NMem[pc_];
+
+  dsp_fast_load_alu_operands(pc_);
+
+  aop = 0;
+  switch(inst.aif.MUXA)
+    {
+    case 3:
+      if(inst.aif.M2SEL == 0)
+        {
+          if((inst.aif.ALU == 3) || (inst.aif.ALU == 5))
+            aop = (flags_->carry ?
+                   ((uint32_t)(uint16_t)DSP.flags.MULT1 << 16) : 0);
+          else
+            aop = (uint32_t)(((int64_t)DSP.flags.MULT1 *
+                              (int64_t)(((int32_t)*Y_ >> 15) & ~1)) &
+                             ALUSIZEMASK);
+        }
+      else
+        aop = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+      break;
+    case 1:
+      aop = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+      break;
+    case 0:
+      aop = *Y_;
+      break;
+    case 2:
+      aop = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+      break;
+    }
+
+  if((inst.aif.ALU == 3) || (inst.aif.ALU == 5))
+    bop = ((uint32_t)flags_->carry << 16);
+  else
+    {
+      bop = 0;
+      switch(inst.aif.MUXB)
+        {
+        case 0:
+          bop = *Y_;
+          break;
+        case 1:
+          bop = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+          break;
+        case 2:
+          bop = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+          break;
+        case 3:
+          if(inst.aif.M2SEL == 0)
+            bop = ((uint32_t)(((int64_t)DSP.flags.MULT1 *
+                               (int64_t)((int32_t)*Y_ >> 15)) & ~1LL) &
+                   ALUSIZEMASK);
+          else
+            bop = dsp_fast_multiply_product_value(DSP.flags.MULT1,
+                                                  DSP.flags.MULT2);
+          break;
+        }
+    }
+
+  flags_->carry    = 0;
+  flags_->overflow = 0;
+  switch(inst.aif.ALU)
+    {
+    case 0:
+    case 8:
+      y = aop;
+      break;
+    case 1:
+      y = 0 - bop;
+      flags_->carry    = SUB_CFLAG(0,bop,y);
+      flags_->overflow = SUB_VFLAG(0,bop,y);
+      break;
+    case 2:
+    case 3:
+      y = aop + bop;
+      flags_->carry    = ADD_CFLAG(aop,bop,y);
+      flags_->overflow = ADD_VFLAG(aop,bop,y);
+      break;
+    case 4:
+    case 5:
+      y = aop - bop;
+      flags_->carry    = SUB_CFLAG(aop,bop,y);
+      flags_->overflow = SUB_VFLAG(aop,bop,y);
+      break;
+    case 6:
+      y = aop + 0x1000;
+      flags_->carry    = ADD_CFLAG(aop,0x1000,y);
+      flags_->overflow = ADD_VFLAG(aop,0x1000,y);
+      break;
+    case 7:
+      y = aop - 0x1000;
+      flags_->carry    = SUB_CFLAG(aop,0x1000,y);
+      flags_->overflow = SUB_VFLAG(aop,0x1000,y);
+      break;
+    case 9:
+      y = (aop ^ ALUSIZEMASK);
+      break;
+    case 10:
+      y = (aop & bop);
+      break;
+    case 11:
+      y = ((aop & bop) ^ ALUSIZEMASK);
+      break;
+    case 12:
+      y = (aop | bop);
+      break;
+    case 13:
+      y = ((aop | bop) ^ ALUSIZEMASK);
+      break;
+    case 14:
+      y = (aop ^ bop);
+      break;
+    case 15:
+      y = (aop ^ bop ^ ALUSIZEMASK);
+      break;
+    default:
+      y = aop;
+      break;
+    }
+
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  switch(DSP.flags.BS)
+    {
+    case 1:
+    case 17:
+      y <<= 1;
+      break;
+    case 2:
+    case 18:
+      y <<= 2;
+      break;
+    case 3:
+    case 19:
+      y <<= 3;
+      break;
+    case 4:
+    case 20:
+      y <<= 4;
+      break;
+    case 5:
+    case 21:
+      y <<= 5;
+      break;
+    case 6:
+    case 22:
+      y <<= 8;
+      break;
+    case 9:
+      y = (uint32_t)((int32_t)y >> 16) & ALUSIZEMASK;
+      break;
+    case 10:
+      y = (uint32_t)((int32_t)y >> 8) & ALUSIZEMASK;
+      break;
+    case 11:
+      y = (uint32_t)((int32_t)y >> 5) & ALUSIZEMASK;
+      break;
+    case 12:
+      y = (uint32_t)((int32_t)y >> 4) & ALUSIZEMASK;
+      break;
+    case 13:
+      y = (uint32_t)((int32_t)y >> 3) & ALUSIZEMASK;
+      break;
+    case 14:
+      y = (uint32_t)((int32_t)y >> 2) & ALUSIZEMASK;
+      break;
+    case 15:
+      y = (uint32_t)((int32_t)y >> 1) & ALUSIZEMASK;
+      break;
+    case 7:
+    case 23:
+      if(1 & flags_->overflow)
+        y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+      break;
+    case 8:
+    case 24:
+      flags_->carry = (((int32_t)y) < 0);
+      y = (((y << 1) & 0xFFFE0000) |
+           (flags_->carry ? 1 << 16 : 0) |
+           (y & 0xF000));
+      break;
+    case 25:
+      y = ((uint32_t)y >> 16) & ALUSIZEMASK;
+      break;
+    case 26:
+      y = ((uint32_t)y >> 8) & ALUSIZEMASK;
+      break;
+    case 27:
+      y = ((uint32_t)y >> 5) & ALUSIZEMASK;
+      break;
+    case 28:
+      y = ((uint32_t)y >> 4) & ALUSIZEMASK;
+      break;
+    case 29:
+      y = ((uint32_t)y >> 3) & ALUSIZEMASK;
+      break;
+    case 30:
+      y = ((uint32_t)y >> 2) & ALUSIZEMASK;
+      break;
+    case 31:
+      y = ((uint32_t)y >> 1) & ALUSIZEMASK;
+      break;
+    }
+
+  *Y_ = y;
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+}
+
+static
+void
 dsp_fast_multiply_product_to_y(uint16_t         insn_,
                                uint16_t         src1_op_,
                                uint16_t         src2_op_,
@@ -10309,8 +10533,15 @@ dsp_fast_sawenvsvfenv_82(uint32_t        *Y_,
                          uint32_t        *RBSR_,
                          bool            *work_)
 {
+  uint32_t addr;
   uint32_t base;
+  ITAG_t branch;
+  ITAG_t inst;
   uint32_t pc;
+  uint16_t val;
+
+  (void)RBSR_;
+  (void)work_;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -10319,8 +10550,108 @@ dsp_fast_sawenvsvfenv_82(uint32_t        *Y_,
   if(!dsp_fast_sawenvsvfenv_82_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_SAWENVSVFENV_82_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x35))
+    goto filter_tail;
+  if(pc == (base + 0x2D))
+    goto copy_path_2;
+  if(pc == (base + 0x18))
+    goto env_tail_1;
+  if(pc == (base + 0x10))
+    goto copy_path_1;
+  if(pc != base)
+    return false;
+
+  dsp_fast_execute_alu_at(base + 0,Y_,flags_,fExact_);
+
+  branch.raw = DSP.NMem[base + 3];
+  DSP.dregs.PC = base + 4;
+  if(1 & DSP.BRCONDTAB[branch.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch.cif.BCH_ADDR;
+      if(DSP.dregs.PC == (base + 0x10))
+        goto copy_path_1;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 4,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 7,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 10,Y_,flags_,fExact_);
+
+  DSP.dregs.PC = base + 0x18;
+
+env_tail_1:
+  dsp_fast_execute_alu_at(base + 24,Y_,flags_,fExact_);
+
+  dsp_fast_execute_alu_at(base + 29,Y_,flags_,fExact_);
+
+  branch.raw = DSP.NMem[base + 32];
+  DSP.dregs.PC = base + 33;
+  if(1 & DSP.BRCONDTAB[branch.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch.cif.BCH_ADDR;
+      if(DSP.dregs.PC == (base + 0x2D))
+        goto copy_path_2;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 33,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 36,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 39,Y_,flags_,fExact_);
+
+  DSP.dregs.PC = base + 0x35;
+  goto filter_tail;
+
+copy_path_1:
+  dsp_fast_execute_alu_at(base + 16,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 19];
+  DSP.dregs.PC = base + 20;
+  val = dsp_operand_load1();
+  addr = inst.cif.BCH_ADDR;
+  if(inst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  inst.raw = DSP.NMem[base + 21];
+  DSP.dregs.PC = base + 22;
+  val = dsp_operand_load1();
+  addr = inst.cif.BCH_ADDR;
+  if(inst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  goto env_tail_1;
+
+copy_path_2:
+  dsp_fast_execute_alu_at(base + 45,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 48];
+  DSP.dregs.PC = base + 49;
+  val = dsp_operand_load1();
+  addr = inst.cif.BCH_ADDR;
+  if(inst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  inst.raw = DSP.NMem[base + 50];
+  DSP.dregs.PC = base + 51;
+  val = dsp_operand_load1();
+  addr = inst.cif.BCH_ADDR;
+  if(inst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+filter_tail:
+  dsp_fast_execute_alu_at(base + 53,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 56,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 60,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 64,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 68,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 71,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 74,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 77,Y_,flags_,fExact_);
+
+  return true;
 }
 
 static
