@@ -15033,8 +15033,14 @@ dsp_fast_dcsqxdhalfmono_62(uint32_t        *Y_,
                            uint32_t        *RBSR_,
                            bool            *work_)
 {
+  uint16_t addr;
   uint32_t base;
+  ITAG_t inst;
   uint32_t pc;
+  uint16_t val;
+
+  (void)RBSR_;
+  (void)work_;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -15043,8 +15049,115 @@ dsp_fast_dcsqxdhalfmono_62(uint32_t        *Y_,
   if(!dsp_fast_dcsqxdhalfmono_62_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_DCSQXDHALFMONO_62_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x38))
+    goto path_56;
+  if(pc == (base + 0x36))
+    goto path_54;
+  if(pc == (base + 0x2A))
+    goto path_42;
+  if(pc == (base + 0x27))
+    goto path_39;
+  if(pc == (base + 0x1C))
+    goto path_28;
+  if(pc == (base + 0x18))
+    goto path_24;
+  if(pc == (base + 0x15))
+    goto path_21;
+  if(pc != base)
+    return false;
+
+  dsp_fast_execute_alu_at(base + 0,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 2,flags_,fExact_))
+    return true;
+
+  dsp_fast_execute_alu_at(base + 3,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 7,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 9,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x36))
+        goto path_54;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 10,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 13,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x15))
+        goto path_21;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 14,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 17,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 20];
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+  if(DSP.dregs.PC == (base + 0x18))
+    goto path_24;
+  return true;
+
+path_21:
+  dsp_fast_execute_alu_at(base + 21,Y_,flags_,fExact_);
+
+path_24:
+  dsp_fast_execute_alu_at(base + 24,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 25,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x1C))
+        goto path_28;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 27,Y_,flags_,fExact_);
+
+path_28:
+  dsp_fast_execute_alu_at(base + 28,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 31,Y_,flags_,fExact_);
+  if(dsp_fast_branch_taken_at(base + 34,flags_,fExact_))
+    {
+      if(DSP.dregs.PC == (base + 0x27))
+        goto path_39;
+      return true;
+    }
+
+  dsp_fast_execute_alu_at(base + 35,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 38];
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+  if(DSP.dregs.PC == (base + 0x2A))
+    goto path_42;
+  return true;
+
+path_39:
+  dsp_fast_execute_alu_at(base + 39,Y_,flags_,fExact_);
+
+path_42:
+  dsp_fast_execute_alu_at(base + 42,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 45,Y_,flags_,fExact_);
+  dsp_fast_execute_alu_at(base + 46,Y_,flags_,fExact_);
+
+  inst.raw = DSP.NMem[base + 50];
+  DSP.dregs.PC = base + 51;
+  val = dsp_operand_load1();
+  addr = inst.cif.BCH_ADDR;
+  if(inst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  inst.raw = DSP.NMem[base + 52];
+  DSP.dregs.PC = inst.cif.BCH_ADDR;
+  if(DSP.dregs.PC == (base + 0x38))
+    goto path_56;
+  return true;
+
+path_54:
+  dsp_fast_execute_alu_at(base + 54,Y_,flags_,fExact_);
+
+path_56:
+  dsp_fast_execute_alu_at(base + 56,Y_,flags_,fExact_);
+  DSP.dregs.PC = base + DSP_DCSQXDHALFMONO_62_WORDS;
+
+  return true;
 }
 
 static
