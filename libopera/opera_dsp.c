@@ -7431,6 +7431,20 @@ dsp_fast_multiply_product_value(int16_t const src1_,
 
 static
 void
+dsp_fast_load_alu_operands(uint32_t const pc_)
+{
+  ITAG_t inst;
+
+  inst.raw = DSP.NMem[pc_];
+
+  DSP.flags.req.raw = DSP.INSTTRAS[inst.raw].req.raw;
+  DSP.flags.BS      = DSP.INSTTRAS[inst.raw].BS;
+  DSP.dregs.PC      = pc_ + 1;
+  dsp_operand_load(inst.aif.NUMOPS);
+}
+
+static
+void
 dsp_fast_multiply_product_to_y(uint16_t         insn_,
                                uint16_t         src1_op_,
                                uint16_t         src2_op_,
@@ -9371,8 +9385,23 @@ dsp_fast_sampler3d_100(uint32_t        *Y_,
                        uint32_t        *RBSR_,
                        bool            *work_)
 {
+  uint32_t a;
+  uint32_t addr;
   uint32_t base;
+  uint32_t b;
+  uint32_t block;
+  ITAG_t branch;
+  ITAG_t dst;
+  ITAG_t jsr;
+  ITAG_t mov;
   uint32_t pc;
+  uint32_t setup;
+  ITAG_t src;
+  uint32_t tail;
+  uint16_t val;
+  uint32_t y;
+
+  (void)work_;
 
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
@@ -9381,8 +9410,328 @@ dsp_fast_sampler3d_100(uint32_t        *Y_,
   if(!dsp_fast_sampler3d_100_base_for_pc(pc,&base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_SAMPLER3D_100_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  if(pc == (base + 0x61))
+    {
+      DSP.dregs.PC = base + DSP_SAMPLER3D_100_WORDS;
+      return true;
+    }
+  if(pc == (base + 0x51))
+    goto tail_51;
+  if(pc == (base + 0x44))
+    goto tail_44;
+  if(pc == (base + 0x3A))
+    goto sample_tail;
+  if(pc == (base + 0x22))
+    {
+      block = base + 0x22;
+      goto channel_block;
+    }
+  if(pc == (base + 0x06))
+    {
+      block = base + 0x06;
+      goto channel_block;
+    }
+  if(pc != base)
+    return false;
+
+  setup = base;
+  goto sample_setup;
+
+sample_setup_2:
+  setup = base + 0x1C;
+
+sample_setup:
+  src.raw = DSP.NMem[setup + 0];
+  DSP.dregs.PC = setup + 1;
+  DSP.RBASEx4 = ((src.cif.BCH_ADDR & 0x3F) << 2);
+
+  mov.raw = DSP.NMem[setup + 1];
+  DSP.dregs.PC = setup + 2;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  mov.raw = DSP.NMem[setup + 3];
+  DSP.dregs.PC = setup + 4;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  jsr.raw = DSP.NMem[setup + 5];
+  *RBSR_ = setup + 0x06;
+  DSP.dregs.PC = jsr.cif.BCH_ADDR;
+  if(DSP.dregs.PC != (base + 0x3A))
+    return true;
+
+sample_tail:
+  dsp_fast_load_alu_operands(base + 0x3A);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  branch.raw = DSP.NMem[base + 0x3C];
+  DSP.dregs.PC = base + 0x3D;
+  if(1 & DSP.BRCONDTAB[branch.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch.cif.BCH_ADDR;
+      if(DSP.dregs.PC == (base + 0x51))
+        goto tail_51;
+      return true;
+    }
+
+  branch.raw = DSP.NMem[base + 0x3D];
+  DSP.dregs.PC = base + 0x3E;
+  if(1 & DSP.BRCONDTAB[branch.br.bits][*fExact_ + ((flags_->raw * 0x10080402) >> 24)])
+    {
+      DSP.dregs.PC = branch.cif.BCH_ADDR;
+      if(DSP.dregs.PC == (base + 0x44))
+        goto tail_44;
+      return true;
+    }
+
+  tail = base + 0x3E;
+  goto tail_vector;
+
+tail_44:
+  dsp_fast_load_alu_operands(base + 0x44);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  mov.raw = DSP.NMem[base + 0x47];
+  DSP.dregs.PC = base + 0x48;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  mov.raw = DSP.NMem[base + 0x49];
+  DSP.dregs.PC = base + 0x4A;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  tail = base + 0x4B;
+  goto tail_vector;
+
+tail_51:
+  dsp_fast_load_alu_operands(base + 0x51);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  dsp_fast_load_alu_operands(base + 0x54);
+
+  a = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU2 << 16);
+  y = a - b;
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  mov.raw = DSP.NMem[base + 0x57];
+  DSP.dregs.PC = base + 0x58;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  mov.raw = DSP.NMem[base + 0x59];
+  DSP.dregs.PC = base + 0x5A;
+  val = dsp_operand_load1();
+  addr = DSP.REGCONV[DSP.REGi][mov.r2of.R1] ^ DSP.RBASEx4;
+  if(mov.r2of.R1_DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  tail = base + 0x5B;
+
+tail_vector:
+  dsp_fast_load_alu_operands(tail);
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  y = a - b;
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  dsp_fast_load_alu_operands(tail + 2);
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = *Y_;
+  y = a - b;
+
+  flags_->carry    = SUB_CFLAG(a,b,y);
+  flags_->overflow = SUB_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  DSP.dregs.PC = *RBSR_;
+  if(DSP.dregs.PC == (base + 0x06))
+    {
+      block = base + 0x06;
+      goto channel_block;
+    }
+  if(DSP.dregs.PC == (base + 0x22))
+    {
+      block = base + 0x22;
+      goto channel_block;
+    }
+  if(DSP.dregs.PC == (base + 0x61))
+    DSP.dregs.PC = base + DSP_SAMPLER3D_100_WORDS;
+  return true;
+
+channel_block:
+  dst.raw = DSP.NMem[block + 0];
+  DSP.dregs.PC = block + 1;
+  val = dsp_operand_load1();
+  addr = dst.cif.BCH_ADDR;
+  if(dst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  dsp_fast_load_alu_operands(block + 2);
+
+  y = (uint32_t)(((int64_t)DSP.flags.MULT1 *
+                  (int64_t)(((int32_t)*Y_ >> 15) & ~1)) & ALUSIZEMASK);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+  *Y_ = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  dsp_fast_load_alu_operands(block + 5);
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = *Y_;
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  dsp_fast_load_alu_operands(block + 8);
+
+  a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+  b = *Y_;
+  y = a + b;
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+  *Y_              = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  dst.raw = DSP.NMem[block + 12];
+  DSP.dregs.PC = block + 13;
+  val = dsp_operand_load1();
+  addr = dst.cif.BCH_ADDR;
+  if(dst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  dst.raw = DSP.NMem[block + 14];
+  DSP.dregs.PC = block + 15;
+  val = dsp_operand_load1();
+  addr = dst.cif.BCH_ADDR;
+  if(dst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  dst.raw = DSP.NMem[block + 16];
+  DSP.dregs.PC = block + 17;
+  val = dsp_operand_load1();
+  addr = dst.cif.BCH_ADDR;
+  if(dst.nrof.DI)
+    addr = dsp_read(addr);
+  dsp_write(addr,val);
+
+  dsp_fast_load_alu_operands(block + 18);
+
+  y = (uint32_t)(((int64_t)DSP.flags.MULT1 *
+                  (int64_t)(((int32_t)*Y_ >> 15) & ~1)) & ALUSIZEMASK);
+  dsp_fast_set_product_flags(y,flags_,fExact_);
+  *Y_ = y;
+
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+
+  if(block == (base + 0x06))
+    goto sample_setup_2;
+
+  DSP.dregs.PC = base + DSP_SAMPLER3D_100_WORDS;
+  return true;
 }
 
 static
