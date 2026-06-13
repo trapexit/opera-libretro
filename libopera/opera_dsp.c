@@ -6446,7 +6446,68 @@ static
 bool
 dsp_fast_mixer8x2amp_59_match(uint32_t pc_)
 {
-  return dsp_fast_mixer8x2amp_59_base_match(pc_);
+  uint32_t term;
+  ITAG_t amp;
+  ITAG_t mix;
+  ITAG_t src;
+
+  if(!dsp_fast_mixer8x2amp_59_base_match(pc_))
+    return false;
+
+  for(term = 0; term < 8; term++)
+    {
+      ITAG_t src1;
+      ITAG_t src2;
+
+      src1.raw = DSP.NMem[pc_ + (term * 3) + 1];
+      src2.raw = DSP.NMem[pc_ + (term * 3) + 2];
+
+      if(!dsp_fast_direct_source_operand(src1) ||
+         !dsp_fast_direct_source_operand(src2))
+        return false;
+    }
+
+  src.raw = DSP.NMem[pc_ + 26];
+  mix.raw = DSP.NMem[pc_ + 27];
+  amp.raw = DSP.NMem[pc_ + 25];
+  if(!dsp_fast_direct_source_operand(src) ||
+     !dsp_fast_direct_dest_operand(mix) ||
+     (mix.nrof.OP_ADDR != DSP_DIRECTOUT_MIX_LEFT) ||
+     amp.aif.PAD ||
+     (amp.aif.BS != 7) ||
+     (amp.aif.ALU != 2) ||
+     (amp.aif.MUXA != 3) ||
+     (amp.aif.MUXB != 1) ||
+     (amp.aif.M2SEL != 0) ||
+     (amp.aif.NUMOPS != 2))
+    return false;
+
+  for(term = 0; term < 8; term++)
+    {
+      ITAG_t src1;
+      ITAG_t src2;
+
+      src1.raw = DSP.NMem[pc_ + 29 + (term * 3) + 1];
+      src2.raw = DSP.NMem[pc_ + 29 + (term * 3) + 2];
+
+      if(!dsp_fast_direct_source_operand(src1) ||
+         !dsp_fast_direct_source_operand(src2))
+        return false;
+    }
+
+  src.raw = DSP.NMem[pc_ + 55];
+  mix.raw = DSP.NMem[pc_ + 56];
+  amp.raw = DSP.NMem[pc_ + 54];
+  return (dsp_fast_direct_source_operand(src) &&
+          dsp_fast_direct_dest_operand(mix) &&
+          (mix.nrof.OP_ADDR == DSP_DIRECTOUT_MIX_RIGHT) &&
+          !amp.aif.PAD &&
+          (amp.aif.BS == 7) &&
+          (amp.aif.ALU == 2) &&
+          (amp.aif.MUXA == 3) &&
+          (amp.aif.MUXB == 1) &&
+          (amp.aif.M2SEL == 0) &&
+          (amp.aif.NUMOPS == 2));
 }
 
 static
@@ -13421,6 +13482,97 @@ dsp_fast_mixer_channel(uint32_t const   pc_,
 }
 
 static
+void
+dsp_fast_mixer8x2amp_channel(uint32_t const   pc_,
+                             uint32_t const   off_,
+                             uint32_t        *Y_,
+                             dsp_alu_flags_t *flags_,
+                             int             *fExact_)
+{
+  uint32_t a;
+  uint32_t b;
+  ITAG_t dst;
+  ITAG_t src1;
+  ITAG_t src2;
+  uint32_t term;
+  uint32_t y;
+
+  for(term = 0; term < 8; term++)
+    {
+      uint32_t const insn_off = off_ + (term * 3);
+
+      src1.raw = DSP.NMem[pc_ + insn_off + 1];
+      src2.raw = DSP.NMem[pc_ + insn_off + 2];
+
+      DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[pc_ + insn_off]].req.raw;
+      DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[pc_ + insn_off]].BS;
+      DSP.flags.WRITEBACK = 0;
+
+      DSP.dregs.PC = pc_ + insn_off + 2;
+      DSP.flags.MULT1 = dsp_read(src1.nrof.OP_ADDR);
+
+      DSP.dregs.PC = pc_ + insn_off + 3;
+      DSP.flags.MULT2 = dsp_read(src2.nrof.OP_ADDR);
+      DSP.flags.WRITEBACK = 0;
+
+      a = dsp_fast_multiply_product_value(DSP.flags.MULT1,DSP.flags.MULT2);
+      if(term == 0)
+        {
+          y = a;
+          dsp_fast_set_product_flags(y,flags_,fExact_);
+        }
+      else
+        {
+          b = *Y_;
+          y = (a + b);
+
+          flags_->carry    = ADD_CFLAG(a,b,y);
+          flags_->overflow = ADD_VFLAG(a,b,y);
+          flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+          flags_->negative = ((y >> 31) ? 1 : 0);
+          *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+          if(1 & flags_->overflow)
+            y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+        }
+
+      *Y_ = y;
+    }
+
+  src1.raw = DSP.NMem[pc_ + off_ + 26];
+  dst.raw  = DSP.NMem[pc_ + off_ + 27];
+
+  DSP.flags.req.raw   = DSP.INSTTRAS[DSP.NMem[pc_ + off_ + 25]].req.raw;
+  DSP.flags.BS        = DSP.INSTTRAS[DSP.NMem[pc_ + off_ + 25]].BS;
+  DSP.flags.WRITEBACK = 0;
+
+  DSP.dregs.PC = pc_ + off_ + 27;
+  DSP.flags.MULT1 = dsp_read(src1.nrof.OP_ADDR);
+
+  DSP.dregs.PC = pc_ + off_ + 28;
+  DSP.flags.WRITEBACK = dst.nrof.OP_ADDR;
+  DSP.flags.ALU1 = dsp_read(DSP.flags.WRITEBACK);
+
+  a = (uint32_t)(((int64_t)DSP.flags.MULT1 *
+                  (int64_t)(((int32_t)*Y_ >> 15) & ~1)) & ALUSIZEMASK);
+  b = ((uint32_t)(uint16_t)DSP.flags.ALU1 << 16);
+  y = (a + b);
+
+  flags_->carry    = ADD_CFLAG(a,b,y);
+  flags_->overflow = ADD_VFLAG(a,b,y);
+  flags_->zero     = ((y & 0xFFFF0000) ? 0 : 1);
+  flags_->negative = ((y >> 31) ? 1 : 0);
+  *fExact_         = ((y & 0x0000F000) ? 0 : 1);
+
+  if(1 & flags_->overflow)
+    y = (flags_->negative ? 0x7FFFF000 : 0x80000000);
+
+  *Y_ = y;
+  if(DSP.flags.WRITEBACK)
+    dsp_write(DSP.flags.WRITEBACK,((int32_t)y) >> 16);
+}
+
+static
 bool
 dsp_fast_mixer12x2(uint32_t        *Y_,
                    dsp_alu_flags_t *flags_,
@@ -13459,11 +13611,15 @@ dsp_fast_mixer8x2amp_59(uint32_t        *Y_,
     return false;
 
   pc = DSP.dregs.PC;
-  if(!dsp_fast_mixer8x2amp_59_base_match(pc))
+  if(!dsp_fast_mixer8x2amp_59_match(pc))
     return false;
 
-  return dsp_fast_interpret_block(pc,pc + DSP_MIXER8X2AMP_59_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  dsp_fast_mixer8x2amp_channel(pc,0,Y_,flags_,fExact_);
+  dsp_fast_mixer8x2amp_channel(pc,29,Y_,flags_,fExact_);
+
+  DSP.dregs.PC = pc + DSP_MIXER8X2AMP_59_WORDS;
+
+  return true;
 }
 
 static
