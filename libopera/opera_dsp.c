@@ -16284,14 +16284,18 @@ dsp_fast_fixedmonosample_6(uint32_t        *Y_,
 {
   uint32_t const base = DSP.dregs.PC;
 
+  (void)RBSR_;
+  (void)work_;
+
   if(DSP.flags.nOP_MASK != 0xFFFF)
     return false;
 
   if(!dsp_fast_fixedmonosample_6_base_match(base))
     return false;
 
-  return dsp_fast_interpret_block(base,base + DSP_FIXEDMONOSAMPLE_6_WORDS,
-                                  Y_,flags_,fExact_,RBSR_,work_);
+  dsp_fast_execute_alu_at(base,Y_,flags_,fExact_);
+
+  return true;
 }
 
 static
