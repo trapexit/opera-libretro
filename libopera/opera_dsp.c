@@ -46,7 +46,8 @@
 #endif
 
 #define TOPBIT       0x80000000
-#define SYSTEM_TICKS 568        /* ceil(((25000000 / 44100) + 1)) */
+#define SYSTEM_TICKS 567        /* ceil(25000000 / 44100) */
+#define FREE_RUNNING_INSTRUCTION_BUDGET SYSTEM_TICKS
 
 #pragma pack(push,1)
 
@@ -1018,6 +1019,7 @@ opera_dsp_loop(void)
     {
       uint32_t AOP    = 0;      /* 1st operand */
       uint32_t RBSR   = 0;	/* return address */
+      uint32_t budget = FREE_RUNNING_INSTRUCTION_BUDGET;
       int      fExact = 0;
       bool     work   = true;
 
@@ -1393,6 +1395,9 @@ opera_dsp_loop(void)
               if(DSP.flags.WRITEBACK)
                 dsp_write(DSP.flags.WRITEBACK,((int32_t)Y) >> 16);
             }
+
+          if((DSP.dregs.DSPPRLD == 0) && (--budget == 0))
+            break;
 
         } while(work);
 
