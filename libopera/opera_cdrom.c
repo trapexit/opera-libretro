@@ -853,10 +853,9 @@ cdrom_data_reset_readahead_state(void)
 
 static
 void
-cdrom_data_publish_read_status_if_ready(cdrom_device_t *cd_)
+cdrom_data_publish_read_status(cdrom_device_t *cd_)
 {
-  /* MEI DIPIR consumes read data only when data is ready with the status. */
-  if(!g_CDROM_STATE.data.read_status_pending || (cd_->data_len == 0))
+  if(!g_CDROM_STATE.data.read_status_pending)
     return;
 
   g_CDROM_STATE.data.read_status_pending = false;
@@ -1088,6 +1087,8 @@ cdrom_data_load_next_if_ready(cdrom_device_t *cd_)
   uint32_t read_size;
   uint32_t wire_size;
 
+  cdrom_data_publish_read_status(cd_);
+
   if((cd_->data_len > 0) || (cd_->blocks_requested == 0))
     return;
 
@@ -1143,7 +1144,6 @@ cdrom_data_load_next_if_ready(cdrom_device_t *cd_)
   cd_->blocks_requested--;
   cd_->poll |= POLDT;
   g_CDROM_STATE.data.sectors_queued++;
-  cdrom_data_publish_read_status_if_ready(cd_);
 
   if(audio_burst)
     g_CDROM_STATE.data.next_ready_cycle = cycles;
@@ -3597,6 +3597,7 @@ cdrom_cmd_read_data(cdrom_device_t *cd_)
       cdrom_data_schedule_start(cd_,continuous_read);
       cd_->poll &= ~POLST;
       cd_->poll &= ~POLDT;
+      cdrom_data_publish_read_status(cd_);
       if(cd_->read_sector_size != CDROM_DA)
         cdrom_data_load_next_if_ready(cd_);
     }
