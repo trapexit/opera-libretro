@@ -477,6 +477,14 @@ cdrom_effective_speed(const cdrom_device_t *cd_)
   if(speed == 1)
     return 1;
 
+  /*
+    High host-speed data reads behave like cached ODE/host reads. Keeping a
+    tiny emulated delay here can split command status and data interrupts in a
+    way real software does not tolerate.
+  */
+  if((cd_->read_sector_size != CDROM_DA) && (speed >= 16))
+    return 0;
+
   if(cdrom_requested_speed(cd_) == 1)
     return 1;
 
@@ -853,9 +861,18 @@ cdrom_data_reset_readahead_state(void)
 
 static
 void
-cdrom_data_publish_read_status(cdrom_device_t *cd_)
+cdrom_data_publish_read_status_if_ready(cdrom_device_t *cd_)
 {
   if(!g_CDROM_STATE.data.read_status_pending)
+    return;
+
+  /*
+    Normal data reads need the first sector available when status is raised.
+    Raw/CD-DA-sized reads are stream-style transfers; some titles wait for the
+    command status before draining data later.
+  */
+  if((cd_->read_sector_size != CDROM_DA) &&
+     (cd_->data_len == 0))
     return;
 
   g_CDROM_STATE.data.read_status_pending = false;
@@ -1087,7 +1104,7 @@ cdrom_data_load_next_if_ready(cdrom_device_t *cd_)
   uint32_t read_size;
   uint32_t wire_size;
 
-  cdrom_data_publish_read_status(cd_);
+  cdrom_data_publish_read_status_if_ready(cd_);
 
   if((cd_->data_len > 0) || (cd_->blocks_requested == 0))
     return;
@@ -1144,8 +1161,15 @@ cdrom_data_load_next_if_ready(cdrom_device_t *cd_)
   cd_->blocks_requested--;
   cd_->poll |= POLDT;
   g_CDROM_STATE.data.sectors_queued++;
+  cdrom_data_publish_read_status_if_ready(cd_);
 
-  if(audio_burst)
+  /*
+    Normal READ_DATA commands are chunked at the command boundary. Preserve the
+    initial read latency, but do not add another sector delay inside the same
+    command.
+  */
+  if(audio_burst ||
+     ((cd_->read_sector_size != CDROM_DA) && (cd_->blocks_requested > 0)))
     g_CDROM_STATE.data.next_ready_cycle = cycles;
   else
     cdrom_data_schedule_next(cd_);
@@ -3597,7 +3621,7 @@ cdrom_cmd_read_data(cdrom_device_t *cd_)
       cdrom_data_schedule_start(cd_,continuous_read);
       cd_->poll &= ~POLST;
       cd_->poll &= ~POLDT;
-      cdrom_data_publish_read_status(cd_);
+      cdrom_data_publish_read_status_if_ready(cd_);
       if(cd_->read_sector_size != CDROM_DA)
         cdrom_data_load_next_if_ready(cd_);
     }
