@@ -43,9 +43,17 @@ typedef enum retro_reset_flags_t
     RETRO_RESET_FLAG_SAVE_NVRAM = (1 << 0)
   } retro_reset_flags_t;
 
+typedef enum software_framebuffer_status_t
+  {
+    SOFTWARE_FRAMEBUFFER_UNKNOWN,
+    SOFTWARE_FRAMEBUFFER_AVAILABLE,
+    SOFTWARE_FRAMEBUFFER_UNAVAILABLE
+  } software_framebuffer_status_t;
+
 static cdimage_t  CDIMAGE;
 static uint32_t   CDIMAGE_SECTOR;
 static char      *g_GAME_INFO_PATH = NULL;
+static software_framebuffer_status_t g_SOFTWARE_FRAMEBUFFER_STATUS = SOFTWARE_FRAMEBUFFER_UNKNOWN;
 
 static
 void
@@ -185,6 +193,7 @@ content_runtime_reset(void)
 {
   cdimage_set_sector(0);
   opera_cdrom_ode_set_root(NULL);
+  g_SOFTWARE_FRAMEBUFFER_STATUS = SOFTWARE_FRAMEBUFFER_UNKNOWN;
 }
 
 static
@@ -534,6 +543,7 @@ set_system_av_info(void)
 
   get_system_av_info(&info);
   retro_environment_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,&info);
+  g_SOFTWARE_FRAMEBUFFER_STATUS = SOFTWARE_FRAMEBUFFER_UNKNOWN;
 }
 
 static
@@ -544,6 +554,7 @@ set_system_geometry(void)
 
   get_system_geometry(&geometry);
   retro_environment_cb(RETRO_ENVIRONMENT_SET_GEOMETRY,&geometry);
+  g_SOFTWARE_FRAMEBUFFER_STATUS = SOFTWARE_FRAMEBUFFER_UNKNOWN;
 }
 
 unsigned
@@ -709,19 +720,70 @@ process_opts_if_updated()
 
 static
 void
-draw_crosshairs_if_enabled()
+draw_crosshairs_if_enabled(void *video_buffer_)
 {
   if(g_OPTS.hide_lightgun_crosshairs)
     return;
 
-  lr_input_crosshairs_draw(g_OPTS.video_buffer,
+  lr_input_crosshairs_draw(video_buffer_,
                            g_OPTS.video_width,
                            g_OPTS.video_height);
+}
+
+static
+bool
+get_current_software_framebuffer(struct retro_framebuffer *fb_)
+{
+  enum retro_pixel_format format;
+  size_t alignment;
+  size_t pitch;
+
+  if(g_SOFTWARE_FRAMEBUFFER_STATUS == SOFTWARE_FRAMEBUFFER_UNAVAILABLE)
+    return false;
+
+  memset(fb_,0,sizeof(*fb_));
+
+  alignment         = ((size_t)1 << (g_OPTS.video_pitch_shift + 1));
+  pitch             = ((size_t)g_OPTS.video_width << g_OPTS.video_pitch_shift);
+  format            = vdlp_pixel_format_to_libretro(g_OPTS.vdlp_pixel_format);
+  fb_->width        = g_OPTS.video_width;
+  fb_->height       = g_OPTS.video_height;
+  fb_->access_flags = RETRO_MEMORY_ACCESS_WRITE;
+
+  if(!retro_environment_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER,
+                           fb_))
+    {
+      if(g_SOFTWARE_FRAMEBUFFER_STATUS == SOFTWARE_FRAMEBUFFER_UNKNOWN)
+        g_SOFTWARE_FRAMEBUFFER_STATUS = SOFTWARE_FRAMEBUFFER_UNAVAILABLE;
+      return false;
+    }
+
+  if(fb_->data == NULL ||
+     fb_->width != g_OPTS.video_width ||
+     fb_->height != g_OPTS.video_height ||
+     fb_->pitch != pitch ||
+     fb_->format != format ||
+     ((uintptr_t)fb_->data & (alignment - 1)) != 0)
+    {
+      if(g_SOFTWARE_FRAMEBUFFER_STATUS == SOFTWARE_FRAMEBUFFER_UNKNOWN)
+        g_SOFTWARE_FRAMEBUFFER_STATUS = SOFTWARE_FRAMEBUFFER_UNAVAILABLE;
+      return false;
+    }
+
+  if(g_SOFTWARE_FRAMEBUFFER_STATUS == SOFTWARE_FRAMEBUFFER_UNKNOWN)
+    retro_log_printf_cb(RETRO_LOG_INFO,
+                        "[Opera]: rendering directly to frontend framebuffer\n");
+  g_SOFTWARE_FRAMEBUFFER_STATUS = SOFTWARE_FRAMEBUFFER_AVAILABLE;
+  return true;
 }
 
 void
 retro_run(void)
 {
+  void *video_buffer;
+  size_t video_pitch;
+  struct retro_framebuffer fb;
+
   if(ode_reset_if_requested())
     return;
 
@@ -729,16 +791,30 @@ retro_run(void)
 
   lr_input_update(g_OPTS.active_devices);
 
+  video_buffer = g_OPTS.video_buffer;
+  video_pitch  = ((size_t)g_OPTS.video_width << g_OPTS.video_pitch_shift);
+  if(get_current_software_framebuffer(&fb))
+    {
+      video_buffer = fb.data;
+      video_pitch  = fb.pitch;
+      opera_vdlp_set_video_buffer(video_buffer);
+    }
+
   opera_3do_process_frame();
   if(ode_reset_if_requested())
-    return;
+    {
+      opera_vdlp_set_video_buffer(g_OPTS.video_buffer);
+      return;
+    }
 
-  draw_crosshairs_if_enabled();
+  draw_crosshairs_if_enabled(video_buffer);
 
   opera_lr_dsp_upload();
 
-  retro_video_refresh_cb(g_OPTS.video_buffer,
+  retro_video_refresh_cb(video_buffer,
                          g_OPTS.video_width,
                          g_OPTS.video_height,
-                         g_OPTS.video_width << g_OPTS.video_pitch_shift);
+                         video_pitch);
+
+  opera_vdlp_set_video_buffer(g_OPTS.video_buffer);
 }

@@ -1,9 +1,17 @@
-opera-libretro
-============
+# Opera
 
-Opera is a fork of 4DO, originally a port of 4DO, itself a fork of FreeDO, to libretro. The fork/rename occurred due to the original 4DO project being dormant and to differenciate the project due to new development and focus.
+Opera is a fork of 4DO, originally a port of 4DO, itself a fork of
+FreeDO, to libretro. The fork/rename occurred due to the original 4DO
+project being dormant and to differenciate the project due to new
+development and focus. "Opera" is the codename for the original New
+Technology Group / 3DO's first hardware project that later became the
+3DO console released in 1993.
 
-One of several BIOS ROMs must be placed into your RetroArch / libretro "System Directory" folder. "norsa" versions have the RSA encryption check disabled which should allow unsigned software to run.
+## ROMs
+
+One of several BIOS ROMs must be placed into your RetroArch / libretro
+"System Directory" folder. "norsa" versions have the RSA encryption
+check disabled which should allow unsigned software to run.
 
 | Filename                  | Hash                                 |
 | ------------------------- | ------------------------------------ |
@@ -18,6 +26,7 @@ One of several BIOS ROMs must be placed into your RetroArch / libretro "System D
 | sanyotry.bin              | md5:35fa1a1ebaaeea286dc5cd15487c13ea |
 | 3do_arcade_saot.bin       | md5:8970fc987ab89a7f64da9f8a8c4333ff |
 
+
 For certain Japanese games a second "Kanji" ROM is necessary.
 
 | Filename                   | Hash                                 |
@@ -26,6 +35,17 @@ For certain Japanese games a second "Kanji" ROM is necessary.
 | panafz1j-kanji.bin         | md5:c23fb5d5e6bb1c240d02cf968972be37 |
 | panafz10ja-anvil-kanji.bin | md5:428577250f43edc902ea239c50d2240d |
 
-Compatibility lists:
-* [fourdo.com](http://wiki.fourdo.com/index.php?title=Compatibility_List)
-* [3dodev.com](https://3dodev.com/doku.php?id=software:emulation:compatibility:opera)
+
+## Video output
+
+Opera output 320x240 (or PAL equivilant) using XRGB8888 by
+default. RGB565 remains available for frontends or systems that prefer
+16-bit video. However, since the 3DO outputs 24bit RGB you'll be
+losing some fidelity. HighRes CEL rendering doubles the output
+geometry and replaces duplicated native pixels with higher-detail CEL
+samples where possible.
+
+When supported, Opera renders directly into a frontend-managed
+software framebuffer to avoid an extra full-frame copy. This is an
+opportunistic fast path; unsupported frontends and incompatible
+framebuffer layouts transparently use Opera's internal buffer.

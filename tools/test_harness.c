@@ -249,6 +249,7 @@ struct harness_config_t
   bool     have_seconds;
   bool     have_cpu;
   bool     terminal_mode;
+  bool     frontend_framebuffer;
   bool     keep_work_dir;
   bool     user_work_dir;
   bool     verbose;
@@ -279,6 +280,11 @@ struct harness_run_t
 
   void   *last_frame;
   size_t  last_frame_size;
+  void   *frontend_framebuffer;
+  size_t  frontend_framebuffer_size;
+  uint64_t frontend_framebuffer_requests;
+  uint64_t frontend_framebuffer_successes;
+  uint64_t frontend_framebuffer_submissions;
   unsigned last_width;
   unsigned last_height;
   size_t   last_pitch;
@@ -568,6 +574,8 @@ _print_usage(FILE *f_)
           "  --benchmark-end-frame N  last frame included; extends run if needed\n"
           "  --wall-timeout S         stop after S wall seconds between frames\n"
           "  --cpu N                  pin the harness and core-created threads to CPU N\n"
+          "  --frontend-framebuffer   provide a tightly packed frontend-managed\n"
+          "                           software framebuffer when requested by the core\n"
           "  --input SPEC             repeatable input event, e.g. 2S=X or 120F=A\n"
           "  --input-file PATH        file of input events (one per line; # comments)\n"
           "  --terminal               show live terminal framebuffer and read\n"
@@ -1853,6 +1861,8 @@ _parse_args(int    argc_,
         }
       else if(strcmp(arg, "--terminal") == 0)
         g_cfg.terminal_mode = true;
+      else if(strcmp(arg, "--frontend-framebuffer") == 0)
+        g_cfg.frontend_framebuffer = true;
       else if(strcmp(arg, "--terminal-fps") == 0)
         {
           if((_parse_double_value(argv_[++i], &g_cfg.terminal_fps) != 0) ||
@@ -2745,6 +2755,55 @@ _harness_environment(unsigned cmd_,
         _terminal_set_pixel_reader(fmt);
         return true;
       }
+    case RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER:
+      {
+        struct retro_framebuffer *fb = (struct retro_framebuffer *)data_;
+        unsigned pixel_size;
+        size_t pitch;
+        size_t size;
+        void *next;
+
+        g_run.frontend_framebuffer_requests++;
+        if(!g_cfg.frontend_framebuffer)
+          return false;
+
+        switch(g_run.pixel_format)
+          {
+          case RETRO_PIXEL_FORMAT_XRGB8888:
+            pixel_size = 4;
+            break;
+          case RETRO_PIXEL_FORMAT_RGB565:
+            pixel_size = 2;
+            break;
+          default:
+            return false;
+          }
+
+        if((fb == NULL) || (fb->width == 0) || (fb->height == 0) ||
+           ((size_t)fb->width > (SIZE_MAX / pixel_size)))
+          return false;
+
+        pitch = ((size_t)fb->width * pixel_size);
+        if((size_t)fb->height > (SIZE_MAX / pitch))
+          return false;
+        size = ((size_t)fb->height * pitch);
+
+        if(size > g_run.frontend_framebuffer_size)
+          {
+            next = realloc(g_run.frontend_framebuffer,size);
+            if(next == NULL)
+              return false;
+            g_run.frontend_framebuffer      = next;
+            g_run.frontend_framebuffer_size = size;
+          }
+
+        fb->data         = g_run.frontend_framebuffer;
+        fb->pitch        = pitch;
+        fb->format       = g_run.pixel_format;
+        fb->memory_flags = RETRO_MEMORY_TYPE_CACHED;
+        g_run.frontend_framebuffer_successes++;
+        return true;
+      }
     case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
       g_run.av_info = *(const struct retro_system_av_info *)data_;
       return true;
@@ -3019,7 +3078,7 @@ _pixel_size(enum retro_pixel_format fmt_)
     case RETRO_PIXEL_FORMAT_XRGB8888: return 4;
     case RETRO_PIXEL_FORMAT_RGB565:   return 2;
     default:                          return 0;
-  }
+    }
 }
 
 
@@ -4357,6 +4416,8 @@ _harness_video_refresh(const void *data_,
   size_t i;
 
   g_run.video_frames++;
+  if(data_ == g_run.frontend_framebuffer)
+    g_run.frontend_framebuffer_submissions++;
   _store_last_frame(data_, width_, height_, pitch_, g_run.pixel_format);
 
   for(i = 0; i < g_cfg.screenshot_count; i++)
@@ -6219,11 +6280,11 @@ _terminal_sixel_quantize_frame(const void *data_,
         return false;
 
       _terminal_sixel_quantize_xrgb_source(
-        data_,
-        src_width_,
-        src_height_,
-        pitch_,
-        g_run.terminal_sixel_source_indices);
+                                           data_,
+                                           src_width_,
+                                           src_height_,
+                                           pitch_,
+                                           g_run.terminal_sixel_source_indices);
       _terminal_sixel_scale_indices(g_run.terminal_sixel_source_indices,
                                     src_width_,
                                     out_width_,
@@ -6277,15 +6338,15 @@ _terminal_sixel_compact_palette(uint8_t                  *indices_,
 static
 bool
 _terminal_sixel_build_band_events(
-  const uint8_t *indices_,
-  unsigned       width_,
-  unsigned       y_,
-  unsigned       band_rows_,
-  unsigned       palette_count_,
-  unsigned       band_colors_[HARNESS_TERMINAL_SIXEL_COLORS],
-  unsigned      *band_color_count_,
-  unsigned       heads_[HARNESS_TERMINAL_SIXEL_COLORS],
-  unsigned      *event_count_)
+                                  const uint8_t *indices_,
+                                  unsigned       width_,
+                                  unsigned       y_,
+                                  unsigned       band_rows_,
+                                  unsigned       palette_count_,
+                                  unsigned       band_colors_[HARNESS_TERMINAL_SIXEL_COLORS],
+                                  unsigned      *band_color_count_,
+                                  unsigned       heads_[HARNESS_TERMINAL_SIXEL_COLORS],
+                                  unsigned      *event_count_)
 {
   const uint8_t *rows[6];
   bool seen[HARNESS_TERMINAL_SIXEL_COLORS];
@@ -6588,8 +6649,8 @@ _terminal_write_sixel_indices(const uint8_t *indices_,
   if(!use_sparse)
     {
       if(!_terminal_write_sixel_dense_bands(indices_,
-                                             width_,
-                                             height_))
+                                            width_,
+                                            height_))
         goto sixel_fail;
       _terminal_write_all("\x1b\\", 2U);
       return true;
@@ -6608,14 +6669,14 @@ _terminal_write_sixel_indices(const uint8_t *indices_,
         band_rows = 6U;
 
       if(!_terminal_sixel_build_band_events(indices_,
-                                             width_,
-                                             y,
-                                             band_rows,
-                                             palette_->count,
-                                             band_colors,
-                                             &band_color_count,
-                                             heads,
-                                             &event_count))
+                                            width_,
+                                            y,
+                                            band_rows,
+                                            palette_->count,
+                                            band_colors,
+                                            &band_color_count,
+                                            heads,
+                                            &event_count))
         goto sixel_fail;
 
       for(color = 0; color < band_color_count; color++)
@@ -6629,8 +6690,8 @@ _terminal_write_sixel_indices(const uint8_t *indices_,
           _terminal_write_sixel_color_select(slot);
 
           if(!_terminal_write_sixel_event_plane(heads[slot],
-                                                 event_count,
-                                                 width_))
+                                                event_count,
+                                                width_))
             goto sixel_fail;
         }
 
@@ -6642,7 +6703,7 @@ _terminal_write_sixel_indices(const uint8_t *indices_,
   _terminal_write_all("\x1b\\", 2U);
   return true;
 
-sixel_fail:
+ sixel_fail:
   _terminal_write_all("\x1b\\", 2U);
   return false;
 }
@@ -6675,7 +6736,7 @@ _terminal_render_sixel_image(const void             *data_,
   bool ok;
 
   if(!_terminal_sixel_target_size(width_, height_, cols_, rows_,
-                                   &image_width, &image_height))
+                                  &image_width, &image_height))
     return HARNESS_TERMINAL_IMAGE_FAILED;
 
   if(_terminal_image_cache_matches(data_,
@@ -8532,6 +8593,14 @@ _write_metrics(const char *status_,
   _write_input_events_json(f);
   fprintf(f, "  \"frames_run\": %" PRIu64 ",\n", g_run.frames_run);
   fprintf(f, "  \"video_frames\": %" PRIu64 ",\n", g_run.video_frames);
+  fprintf(f, "  \"frontend_framebuffer_enabled\": %s,\n",
+          g_cfg.frontend_framebuffer ? "true" : "false");
+  fprintf(f, "  \"frontend_framebuffer_requests\": %" PRIu64 ",\n",
+          g_run.frontend_framebuffer_requests);
+  fprintf(f, "  \"frontend_framebuffer_successes\": %" PRIu64 ",\n",
+          g_run.frontend_framebuffer_successes);
+  fprintf(f, "  \"frontend_framebuffer_submissions\": %" PRIu64 ",\n",
+          g_run.frontend_framebuffer_submissions);
   fprintf(f, "  \"audio_frames\": %" PRIu64 ",\n", g_run.audio_frames);
   fprintf(f, "  \"audio_bytes\": %" PRIu64 ",\n", g_run.audio_bytes);
   fprintf(f, "  \"core_fps\": %.9f,\n", g_run.core_fps);
@@ -8898,6 +8967,7 @@ main(int    argc_,
     }
 
   free(g_run.last_frame);
+  free(g_run.frontend_framebuffer);
   free(g_run.screenshot_when_prev);
   _free_screenshot_captures();
   return exit_code;

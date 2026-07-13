@@ -116,6 +116,14 @@ Examples:
  opera_high_resolution=enabled`.  Keys are normalized
  (case-insensitive, `_`/`-` interchange).
 
+### Frontend-managed framebuffer
+- `--frontend-framebuffer` — emulate a frontend that supports
+ `RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER`. The harness provides
+ a tightly packed, cached buffer in the active pixel format. Metrics report
+ request, success, and submitted-buffer counts so the direct-render path can
+ be verified. Without this flag, the environment request returns false and
+ the core must use its fallback buffer.
+
 ### Terminal mode
 - `--terminal` — opt-in live terminal framebuffer and keyboard
   controls.
