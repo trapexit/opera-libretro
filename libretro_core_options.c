@@ -156,14 +156,14 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       "VDLP Pixel Format",
       NULL,
       "Select the pixel format to request from the runtime and convert to from the internal 16bpp format."
-      " Changes take affect at core start.",
+      " Changes take effect at core start.",
       NULL,
       "video",
       {
         { "RGB565",   NULL },
         { "XRGB8888", NULL }
       },
-      "RGB565"
+      "XRGB8888"
     },
     {
       "opera_vdlp_bypass_clut",
@@ -435,12 +435,12 @@ static struct retro_core_option_definition option_defs_us[] =
       "opera_vdlp_pixel_format",
       "VDLP Pixel Format",
       "Select the pixel format to request from the runtime and convert to from the internal 16bpp format."
-      " Changes take affect at core start.",
+      " Changes take effect at core start.",
       {
         { "RGB565",   NULL },
         { "XRGB8888", NULL }
       },
-      "RGB565"
+      "XRGB8888"
     },
     {
       "opera_vdlp_bypass_clut",

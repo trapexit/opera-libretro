@@ -1805,7 +1805,7 @@ _parse_args(int    argc_,
   g_run.log_fd       = -1;
   g_run.tty_fd       = -1;
   g_run.tty_flags    = -1;
-  g_run.pixel_format = RETRO_PIXEL_FORMAT_RGB565;
+  g_run.pixel_format = RETRO_PIXEL_FORMAT_XRGB8888;
   g_run.terminal_render_mode = -1;
   g_run.terminal_color_mode = -1;
   g_run.terminal_kitty_probe_result = "not_run";
@@ -2816,7 +2816,7 @@ _terminal_set_pixel_reader(enum retro_pixel_format fmt_)
   switch(fmt_)
     {
     case RETRO_PIXEL_FORMAT_XRGB8888:
-      g_run.terminal_read_pixel = _terminal_read_pixel_rgb565;
+      g_run.terminal_read_pixel = _terminal_read_pixel_xrgb8888;
       break;
     case RETRO_PIXEL_FORMAT_RGB565:
       g_run.terminal_read_pixel = _terminal_read_pixel_rgb565;
@@ -8652,8 +8652,8 @@ main(int    argc_,
   g_run.saved_stdout = -1;
   g_run.saved_stderr = -1;
   g_run.log_fd = -1;
-  g_run.pixel_format = RETRO_PIXEL_FORMAT_RGB565;
-  g_run.last_pixel_format = RETRO_PIXEL_FORMAT_RGB565;
+  g_run.pixel_format = RETRO_PIXEL_FORMAT_XRGB8888;
+  g_run.last_pixel_format = RETRO_PIXEL_FORMAT_XRGB8888;
 
   _install_signal_handlers();
   _validate_arg_followers(argc_, argv_);
