@@ -476,11 +476,6 @@ opera_lr_opts_get_vdlp_pixel_format(opera_lr_opts_t *opts_)
       opts_->vdlp_pixel_format = VDLP_PIXEL_FORMAT_RGB565;
       opts_->video_pitch_shift = 1;
     }
-  else if(!strcmp(val,"0RGB1555"))
-    {
-      opts_->vdlp_pixel_format = VDLP_PIXEL_FORMAT_0RGB1555;
-      opts_->video_pitch_shift = 1;
-    }
 }
 
 static

@@ -79,7 +79,6 @@
 #define HARNESS_TERMINAL_KITTY_MAX_HEIGHT 1080U
 #define HARNESS_TERMINAL_SIXEL_COLORS 256U
 #define HARNESS_TERMINAL_SIXEL_RGB565_LUT_SIZE 65536U
-#define HARNESS_TERMINAL_SIXEL_0RGB1555_LUT_SIZE 32768U
 #define HARNESS_TERMINAL_SIXEL_SPARSE_MIN_WIDTH 256U
 /* _terminal_rgb_to_256() emits xterm cube/gray indices 16 through 255. */
 #define HARNESS_TERMINAL_SIXEL_SPARSE_MIN_COLORS 240U
@@ -491,11 +490,8 @@ static uint8_t g_terminal_rgb256_gray_low_index[256];
 static uint8_t g_terminal_rgb256_gray_high_value[256];
 static uint8_t g_terminal_rgb256_gray_high_index[256];
 static bool g_terminal_sixel_rgb565_lut_ready;
-static bool g_terminal_sixel_0rgb1555_lut_ready;
 static uint8_t
 g_terminal_sixel_rgb565_lut[HARNESS_TERMINAL_SIXEL_RGB565_LUT_SIZE];
-static uint8_t
-g_terminal_sixel_0rgb1555_lut[HARNESS_TERMINAL_SIXEL_0RGB1555_LUT_SIZE];
 
 RETRO_CALLCONV
 static
@@ -1809,7 +1805,7 @@ _parse_args(int    argc_,
   g_run.log_fd       = -1;
   g_run.tty_fd       = -1;
   g_run.tty_flags    = -1;
-  g_run.pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+  g_run.pixel_format = RETRO_PIXEL_FORMAT_RGB565;
   g_run.terminal_render_mode = -1;
   g_run.terminal_color_mode = -1;
   g_run.terminal_kitty_probe_result = "not_run";
@@ -2741,8 +2737,7 @@ _harness_environment(unsigned cmd_,
       {
         enum retro_pixel_format fmt = *(const enum retro_pixel_format *)data_;
 
-        if((fmt != RETRO_PIXEL_FORMAT_0RGB1555) &&
-           (fmt != RETRO_PIXEL_FORMAT_XRGB8888) &&
+        if((fmt != RETRO_PIXEL_FORMAT_XRGB8888) &&
            (fmt != RETRO_PIXEL_FORMAT_RGB565))
           return false;
 
@@ -2785,23 +2780,6 @@ _scale_6_to_8(uint32_t v_)
 
 static
 uint32_t
-_terminal_read_pixel_0rgb1555(const void *data_,
-                              size_t      pitch_,
-                              unsigned    x_,
-                              unsigned    y_)
-{
-  const uint8_t *row = (const uint8_t *)data_ + (pitch_ * y_);
-  uint16_t p = ((const uint16_t *)row)[x_];
-  uint32_t r = _scale_5_to_8((p >> 10) & 0x1f);
-  uint32_t g = _scale_5_to_8((p >> 5) & 0x1f);
-  uint32_t b = _scale_5_to_8(p & 0x1f);
-
-  return (r << 16U) | (g << 8U) | b;
-}
-
-
-static
-uint32_t
 _terminal_read_pixel_xrgb8888(const void *data_,
                               size_t      pitch_,
                               unsigned    x_,
@@ -2838,14 +2816,13 @@ _terminal_set_pixel_reader(enum retro_pixel_format fmt_)
   switch(fmt_)
     {
     case RETRO_PIXEL_FORMAT_XRGB8888:
-      g_run.terminal_read_pixel = _terminal_read_pixel_xrgb8888;
+      g_run.terminal_read_pixel = _terminal_read_pixel_rgb565;
       break;
     case RETRO_PIXEL_FORMAT_RGB565:
       g_run.terminal_read_pixel = _terminal_read_pixel_rgb565;
       break;
-    case RETRO_PIXEL_FORMAT_0RGB1555:
     default:
-      g_run.terminal_read_pixel = _terminal_read_pixel_0rgb1555;
+      g_run.terminal_read_pixel = _terminal_read_pixel_xrgb8888;
       break;
     }
 }
@@ -2858,8 +2835,6 @@ _pixel_format_name(enum retro_pixel_format fmt_)
 {
   switch(fmt_)
     {
-    case RETRO_PIXEL_FORMAT_0RGB1555:
-      return "0RGB1555";
     case RETRO_PIXEL_FORMAT_XRGB8888:
       return "XRGB8888";
     case RETRO_PIXEL_FORMAT_RGB565:
@@ -2933,17 +2908,8 @@ _pack_frame_rgb_into(const void             *data_,
               out[x * 3U + 2U] = _scale_5_to_8(p & 0x1fU);
             }
           break;
-        case RETRO_PIXEL_FORMAT_0RGB1555:
         default:
-          for(x = 0; x < width_; x++)
-            {
-              uint16_t p = ((const uint16_t *)row)[x];
-
-              out[x * 3U + 0U] = _scale_5_to_8((p >> 10U) & 0x1fU);
-              out[x * 3U + 1U] = _scale_5_to_8((p >> 5U) & 0x1fU);
-              out[x * 3U + 2U] = _scale_5_to_8(p & 0x1fU);
-            }
-          break;
+          return false;
         }
     }
 
@@ -3051,8 +3017,7 @@ _pixel_size(enum retro_pixel_format fmt_)
   switch(fmt_)
     {
     case RETRO_PIXEL_FORMAT_XRGB8888: return 4;
-    case RETRO_PIXEL_FORMAT_RGB565:
-    case RETRO_PIXEL_FORMAT_0RGB1555: return 2;
+    case RETRO_PIXEL_FORMAT_RGB565:   return 2;
     default:                          return 0;
   }
 }
@@ -4898,30 +4863,6 @@ _terminal_sixel_init_rgb565_lut(void)
 
 static
 void
-_terminal_sixel_init_0rgb1555_lut(void)
-{
-  unsigned p;
-
-  if(g_terminal_sixel_0rgb1555_lut_ready)
-    return;
-
-  _terminal_rgb256_init_tables();
-  for(p = 0; p < HARNESS_TERMINAL_SIXEL_0RGB1555_LUT_SIZE; p++)
-    {
-      uint32_t rgb =
-        ((uint32_t)_scale_5_to_8((p >> 10U) & 0x1fU) << 16U) |
-        ((uint32_t)_scale_5_to_8((p >> 5U) & 0x1fU) << 8U) |
-        _scale_5_to_8(p & 0x1fU);
-
-      g_terminal_sixel_0rgb1555_lut[p] = _terminal_rgb_to_256(rgb);
-    }
-
-  g_terminal_sixel_0rgb1555_lut_ready = true;
-}
-
-
-static
-void
 _terminal_store_color(uint32_t  rgb_,
                       uint8_t  *r_,
                       uint8_t  *g_,
@@ -6229,29 +6170,8 @@ _terminal_sixel_quantize_mapped(const void *data_,
             }
         }
       break;
-    case RETRO_PIXEL_FORMAT_0RGB1555:
     default:
-      _terminal_sixel_init_0rgb1555_lut();
-      for(y = 0; y < out_height_; y++)
-        {
-          const uint8_t *src_row = (const uint8_t *)data_ +
-            (pitch_ * (size_t)g_run.terminal_sixel_src_y[y]);
-          uint8_t *dst_row = indices_ + ((size_t)y * (size_t)out_width_);
-          unsigned x;
-
-          for(x = 0; x < out_width_; x++)
-            {
-              uint16_t p;
-              uint8_t index;
-
-              p = ((const uint16_t *)src_row)
-                [g_run.terminal_sixel_src_x[x]];
-              index = g_terminal_sixel_0rgb1555_lut[p & 0x7fffU];
-              dst_row[x] = index;
-              used_xterm_[index] = true;
-            }
-        }
-      break;
+      return;
     }
 }
 
@@ -8732,8 +8652,8 @@ main(int    argc_,
   g_run.saved_stdout = -1;
   g_run.saved_stderr = -1;
   g_run.log_fd = -1;
-  g_run.pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
-  g_run.last_pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+  g_run.pixel_format = RETRO_PIXEL_FORMAT_RGB565;
+  g_run.last_pixel_format = RETRO_PIXEL_FORMAT_RGB565;
 
   _install_signal_handlers();
   _validate_arg_followers(argc_, argv_);

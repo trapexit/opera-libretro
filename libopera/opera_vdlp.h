@@ -15,7 +15,6 @@
 
 enum vdlp_pixel_format_e
   {
-    VDLP_PIXEL_FORMAT_0RGB1555,
     VDLP_PIXEL_FORMAT_XRGB8888,
     VDLP_PIXEL_FORMAT_RGB565
   };

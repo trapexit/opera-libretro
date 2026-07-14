@@ -160,7 +160,6 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       NULL,
       "video",
       {
-        { "0RGB1555", NULL },
         { "RGB565",   NULL },
         { "XRGB8888", NULL }
       },
@@ -438,7 +437,6 @@ static struct retro_core_option_definition option_defs_us[] =
       "Select the pixel format to request from the runtime and convert to from the internal 16bpp format."
       " Changes take affect at core start.",
       {
-        { "0RGB1555", NULL },
         { "RGB565",   NULL },
         { "XRGB8888", NULL }
       },
@@ -832,7 +830,7 @@ libretro_set_core_options(void)
           core_options_intl.local = NULL;
 
           if(retro_environment_cb(RETRO_ENVIRONMENT_GET_LANGUAGE, &language) &&
-              (language < RETRO_LANGUAGE_LAST) && (language != RETRO_LANGUAGE_ENGLISH))
+             (language < RETRO_LANGUAGE_LAST) && (language != RETRO_LANGUAGE_ENGLISH))
             core_options_intl.local = option_defs_intl_v2[language];
 
           retro_environment_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL, &core_options_intl);
@@ -847,7 +845,7 @@ libretro_set_core_options(void)
           core_options_intl.local = NULL;
 
           if(retro_environment_cb(RETRO_ENVIRONMENT_GET_LANGUAGE, &language) &&
-              (language < RETRO_LANGUAGE_LAST) && (language != RETRO_LANGUAGE_ENGLISH))
+             (language < RETRO_LANGUAGE_LAST) && (language != RETRO_LANGUAGE_ENGLISH))
             core_options_intl.local = option_defs_intl[language];
 
           retro_environment_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_INTL, &core_options_intl);
