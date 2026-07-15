@@ -140,13 +140,13 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       "opera_region",
       "Region / Mode",
       NULL,
-      "Select the resolution and field rate. NOTE: some EU games require a EU ROM.",
+      "Select the emulated region and field rate. Output is integer-doubled to the listed resolution. NOTE: some EU games require a EU ROM.",
       NULL,
       "system",
       {
-        { "ntsc", "NTSC 320x240@60" },
-        { "pal1", "PAL1 320x288@50" },
-        { "pal2", "PAL2 384x288@50" },
+        { "ntsc", "NTSC 640x480@60" },
+        { "pal1", "PAL1 640x576@50" },
+        { "pal2", "PAL2 768x576@50" },
         { NULL, NULL }
       },
       "ntsc"
@@ -183,7 +183,7 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       "opera_high_resolution",
       "HiRes CEL Rendering",
       NULL,
-      "Enabling this option causes CELs to be rendered at 2x the resolution into a 2x output framebuffer, increasing the fidelity of 3D models. Will not affect 2D games. Has a significant performance impact.",
+      "Replace integer-duplicated native pixels with four high-resolution CEL samples where available, increasing the fidelity of 3D models. Will not affect 2D games. Has a significant performance impact.",
       NULL,
       "video",
       {
@@ -422,11 +422,11 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_region",
       "Region / Mode",
-      "Select the resolution and field rate. NOTE: some EU games require a EU ROM.",
+      "Select the emulated region and field rate. Output is integer-doubled to the listed resolution. NOTE: some EU games require a EU ROM.",
       {
-        { "ntsc", "NTSC 320x240@60" },
-        { "pal1", "PAL1 320x288@50" },
-        { "pal2", "PAL2 384x288@50" },
+        { "ntsc", "NTSC 640x480@60" },
+        { "pal1", "PAL1 640x576@50" },
+        { "pal2", "PAL2 768x576@50" },
         { NULL, NULL }
       },
       "ntsc"
@@ -456,7 +456,7 @@ static struct retro_core_option_definition option_defs_us[] =
     {
       "opera_high_resolution",
       "HiRes CEL Rendering",
-      "Enabling this option causes CELs to be rendered at 2x the resolution into a 2x output framebuffer, increasing the fidelity of 3D models. Will not affect 2D games. Has a significant performance impact.",
+      "Replace integer-duplicated native pixels with four high-resolution CEL samples where available, increasing the fidelity of 3D models. Will not affect 2D games. Has a significant performance impact.",
       {
         { "disabled", NULL },
         { "enabled",  NULL },

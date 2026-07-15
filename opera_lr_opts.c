@@ -397,8 +397,8 @@ opera_lr_opts_set_region(opera_lr_opts_t const *opts_)
     }
 
   g_OPTS.region       = opts_->region;
-  g_OPTS.video_width  = (opera_region_width()  << g_OPTS.high_resolution);
-  g_OPTS.video_height = (opera_region_height() << g_OPTS.high_resolution);
+  g_OPTS.video_width  = (opera_region_width()  << OPERA_LR_VIDEO_SCALE_SHIFT);
+  g_OPTS.video_height = (opera_region_height() << OPERA_LR_VIDEO_SCALE_SHIFT);
 }
 
 static
@@ -530,8 +530,8 @@ opera_lr_opts_set_high_resolution(opera_lr_opts_t const *opts_)
 
   HIRESMODE = g_OPTS.high_resolution;
 
-  g_OPTS.video_width  = (opera_region_width()  << g_OPTS.high_resolution);
-  g_OPTS.video_height = (opera_region_height() << g_OPTS.high_resolution);
+  g_OPTS.video_width  = (opera_region_width()  << OPERA_LR_VIDEO_SCALE_SHIFT);
+  g_OPTS.video_height = (opera_region_height() << OPERA_LR_VIDEO_SCALE_SHIFT);
 }
 
 static
@@ -717,9 +717,6 @@ opera_lr_opts_changes(opera_lr_opts_t const *opts_)
     changes |= (OPERA_LR_OPTS_CHANGE_REGION |
                 OPERA_LR_OPTS_CHANGE_TIMING |
                 OPERA_LR_OPTS_CHANGE_GEOMETRY);
-
-  if(opts_->high_resolution != g_OPTS.high_resolution)
-    changes |= OPERA_LR_OPTS_CHANGE_GEOMETRY;
 
   return changes;
 }

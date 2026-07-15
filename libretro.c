@@ -511,8 +511,8 @@ static
 void
 get_system_geometry(struct retro_game_geometry *geometry_)
 {
-  geometry_->base_width   = (opera_region_width()  << g_OPTS.high_resolution);
-  geometry_->base_height  = (opera_region_height() << g_OPTS.high_resolution);
+  geometry_->base_width   = (opera_region_width()  << OPERA_LR_VIDEO_SCALE_SHIFT);
+  geometry_->base_height  = (opera_region_height() << OPERA_LR_VIDEO_SCALE_SHIFT);
   geometry_->max_width    = (opera_region_max_width()  * 2);
   geometry_->max_height   = (opera_region_max_height() * 2);
   geometry_->aspect_ratio = 4.0 / 3.0;

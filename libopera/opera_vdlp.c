@@ -193,22 +193,6 @@ vdlp_process_vdl_entry(void)
 
 static
 void
-vdlp_render_line_black(const uint32_t width_,
-                       const uint32_t bytes_per_pixel_)
-{
-  uint8_t *dst;
-  uint32_t len;
-
-  dst = g_CURBUF;
-  len = (width_ * bytes_per_pixel_);
-
-  memset(dst,0,len);
-
-  g_CURBUF = (dst + len);
-}
-
-static
-void
 vdlp_render_line_black_hires(const uint32_t width_,
                              const uint32_t bytes_per_pixel_)
 {
@@ -221,6 +205,22 @@ vdlp_render_line_black_hires(const uint32_t width_,
   memset(dst,0,len);
 
   g_CURBUF = (dst + len);
+}
+
+static
+INLINE
+uint32_t
+duplicate_pixel_16(const uint16_t pixel_)
+{
+  return ((uint32_t)pixel_ | ((uint32_t)pixel_ << 16));
+}
+
+static
+INLINE
+uint64_t
+duplicate_pixel_32(const uint32_t pixel_)
+{
+  return ((uint64_t)pixel_ | ((uint64_t)pixel_ << 32));
 }
 
 static
@@ -282,31 +282,45 @@ vdlp_render_line_RGB565(void)
 {
   int x;
   int width;
+  uint16_t pixel;
+  uint32_t pair;
   uint32_t *src;
-  uint16_t *dst;
+  uint32_t *dst0;
+  uint32_t *dst1;
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   if(!bitmap_dma_enabled())
     {
-      vdlp_render_line_black(width,sizeof(uint16_t));
+      vdlp_render_line_black_hires(width,sizeof(uint16_t));
       return;
     }
 
-  dst = g_CURBUF;
+  dst0 = g_CURBUF;
+  dst1 = &dst0[width];
   src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
-        dst[x] = vdlp_render_pixel_RGB565(*(uint16_t*)&src[x]);
+        {
+          pixel = vdlp_render_pixel_RGB565(*(uint16_t*)&src[x]);
+          pair = duplicate_pixel_16(pixel);
+          *dst0++ = pair;
+          *dst1++ = pair;
+        }
     }
   else
     {
       for(x = 0; x < width; x++)
-        dst[x] = vdlp_render_pixel_RGB565_bypass_clut(*(uint16_t*)&src[x]);
+        {
+          pixel = vdlp_render_pixel_RGB565_bypass_clut(*(uint16_t*)&src[x]);
+          pair = duplicate_pixel_16(pixel);
+          *dst0++ = pair;
+          *dst1++ = pair;
+        }
     }
 
-  g_CURBUF = &dst[width];
+  g_CURBUF = dst1;
 }
 
 static
@@ -315,23 +329,32 @@ vdlp_render_line_RGB565_bypass_clut(void)
 {
   int x;
   int width;
+  uint16_t pixel;
+  uint32_t pair;
   uint32_t *src;
-  uint16_t *dst;
+  uint32_t *dst0;
+  uint32_t *dst1;
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   if(!bitmap_dma_enabled())
     {
-      vdlp_render_line_black(width,sizeof(uint16_t));
+      vdlp_render_line_black_hires(width,sizeof(uint16_t));
       return;
     }
 
-  dst = g_CURBUF;
+  dst0 = g_CURBUF;
+  dst1 = &dst0[width];
   src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   for(x = 0; x < width; x++)
-    dst[x] = fixed_clut_to_RGB565(*(uint16_t*)&src[x]);
+    {
+      pixel = fixed_clut_to_RGB565(*(uint16_t*)&src[x]);
+      pair = duplicate_pixel_16(pixel);
+      *dst0++ = pair;
+      *dst1++ = pair;
+    }
 
-  g_CURBUF = &dst[width];
+  g_CURBUF = dst1;
 }
 
 static
@@ -474,31 +497,45 @@ vdlp_render_line_XRGB8888(void)
 {
   int x;
   int width;
+  uint32_t pixel;
+  uint64_t pair;
   uint32_t *src;
-  uint32_t *dst;
+  uint64_t *dst0;
+  uint64_t *dst1;
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   if(!bitmap_dma_enabled())
     {
-      vdlp_render_line_black(width,sizeof(uint32_t));
+      vdlp_render_line_black_hires(width,sizeof(uint32_t));
       return;
     }
 
-  dst = g_CURBUF;
+  dst0 = g_CURBUF;
+  dst1 = &dst0[width];
   src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
     {
       for(x = 0; x < width; x++)
-        dst[x] = vdlp_render_pixel_XRGB8888(*(uint16_t*)&src[x]);
+        {
+          pixel = vdlp_render_pixel_XRGB8888(*(uint16_t*)&src[x]);
+          pair = duplicate_pixel_32(pixel);
+          *dst0++ = pair;
+          *dst1++ = pair;
+        }
     }
   else
     {
       for(x = 0; x < width; x++)
-        dst[x] = vdlp_render_pixel_XRGB8888_bypass_clut(*(uint16_t*)&src[x]);
+        {
+          pixel = vdlp_render_pixel_XRGB8888_bypass_clut(*(uint16_t*)&src[x]);
+          pair = duplicate_pixel_32(pixel);
+          *dst0++ = pair;
+          *dst1++ = pair;
+        }
     }
 
-  g_CURBUF = &dst[width];
+  g_CURBUF = dst1;
 }
 
 static
@@ -507,23 +544,32 @@ vdlp_render_line_XRGB8888_bypass_clut(void)
 {
   int x;
   int width;
+  uint32_t pixel;
+  uint64_t pair;
   uint32_t *src;
-  uint32_t *dst;
+  uint64_t *dst0;
+  uint64_t *dst1;
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   if(!bitmap_dma_enabled())
     {
-      vdlp_render_line_black(width,sizeof(uint32_t));
+      vdlp_render_line_black_hires(width,sizeof(uint32_t));
       return;
     }
 
-  dst = g_CURBUF;
+  dst0 = g_CURBUF;
+  dst1 = &dst0[width];
   src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
   for(x = 0; x < width; x++)
-    dst[x] = fixed_clut_to_XRGB8888(*(uint16_t*)&src[x]);
+    {
+      pixel = fixed_clut_to_XRGB8888(*(uint16_t*)&src[x]);
+      pair = duplicate_pixel_32(pixel);
+      *dst0++ = pair;
+      *dst1++ = pair;
+    }
 
-  g_CURBUF = &dst[width];
+  g_CURBUF = dst1;
 }
 
 static
