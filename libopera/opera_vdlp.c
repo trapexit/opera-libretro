@@ -20,7 +20,7 @@
 
 /*
   VDLP options TODO
-  - interpolation
+  - full cornerweight interpolation
   - add pseudo random 3bit pattern for second clut bypass mode
 */
 
@@ -32,6 +32,21 @@ static void                *g_CURBUF       = NULL;
 static vdlp_renderer_t      g_RENDERER     = NULL;
 static uint32_t             g_FLAGS        = VDLP_FLAG_NONE;
 static vdlp_pixel_format_e  g_PIXEL_FORMAT = VDLP_PIXEL_FORMAT_RGB565;
+
+/*
+  Derived custom-CLUT cache; it is not part of emulated or saved
+  state.
+*/
+static uint32_t g_CLUT_RG[CLUT_LEN * CLUT_LEN];
+static uint32_t g_CLUT_B[CLUT_LEN];
+static uint8_t  g_PACKED_CLUT_R[CLUT_LEN];
+static uint8_t  g_PACKED_CLUT_G[CLUT_LEN];
+static uint8_t  g_PACKED_CLUT_B[CLUT_LEN];
+static bool     g_PACKED_CLUT_VALID               = false;
+static bool     g_PACKED_CLUT_DEFERRED            = false;
+static uint32_t g_CLUT_GENERATION                 = 0;
+static uint32_t g_PACKED_CLUT_GENERATION          = 0;
+static uint32_t g_PACKED_CLUT_DEFERRED_GENERATION = 0;
 
 static const uint32_t PIXELS_PER_LINE_MODULO[8] =
   {320, 384, 512, 640, 1024, 320, 320, 320};
@@ -57,12 +72,13 @@ INLINE
 bool
 bitmap_dma_enabled(void)
 {
-  return (madam_video_dma_enabled() && g_VDLP.clut_ctrl.cdcw.enable_dma);
+  return (madam_video_dma_enabled() &&
+          g_VDLP.clut_ctrl.cdcw.enable_dma);
 }
 
 /*
-  TODO: why the "& VRAM_SIZE_MASK"?
-  The addresses shouldn't be outside the RAM space but are at times.
+  TODO: why the "& VRAM_SIZE_MASK"?  The addresses shouldn't be
+  outside the RAM space but are at times.
 */
 static
 INLINE
@@ -186,6 +202,9 @@ vdlp_process_vdl_entry(void)
   g_VDLP.curr_vdl += (4 * sizeof(uint32_t));
 
   vdlp_process_optional_cmds(cdcw->ctrl_word_cnt);
+  /* Only interpolated custom-CLUT rendering consumes the derived cache. */
+  if(cdcw->vertical_mode && g_VDLP.disp_ctrl.dcw.vi_on)
+    g_CLUT_GENERATION++;
 
   g_VDLP.curr_vdl = next_entry;
   g_VDLP.line_cnt = cdcw->persist_len;
@@ -222,6 +241,56 @@ duplicate_pixel_32(const uint32_t pixel_)
 {
   return ((uint64_t)pixel_ | ((uint64_t)pixel_ << 32));
 }
+
+INLINE
+uint32_t
+vdlp_next_bitmap_line(const uint32_t fba_)
+{
+  uint32_t modulo;
+
+  modulo = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+
+  return (fba_ + ((fba_ & 2) ? ((modulo << 2) - 2) : 2));
+}
+
+static
+INLINE
+bool
+vdlp_vertical_interpolation_enabled(const bool fixed_clut_)
+{
+  if(!g_VDLP.clut_ctrl.cdcw.vertical_mode ||
+     g_VDLP.disp_ctrl.dcw.vi_off_1_line)
+    return false;
+
+  return (fixed_clut_ ? g_VDLP.disp_ctrl.dcw.window_vi_on :
+          g_VDLP.disp_ctrl.dcw.vi_on);
+}
+
+static
+INLINE
+bool
+vdlp_pixel_uses_fixed_clut(const uint16_t pixel_)
+{
+  return (g_VDLP.disp_ctrl.dcw.clut_bypass && (pixel_ & 0x8000));
+}
+
+static
+INLINE
+uint32_t
+average_XRGB8888(const uint32_t a_,
+                 const uint32_t b_)
+{
+  return ((a_ & b_) + (((a_ ^ b_) & 0x00FEFEFE) >> 1));
+}
+
+static
+void
+vdlp_render_line_vertical(const vdlp_pixel_format_e pixel_format_,
+                          const bool                force_fixed_clut_);
+
+static
+void
+vdlp_render_line_vertical_RGB565_custom(void);
 
 static
 INLINE
@@ -296,6 +365,15 @@ vdlp_render_line_RGB565(void)
       return;
     }
 
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      if(!g_VDLP.disp_ctrl.dcw.clut_bypass)
+        vdlp_render_line_vertical_RGB565_custom();
+      else
+        vdlp_render_line_vertical(VDLP_PIXEL_FORMAT_RGB565,false);
+      return;
+    }
+
   dst0 = g_CURBUF;
   dst1 = &dst0[width];
   src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
@@ -343,6 +421,12 @@ vdlp_render_line_RGB565_bypass_clut(void)
       return;
     }
 
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      vdlp_render_line_vertical(VDLP_PIXEL_FORMAT_RGB565,true);
+      return;
+    }
+
   dst0 = g_CURBUF;
   dst1 = &dst0[width];
   src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
@@ -369,6 +453,12 @@ vdlp_render_line_RGB565_hires(void)
   uint32_t *src1;
   uint32_t *src2;
   uint32_t *src3;
+
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      vdlp_render_line_RGB565();
+      return;
+    }
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -420,6 +510,12 @@ vdlp_render_line_RGB565_hires_bypass_clut(void)
   uint32_t *src1;
   uint32_t *src2;
   uint32_t *src3;
+
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      vdlp_render_line_RGB565_bypass_clut();
+      return;
+    }
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -492,6 +588,295 @@ vdlp_render_pixel_XRGB8888_bypass_clut(const uint16_t p_)
 }
 
 static
+INLINE
+uint32_t
+vdlp_decode_pixel_XRGB8888(const uint16_t pixel_,
+                           const bool     force_fixed_clut_)
+{
+  if(force_fixed_clut_)
+    return fixed_clut_to_XRGB8888(pixel_);
+
+  if(g_VDLP.disp_ctrl.dcw.clut_bypass)
+    return vdlp_render_pixel_XRGB8888_bypass_clut(pixel_);
+
+  return vdlp_render_pixel_XRGB8888(pixel_);
+}
+
+static
+bool
+vdlp_prepare_packed_custom_lut(void)
+{
+  uint32_t r;
+  uint32_t g;
+
+  if(g_PACKED_CLUT_VALID)
+    {
+      if(g_PACKED_CLUT_GENERATION == g_CLUT_GENERATION)
+        return true;
+
+      if(!memcmp(g_PACKED_CLUT_R,g_VDLP.clut_r,CLUT_LEN) &&
+         !memcmp(g_PACKED_CLUT_G,g_VDLP.clut_g,CLUT_LEN) &&
+         !memcmp(g_PACKED_CLUT_B,g_VDLP.clut_b,CLUT_LEN))
+        {
+          g_PACKED_CLUT_GENERATION = g_CLUT_GENERATION;
+          g_PACKED_CLUT_DEFERRED = false;
+          return true;
+        }
+
+      /* Avoid rebuilding every line when a VDL animates its custom CLUT. */
+      if(!g_PACKED_CLUT_DEFERRED ||
+         (g_PACKED_CLUT_DEFERRED_GENERATION != g_CLUT_GENERATION))
+        {
+          g_PACKED_CLUT_DEFERRED = true;
+          g_PACKED_CLUT_DEFERRED_GENERATION = g_CLUT_GENERATION;
+          return false;
+        }
+    }
+
+  for(r = 0; r < CLUT_LEN; r++)
+    for(g = 0; g < CLUT_LEN; g++)
+      g_CLUT_RG[(r << 5) | g] =
+        ((g_VDLP.clut_r[r] << 16) | (g_VDLP.clut_g[g] << 8));
+
+  for(g = 0; g < CLUT_LEN; g++)
+    g_CLUT_B[g] = g_VDLP.clut_b[g];
+
+  memcpy(g_PACKED_CLUT_R,g_VDLP.clut_r,CLUT_LEN);
+  memcpy(g_PACKED_CLUT_G,g_VDLP.clut_g,CLUT_LEN);
+  memcpy(g_PACKED_CLUT_B,g_VDLP.clut_b,CLUT_LEN);
+  g_PACKED_CLUT_VALID = true;
+  g_PACKED_CLUT_DEFERRED = false;
+  g_PACKED_CLUT_GENERATION = g_CLUT_GENERATION;
+
+  return true;
+}
+
+/* Decode two custom-CLUT pixels with two packed lookups each. */
+static
+INLINE
+uint32_t
+vdlp_average_custom_XRGB8888(const uint16_t a_,
+                             const uint16_t b_)
+{
+  uint32_t a;
+  uint32_t b;
+
+  if((a_ == 0) || (b_ == 0))
+    return average_XRGB8888(vdlp_render_pixel_XRGB8888(a_),
+                            vdlp_render_pixel_XRGB8888(b_));
+
+  a = (g_CLUT_RG[(a_ >> 5) & 0x3FF] | g_CLUT_B[a_ & 0x1F]);
+  b = (g_CLUT_RG[(b_ >> 5) & 0x3FF] | g_CLUT_B[b_ & 0x1F]);
+
+  return average_XRGB8888(a,b);
+}
+
+/* Render the two custom-CLUT source rows without unused interpolation work. */
+static
+void
+vdlp_render_line_vertical_XRGB8888_custom_rows(void)
+{
+  int x;
+  int width;
+  uint32_t pixel;
+  uint32_t pixel_other;
+  uint32_t const *src;
+  uint32_t const *next;
+  uint64_t *dst0;
+  uint64_t *dst1;
+
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+  src = (uint32_t const *)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  next = (uint32_t const *)&VRAM[(vdlp_next_bitmap_line(g_VDLP.curr_bmp) ^ 2) &
+                                 VRAM_SIZE_MASK];
+  dst0 = g_CURBUF;
+  dst1 = &dst0[width];
+
+  for(x = 0; x < width; x++)
+    {
+      pixel = vdlp_render_pixel_XRGB8888(*(uint16_t*)&src[x]);
+      pixel_other = vdlp_render_pixel_XRGB8888(*(uint16_t*)&next[x]);
+      *dst0++ = duplicate_pixel_32(pixel);
+      *dst1++ = duplicate_pixel_32(pixel_other);
+    }
+
+  g_CURBUF = dst1;
+}
+
+static
+INLINE
+uint16_t
+xrgb8888_to_RGB565(const uint32_t pixel_)
+{
+  return ((((pixel_ >> 19) & 0x1F) << 11) |
+          (((pixel_ >> 10) & 0x3F) <<  5) |
+          (((pixel_ >>  3) & 0x1F) <<  0));
+}
+
+/* Keep invariant custom-CLUT, interpolation, and 16-bit format branches out of
+   the per-pixel loops. */
+static
+void
+vdlp_render_line_vertical_RGB565_custom(void)
+{
+  int x;
+  int width;
+  uint16_t pixel;
+  uint32_t color;
+  uint32_t pair;
+  uint32_t const *src;
+  uint32_t const *other;
+  uint32_t *dst0;
+  uint32_t *dst1;
+
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+  src = (uint32_t const *)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  dst0 = g_CURBUF;
+  dst1 = &dst0[width];
+
+  if(vdlp_vertical_interpolation_enabled(false))
+    {
+      if(!vdlp_prepare_packed_custom_lut())
+        {
+          vdlp_render_line_vertical(VDLP_PIXEL_FORMAT_RGB565,false);
+          return;
+        }
+      other = (uint32_t const *)&VRAM[(g_VDLP.prev_bmp ^ 2) & VRAM_SIZE_MASK];
+      for(x = 0; x < width; x++)
+        {
+          color = vdlp_average_custom_XRGB8888(*(uint16_t*)&src[x],
+                                               *(uint16_t*)&other[x]);
+          pixel = xrgb8888_to_RGB565(color);
+          pair = duplicate_pixel_16(pixel);
+          *dst0++ = pair;
+          *dst1++ = pair;
+        }
+    }
+  else
+    {
+      other = (uint32_t const *)&VRAM[
+        (vdlp_next_bitmap_line(g_VDLP.curr_bmp) ^ 2) & VRAM_SIZE_MASK];
+      for(x = 0; x < width; x++)
+        {
+          *dst0++ = duplicate_pixel_16(
+            vdlp_render_pixel_RGB565(*(uint16_t*)&src[x]));
+          *dst1++ = duplicate_pixel_16(
+            vdlp_render_pixel_RGB565(*(uint16_t*)&other[x]));
+        }
+    }
+
+  g_CURBUF = dst1;
+}
+
+/*
+  In 480-line mode each field line consumes two bitmap rows. With vertical
+  interpolation enabled, the display generator averages the current and
+  previous rows; pseudo-24-bit images use this to reconstruct each original
+  8-bit color component. Without interpolation, expose both rows in the
+  progressive output so all 480 source lines remain visible.
+*/
+static
+void
+vdlp_render_line_vertical(const vdlp_pixel_format_e pixel_format_,
+                          const bool                force_fixed_clut_)
+{
+  int x;
+  int width;
+  bool fixed_clut;
+  bool fixed_clut_other;
+  bool interpolate;
+  uint16_t raw;
+  uint16_t raw_other;
+  uint16_t pixel16;
+  uint16_t pixel16_other;
+  uint32_t pixel;
+  uint32_t pixel_other;
+  uint8_t *out;
+  uint32_t const *src;
+  uint32_t const *prev;
+  uint32_t const *next;
+  uint32_t *dst16_0;
+  uint32_t *dst16_1;
+  uint64_t *dst32_0;
+  uint64_t *dst32_1;
+
+  width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+  out = g_CURBUF;
+  src = (uint32_t const *)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
+  prev = (uint32_t const *)&VRAM[(g_VDLP.prev_bmp ^ 2) & VRAM_SIZE_MASK];
+  dst16_0 = (uint32_t*)out;
+  dst16_1 = &dst16_0[width];
+  dst32_0 = (uint64_t*)out;
+  dst32_1 = &dst32_0[width];
+
+  /* Hoist the invariant format, CLUT-path, and interpolation decisions. */
+  if((pixel_format_ == VDLP_PIXEL_FORMAT_XRGB8888) &&
+     !force_fixed_clut_ &&
+     !g_VDLP.disp_ctrl.dcw.clut_bypass &&
+     vdlp_vertical_interpolation_enabled(false) &&
+     vdlp_prepare_packed_custom_lut())
+    {
+      for(x = 0; x < width; x++)
+        {
+          raw = *(uint16_t*)&src[x];
+          raw_other = *(uint16_t*)&prev[x];
+          pixel = vdlp_average_custom_XRGB8888(raw,raw_other);
+          *dst32_0++ = duplicate_pixel_32(pixel);
+          *dst32_1++ = duplicate_pixel_32(pixel);
+        }
+
+      g_CURBUF = (out + (width << 4));
+      return;
+    }
+
+  next = (uint32_t const *)&VRAM[(vdlp_next_bitmap_line(g_VDLP.curr_bmp) ^ 2) &
+                                 VRAM_SIZE_MASK];
+  for(x = 0; x < width; x++)
+    {
+      raw = *(uint16_t*)&src[x];
+      raw_other = *(uint16_t*)&prev[x];
+      fixed_clut = (force_fixed_clut_ || vdlp_pixel_uses_fixed_clut(raw));
+      fixed_clut_other =
+        (force_fixed_clut_ || vdlp_pixel_uses_fixed_clut(raw_other));
+      interpolate =
+        (vdlp_vertical_interpolation_enabled(fixed_clut) ||
+         vdlp_vertical_interpolation_enabled(fixed_clut_other));
+      pixel = vdlp_decode_pixel_XRGB8888(raw,force_fixed_clut_);
+
+      if(interpolate)
+        {
+          pixel_other =
+            vdlp_decode_pixel_XRGB8888(raw_other,force_fixed_clut_);
+          pixel = average_XRGB8888(pixel,pixel_other);
+          pixel_other = pixel;
+        }
+      else
+        {
+          raw_other = *(uint16_t*)&next[x];
+          pixel_other =
+            vdlp_decode_pixel_XRGB8888(raw_other,force_fixed_clut_);
+        }
+
+      switch(pixel_format_)
+        {
+        case VDLP_PIXEL_FORMAT_RGB565:
+          pixel16 = xrgb8888_to_RGB565(pixel);
+          pixel16_other = xrgb8888_to_RGB565(pixel_other);
+          *dst16_0++ = duplicate_pixel_16(pixel16);
+          *dst16_1++ = duplicate_pixel_16(pixel16_other);
+          break;
+        case VDLP_PIXEL_FORMAT_XRGB8888:
+          *dst32_0++ = duplicate_pixel_32(pixel);
+          *dst32_1++ = duplicate_pixel_32(pixel_other);
+          break;
+        }
+    }
+
+  g_CURBUF = (out + (width << ((pixel_format_ == VDLP_PIXEL_FORMAT_XRGB8888) ?
+                               4 : 3)));
+}
+
+static
 void
 vdlp_render_line_XRGB8888(void)
 {
@@ -508,6 +893,16 @@ vdlp_render_line_XRGB8888(void)
   if(!bitmap_dma_enabled())
     {
       vdlp_render_line_black_hires(width,sizeof(uint32_t));
+      return;
+    }
+
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      if(!g_VDLP.disp_ctrl.dcw.clut_bypass &&
+         !vdlp_vertical_interpolation_enabled(false))
+        vdlp_render_line_vertical_XRGB8888_custom_rows();
+      else
+        vdlp_render_line_vertical(VDLP_PIXEL_FORMAT_XRGB8888,false);
       return;
     }
 
@@ -558,6 +953,12 @@ vdlp_render_line_XRGB8888_bypass_clut(void)
       return;
     }
 
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      vdlp_render_line_vertical(VDLP_PIXEL_FORMAT_XRGB8888,true);
+      return;
+    }
+
   dst0 = g_CURBUF;
   dst1 = &dst0[width];
   src = (uint32_t*)&VRAM[(g_VDLP.curr_bmp ^ 2) & VRAM_SIZE_MASK];
@@ -584,6 +985,12 @@ vdlp_render_line_XRGB8888_hires(void)
   uint32_t *src1;
   uint32_t *src2;
   uint32_t *src3;
+
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      vdlp_render_line_XRGB8888();
+      return;
+    }
 
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
@@ -636,6 +1043,12 @@ vdlp_render_line_XRGB8888_hires_bypass_clut(void)
   uint32_t *src2;
   uint32_t *src3;
 
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      vdlp_render_line_XRGB8888_bypass_clut();
+      return;
+    }
+
   width = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
 
   if(!bitmap_dma_enabled())
@@ -670,9 +1083,14 @@ tick_fba(const uint32_t fba_)
 {
   uint32_t modulo;
 
-  modulo = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+  if(g_VDLP.clut_ctrl.cdcw.vertical_mode)
+    {
+      /* Two bitmap-line increments collapse to one full modulo step. */
+      modulo = PIXELS_PER_LINE_MODULO[g_VDLP.clut_ctrl.cdcw.fba_incr_modulo];
+      return (fba_ + (modulo << 2));
+    }
 
-  return (fba_ + ((fba_ & 2) ? ((modulo << 2) - 2) : 2));
+  return vdlp_next_bitmap_line(fba_);
 }
 
 static
@@ -754,6 +1172,9 @@ opera_vdlp_init()
   pixel_format = g_PIXEL_FORMAT;
 
   memset(&g_VDLP,0,sizeof(g_VDLP));
+  g_PACKED_CLUT_VALID = false;
+  g_PACKED_CLUT_DEFERRED = false;
+  g_CLUT_GENERATION = 0;
   g_BUF          = buf;
   g_CURBUF       = buf;
   g_RENDERER     = renderer;
@@ -835,7 +1256,16 @@ uint32_t
 opera_vdlp_state_load_v1(const void     *buf_,
                          uint32_t const  size_)
 {
-  return opera_state_load_sized(&g_VDLP,"VDLP",buf_,size_,sizeof(g_VDLP));
+  uint32_t size;
+
+  size = opera_state_load_sized(&g_VDLP,"VDLP",buf_,size_,sizeof(g_VDLP));
+  if(size)
+    {
+      g_PACKED_CLUT_VALID = false;
+      g_PACKED_CLUT_DEFERRED = false;
+    }
+
+  return size;
 }
 
 static
@@ -872,6 +1302,8 @@ opera_vdlp_state_load(const void     *buf_,
     return 0;
 
   g_VDLP = state;
+  g_PACKED_CLUT_VALID = false;
+  g_PACKED_CLUT_DEFERRED = false;
 
   return opera_state_reader_used(&reader);
 }

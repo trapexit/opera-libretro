@@ -1,4 +1,5 @@
 #include "lr_input.h"
+#include "lr_input_crosshair.h"
 
 #include <stdint.h>
 
@@ -26,15 +27,49 @@ static const uint32_t COLORS[LR_INPUT_MAX_DEVICES] =
 static lr_crosshair_t CROSSHAIRS[LR_INPUT_MAX_DEVICES] = {{0,0,0}};
 
 static
+uint16_t
+lr_input_crosshair_color_RGB565(const uint32_t color_)
+{
+  uint16_t r;
+  uint16_t g;
+  uint16_t b;
+
+  r = ((color_ >> 16) & 0xFF);
+  g = ((color_ >>  8) & 0xFF);
+  b = ((color_ >>  0) & 0xFF);
+
+  return (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+}
+
+static
 void
-lr_input_crosshair_draw(const lr_crosshair_t *crosshair_,
-                        uint32_t             *buf_,
-                        const int32_t         width_,
-                        const int32_t         height_)
+lr_input_crosshair_draw_pixel(void                      *buf_,
+                              const size_t               pitch_,
+                              const int32_t              x_,
+                              const int32_t              y_,
+                              const uint32_t             color_,
+                              const vdlp_pixel_format_e  pixel_format_)
+{
+  uint8_t *row;
+
+  row = ((uint8_t*)buf_ + ((size_t)y_ * pitch_));
+  if(pixel_format_ == VDLP_PIXEL_FORMAT_XRGB8888)
+    ((uint32_t*)row)[x_] = color_;
+  else
+    ((uint16_t*)row)[x_] = lr_input_crosshair_color_RGB565(color_);
+}
+
+static
+void
+lr_input_crosshair_draw(const lr_crosshair_t      *crosshair_,
+                        void                      *buf_,
+                        const int32_t              width_,
+                        const int32_t              height_,
+                        const size_t               pitch_,
+                        const vdlp_pixel_format_e  pixel_format_)
 {
   int32_t x;
   int32_t y;
-  uint32_t *p;
 
   if((width_ <= 0) || (height_ <= 0))
     return;
@@ -52,17 +87,15 @@ lr_input_crosshair_draw(const lr_crosshair_t *crosshair_,
   else if(y >= height_)
     y = (height_ - 1);
 
-  p = &buf_[x + (y * width_)];
-
-  *p = crosshair_->c;
+  lr_input_crosshair_draw_pixel(buf_,pitch_,x,y,crosshair_->c,pixel_format_);
   if(x >= 1)
-    *(p -1) = crosshair_->c;
+    lr_input_crosshair_draw_pixel(buf_,pitch_,x - 1,y,crosshair_->c,pixel_format_);
   if(x < (width_ - 1))
-    *(p + 1) = crosshair_->c;
+    lr_input_crosshair_draw_pixel(buf_,pitch_,x + 1,y,crosshair_->c,pixel_format_);
   if(y >= 1)
-    *(p - width_) = crosshair_->c;
+    lr_input_crosshair_draw_pixel(buf_,pitch_,x,y - 1,crosshair_->c,pixel_format_);
   if(y < (height_ - 1))
-    *(p + width_) = crosshair_->c;
+    lr_input_crosshair_draw_pixel(buf_,pitch_,x,y + 1,crosshair_->c,pixel_format_);
 }
 
 void
@@ -90,9 +123,11 @@ lr_input_crosshair_reset(const uint32_t i_)
 }
 
 void
-lr_input_crosshairs_draw(uint32_t       *buf_,
-                         const uint32_t  width_,
-                         const uint32_t  height_)
+lr_input_crosshairs_draw(void                      *buf_,
+                         const uint32_t             width_,
+                         const uint32_t             height_,
+                         const size_t               pitch_,
+                         const vdlp_pixel_format_e  pixel_format_)
 {
   int i;
 
@@ -100,6 +135,11 @@ lr_input_crosshairs_draw(uint32_t       *buf_,
     {
       if(CROSSHAIRS[i].c == 0)
         continue;
-      lr_input_crosshair_draw(&CROSSHAIRS[i],buf_,width_,height_);
+      lr_input_crosshair_draw(&CROSSHAIRS[i],
+                              buf_,
+                              width_,
+                              height_,
+                              pitch_,
+                              pixel_format_);
     }
 }

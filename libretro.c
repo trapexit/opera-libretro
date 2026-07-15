@@ -720,14 +720,17 @@ process_opts_if_updated()
 
 static
 void
-draw_crosshairs_if_enabled(void *video_buffer_)
+draw_crosshairs_if_enabled(void         *video_buffer_,
+                           const size_t  video_pitch_)
 {
   if(g_OPTS.hide_lightgun_crosshairs)
     return;
 
   lr_input_crosshairs_draw(video_buffer_,
                            g_OPTS.video_width,
-                           g_OPTS.video_height);
+                           g_OPTS.video_height,
+                           video_pitch_,
+                           g_OPTS.vdlp_pixel_format);
 }
 
 static
@@ -807,7 +810,7 @@ retro_run(void)
       return;
     }
 
-  draw_crosshairs_if_enabled(video_buffer);
+  draw_crosshairs_if_enabled(video_buffer,video_pitch);
 
   opera_lr_dsp_upload();
 
