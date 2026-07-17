@@ -95,7 +95,8 @@ ifneq (,$(findstring unix,$(platform)))
             CFLAGS += -mtune=cortex-a5
         # ODROID-XU3 & ODROID-XU4
         else ifneq (,$(findstring odroidxu,$(platform)))
-            CFLAGS += -march=armv7ve -mtune=cortex-a15.cortex-a7
+            CFLAGS += -march=armv7ve -mtune=cortex-a15.cortex-a7 \
+                      -mfpu=neon-vfpv4
         # ODROID-U2, -U3, -X & -X2
         else
             CFLAGS += -mtune=cortex-a9
