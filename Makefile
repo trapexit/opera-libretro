@@ -643,7 +643,8 @@ endif
 %.o: %.c
 	$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
 
-HARNESS_TARGET := test-harness
+HARNESS_TARGET := opera-test-harness
+HARNESS_PRESENTER_TARGET := opera-test-harness-presenter
 HARNESS_ZLIB_DIR := $(DEPS_DIR)/zlib-1.3.1.2
 HARNESS_ZLIB_CFLAGS := -I$(HARNESS_ZLIB_DIR)
 HARNESS_ZLIB_SOURCES := \
@@ -656,17 +657,35 @@ HARNESS_ZLIB_DEPS := $(HARNESS_ZLIB_SOURCES) \
 	$(wildcard $(HARNESS_ZLIB_DIR)/*.h)
 HARNESS_CFLAGS := -O2 -g -Wall -Wextra $(HARNESS_ZLIB_CFLAGS) $(INCFLAGS)
 HARNESS_LIBS := -ldl -lm
+HARNESS_PRESENTER_PACKAGES := sdl2 libavformat libavcodec libavutil
+HARNESS_PRESENTER_CFLAGS := $(shell pkg-config --cflags $(HARNESS_PRESENTER_PACKAGES) 2>/dev/null)
+HARNESS_PRESENTER_LIBS := $(shell pkg-config --libs $(HARNESS_PRESENTER_PACKAGES) 2>/dev/null)
 
 harness: $(HARNESS_TARGET)
 
-$(HARNESS_TARGET): tools/test_harness.c tools/stb_image_write.h $(HARNESS_ZLIB_DEPS)
+harness-presenter: $(HARNESS_PRESENTER_TARGET)
+
+harness-presenter-test: $(HARNESS_TARGET) $(HARNESS_PRESENTER_TARGET)
+	sh tools/tests/test_presenter.sh \
+		./$(HARNESS_PRESENTER_TARGET) ./$(HARNESS_TARGET)
+
+$(HARNESS_TARGET): tools/test_harness.c tools/test_harness_present.h tools/stb_image_write.h $(HARNESS_ZLIB_DEPS)
 	$(CC) -o $@ tools/test_harness.c $(HARNESS_ZLIB_SOURCES) \
 		$(HARNESS_CFLAGS) $(HARNESS_LIBS)
 
-clean:
-	rm -f $(TARGET) $(OBJECTS) $(HARNESS_TARGET)
+$(HARNESS_PRESENTER_TARGET): tools/test_harness_presenter.c \
+	tools/test_harness_presenter_background.c \
+	tools/test_harness_presenter_background.h tools/test_harness_present.h
+	@pkg-config --exists $(HARNESS_PRESENTER_PACKAGES) || { \
+		echo "SDL2 and FFmpeg development files are required for $@" >&2; exit 1; }
+	$(CC) -o $@ tools/test_harness_presenter.c \
+		tools/test_harness_presenter_background.c \
+		-O2 -g -Wall -Wextra $(HARNESS_PRESENTER_CFLAGS) $(HARNESS_PRESENTER_LIBS)
 
-.PHONY: clean harness
+clean:
+	rm -f $(TARGET) $(OBJECTS) $(HARNESS_TARGET) $(HARNESS_PRESENTER_TARGET)
+
+.PHONY: clean harness harness-presenter harness-presenter-test
 endif
 
 print-%:

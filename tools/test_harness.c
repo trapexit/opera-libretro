@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "libretro.h"
+#include "test_harness_present.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -35,9 +36,11 @@
 #include <unistd.h>
 
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/un.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -250,6 +253,9 @@ struct harness_config_t
   bool     have_seconds;
   bool     have_cpu;
   bool     terminal_mode;
+  bool     presentation_mode;
+  bool     presentation_required;
+  bool     presentation_disabled;
   bool     keep_work_dir;
   bool     user_work_dir;
   bool     verbose;
@@ -259,6 +265,8 @@ struct harness_config_t
   bool     terminal_fps_user;
   int      terminal_render_override;
   int      terminal_color_override;
+  char    *presentation_socket;
+  char    *presentation_label;
 };
 
 typedef struct harness_run_t harness_run_t;
@@ -318,6 +326,19 @@ struct harness_run_t
   bool benchmark_started;
   bool benchmark_finished;
   bool cpu_affinity_applied;
+  int presentation_fd;
+  bool presentation_connected;
+  bool presentation_started;
+  bool presentation_disconnected;
+  uint64_t presentation_video_frames;
+  uint64_t presentation_audio_frames;
+  uint64_t presentation_bytes;
+  char presentation_error[256];
+  uint8_t *presentation_rgb_buffer;
+  size_t presentation_rgb_buffer_size;
+  uint8_t *presentation_audio_buffer;
+  size_t presentation_audio_buffer_size;
+  size_t presentation_audio_buffer_used;
   bool terminal_active;
   bool terminal_quit_requested;
   int  tty_fd;
@@ -517,6 +538,12 @@ static
 bool
 _terminal_should_render_status_line(int image_result_);
 
+// Return the kernel-authenticated user ID for the connected peer.
+static
+int
+_presentation_get_peer_uid(int    fd_,
+                           uid_t *uid_);
+
 static
 void
 _handle_process_signal(int signo_)
@@ -556,13 +583,14 @@ void
 _print_usage(FILE *f_)
 {
   fprintf(f_,
-          "Usage: test-harness [--core ./opera_libretro.so] [--bios /path/to/bios.bin] [options]\n"
+          "Usage: opera-test-harness [--core ./opera_libretro.so] "
+          "[--bios /path/to/bios.bin] [options]\n"
           "\n"
           "Core and BIOS:\n"
           "  --core PATH              libretro core shared object to load; default\n"
-          "                           opera_libretro.so beside test-harness\n"
+          "                           opera_libretro.so beside opera-test-harness\n"
           "  --bios PATH              recognized 3DO BIOS ROM; default panafz1.bin\n"
-          "                           beside test-harness, then filename search\n"
+          "                           beside opera-test-harness, then filename search\n"
           "\n"
           "Content and duration:\n"
           "  --title PATH             optional iso/bin/chd/cue title path\n"
@@ -584,9 +612,15 @@ _print_usage(FILE *f_)
           "  --terminal-color MODE    terminal color mode: auto, true, 256, mono\n"
           "  --terminal-button-hold N  keep terminal button pressed for N frames\n"
           "                           (default 6)\n"
+          "  --present               require the persistent presenter; the default\n"
+          "                           socket is otherwise used automatically\n"
+          "  --no-present            do not probe or use the presenter\n"
+          "  --present-socket PATH   presenter Unix socket; defaults below\n"
+          "                           XDG_RUNTIME_DIR\n"
+          "  --present-label TEXT    reserved presenter metadata label\n"
           "\n"
           "Artifacts:\n"
-          "  --output-dir DIR         default ./test-harness-runs/<timestamp-pid>\n"
+          "  --output-dir DIR         default ./opera-test-harness-runs/<timestamp-pid>\n"
           "  --log PATH               default <output-dir>/run.log\n"
           "  --metrics PATH           default <output-dir>/metrics.json\n"
           "  --audio PATH             write stereo s16le WAV\n"
@@ -1809,6 +1843,7 @@ _parse_args(int    argc_,
   g_run.log_fd       = -1;
   g_run.tty_fd       = -1;
   g_run.tty_flags    = -1;
+  g_run.presentation_fd = -1;
   g_run.pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
   g_run.terminal_render_mode = -1;
   g_run.terminal_color_mode = -1;
@@ -1857,6 +1892,17 @@ _parse_args(int    argc_,
         }
       else if(strcmp(arg, "--terminal") == 0)
         g_cfg.terminal_mode = true;
+      else if(strcmp(arg, "--present") == 0)
+        {
+          g_cfg.presentation_mode = true;
+          g_cfg.presentation_required = true;
+        }
+      else if(strcmp(arg, "--no-present") == 0)
+        g_cfg.presentation_disabled = true;
+      else if(strcmp(arg, "--present-socket") == 0)
+        g_cfg.presentation_socket = _xstrdup(argv_[++i]);
+      else if(strcmp(arg, "--present-label") == 0)
+        g_cfg.presentation_label = _xstrdup(argv_[++i]);
       else if(strcmp(arg, "--terminal-fps") == 0)
         {
           if((_parse_double_value(argv_[++i], &g_cfg.terminal_fps) != 0) ||
@@ -2011,6 +2057,8 @@ _validate_arg_followers(int    argc_,
         !strcmp(arg, "--terminal-render") ||
         !strcmp(arg, "--terminal-color") ||
         !strcmp(arg, "--terminal-button-hold") ||
+        !strcmp(arg, "--present-socket") ||
+        !strcmp(arg, "--present-label") ||
         !strcmp(arg, "--option") ||
         !strcmp(arg, "--input") ||
         !strcmp(arg, "--input-file") ||
@@ -2045,13 +2093,13 @@ _default_output_dir(void)
   strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &tm_now);
   snprintf(leaf, sizeof(leaf), "%s-%ld", stamp, (long)getpid());
 
-  if(_mkdir_p("test-harness-runs") != 0)
+  if(_mkdir_p("opera-test-harness-runs") != 0)
     {
-      perror("mkdir test-harness-runs");
+      perror("mkdir opera-test-harness-runs");
       exit(1);
     }
 
-  return _xasprintf2("test-harness-runs", leaf);
+  return _xasprintf2("opera-test-harness-runs", leaf);
 }
 
 
@@ -2093,7 +2141,7 @@ _prepare_paths(void)
         fprintf(stderr, "unable to resolve BIOS path: %s\n", g_cfg.bios_path);
       else
         fprintf(stderr,
-                "unable to find BIOS file %s beside test-harness, "
+                "unable to find BIOS file %s beside opera-test-harness, "
                 "in the current directory, or common RetroArch "
                 "system directories\n",
                 g_cfg.bios_path);
@@ -3009,6 +3057,517 @@ _pack_frame_rgb(const void             *data_,
     *stride_out_ = stride;
 
   return packed;
+}
+
+
+static
+char *
+_presentation_default_socket(void)
+{
+  const char *runtime_dir;
+  char path[PATH_MAX];
+  int count;
+
+  runtime_dir = getenv("XDG_RUNTIME_DIR");
+  if((runtime_dir != NULL) && (runtime_dir[0] != 0))
+    count = snprintf(path, sizeof(path),
+                     "%s/opera-test-harness-presenter.sock", runtime_dir);
+  else
+    count = snprintf(path, sizeof(path),
+                     "/tmp/opera-test-harness-presenter-%lu.sock",
+                     (unsigned long)getuid());
+  if((count <= 0) || ((size_t)count >= sizeof(path)))
+    return NULL;
+  return _xstrdup(path);
+}
+
+
+static
+void
+_presentation_close(void)
+{
+  if(g_run.presentation_fd >= 0)
+    close(g_run.presentation_fd);
+  g_run.presentation_fd = -1;
+}
+
+
+static
+int
+_presentation_get_peer_uid(int    fd_,
+                           uid_t *uid_)
+{
+#if defined(__linux__) && defined(SO_PEERCRED)
+  struct ucred credentials;
+  socklen_t size;
+
+  size = sizeof(credentials);
+  if((getsockopt(fd_, SOL_SOCKET, SO_PEERCRED,
+                 &credentials, &size) != 0) ||
+     (size < sizeof(credentials)))
+    return -1;
+  *uid_ = credentials.uid;
+  return 0;
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || \
+  defined(__OpenBSD__) || defined(__DragonFly__)
+  gid_t gid;
+
+  return getpeereid(fd_, uid_, &gid);
+#else
+  (void)fd_;
+  (void)uid_;
+  errno = ENOTSUP;
+  return -1;
+#endif
+}
+
+
+static
+void
+_presentation_disconnect(const char *message_)
+{
+  if(g_run.presentation_fd >= 0)
+    _harness_log(RETRO_LOG_WARN,
+                 "[Harness]: presenter disconnected; continuing headless: %s\n",
+                 message_);
+  snprintf(g_run.presentation_error, sizeof(g_run.presentation_error),
+           "%s", message_);
+  g_run.presentation_disconnected = true;
+  _presentation_close();
+}
+
+
+static
+int
+_presentation_send_all(const void *data_,
+                       size_t      size_)
+{
+  const uint8_t *data;
+  size_t written;
+
+  data = data_;
+  written = 0;
+  while(written < size_)
+    {
+      ssize_t count;
+
+      count = send(g_run.presentation_fd, data + written,
+                   size_ - written, MSG_NOSIGNAL);
+      if(count > 0)
+        {
+          written += (size_t)count;
+          continue;
+        }
+      if((count < 0) && (errno == EINTR))
+        continue;
+      return -1;
+    }
+  return 0;
+}
+
+
+static
+int
+_presentation_send_message(uint32_t    type_,
+                           const void *payload_,
+                           uint32_t    payload_size_)
+{
+  uint8_t header[OPERA_PRESENT_HEADER_SIZE];
+
+  opera_present_make_header(header, type_, payload_size_);
+  if((_presentation_send_all(header, sizeof(header)) != 0) ||
+     ((payload_size_ > 0U) &&
+      (_presentation_send_all(payload_, payload_size_) != 0)))
+    return -1;
+  g_run.presentation_bytes += sizeof(header) + payload_size_;
+  return 0;
+}
+
+
+static
+int
+_presentation_receive_ack(void)
+{
+  uint8_t header[OPERA_PRESENT_HEADER_SIZE];
+  uint8_t payload[4];
+  size_t received;
+
+  received = 0;
+  while(received < sizeof(header))
+    {
+      ssize_t count;
+
+      count = recv(g_run.presentation_fd, header + received,
+                   sizeof(header) - received, 0);
+      if(count > 0)
+        received += (size_t)count;
+      else if((count < 0) && (errno == EINTR))
+        continue;
+      else
+        return -1;
+    }
+  if((opera_present_get_u32(header) != OPERA_PRESENT_MAGIC) ||
+     (opera_present_get_u32(header + 4U) != OPERA_PRESENT_VERSION) ||
+     (opera_present_get_u32(header + 8U) != OPERA_PRESENT_ACK) ||
+     (opera_present_get_u32(header + 12U) != sizeof(payload)))
+    return -1;
+  received = 0;
+  while(received < sizeof(payload))
+    {
+      ssize_t count;
+
+      count = recv(g_run.presentation_fd, payload + received,
+                   sizeof(payload) - received, 0);
+      if(count > 0)
+        received += (size_t)count;
+      else if((count < 0) && (errno == EINTR))
+        continue;
+      else
+        return -1;
+    }
+  return (opera_present_get_u32(payload) == OPERA_PRESENT_ACK_OK) ? 0 : -1;
+}
+
+
+static
+int
+_presentation_connect_failure(bool        required_,
+                              const char *message_)
+{
+  snprintf(g_run.presentation_error, sizeof(g_run.presentation_error),
+           "%s", message_);
+  _presentation_close();
+  if(required_)
+    {
+      _report_error("%s\n", message_);
+      return -1;
+    }
+  g_cfg.presentation_mode = false;
+  _harness_log(RETRO_LOG_WARN,
+               "[Harness]: automatic presentation failed; "
+               "continuing headless: %s\n",
+               message_);
+  return 0;
+}
+
+
+static
+int
+_presentation_connect(void)
+{
+  struct sockaddr_un address;
+  struct stat socket_stat;
+  struct timeval timeout;
+  const char *label;
+  bool default_socket;
+  bool required;
+  uid_t peer_uid;
+  size_t label_size;
+  char message[512];
+
+  if(g_cfg.presentation_disabled)
+    return 0;
+  required = g_cfg.presentation_required;
+  default_socket = (g_cfg.presentation_socket == NULL);
+  if(g_cfg.presentation_socket == NULL)
+    g_cfg.presentation_socket = _presentation_default_socket();
+  if(g_cfg.presentation_socket == NULL)
+    {
+      return _presentation_connect_failure(
+        required, "unable to construct presenter socket path");
+    }
+  if(strlen(g_cfg.presentation_socket) >= sizeof(address.sun_path))
+    {
+      snprintf(message, sizeof(message),
+               "presenter socket path is too long: %s",
+               g_cfg.presentation_socket);
+      return _presentation_connect_failure(required, message);
+    }
+  if(default_socket)
+    {
+      if(lstat(g_cfg.presentation_socket, &socket_stat) != 0)
+        {
+          if((errno == ENOENT) && !required)
+            return 0;
+          snprintf(message, sizeof(message),
+                   "unable to inspect presenter socket at %s: %s",
+                   g_cfg.presentation_socket, strerror(errno));
+          return _presentation_connect_failure(required, message);
+        }
+      if(!S_ISSOCK(socket_stat.st_mode))
+        {
+          snprintf(message, sizeof(message),
+                   "default presenter path is not a socket: %s",
+                   g_cfg.presentation_socket);
+          return _presentation_connect_failure(required, message);
+        }
+      if(socket_stat.st_uid != getuid())
+        {
+          snprintf(message, sizeof(message),
+                   "default presenter socket is not owned by this user: %s",
+                   g_cfg.presentation_socket);
+          return _presentation_connect_failure(required, message);
+        }
+    }
+
+  g_run.presentation_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if(g_run.presentation_fd < 0)
+    {
+      snprintf(message, sizeof(message),
+               "unable to create presenter socket: %s", strerror(errno));
+      return _presentation_connect_failure(required, message);
+    }
+  timeout.tv_sec = 2;
+  timeout.tv_usec = 0;
+  (void)setsockopt(g_run.presentation_fd, SOL_SOCKET, SO_RCVTIMEO,
+                   &timeout, sizeof(timeout));
+  (void)setsockopt(g_run.presentation_fd, SOL_SOCKET, SO_SNDTIMEO,
+                   &timeout, sizeof(timeout));
+  memset(&address, 0, sizeof(address));
+  address.sun_family = AF_UNIX;
+  memcpy(address.sun_path, g_cfg.presentation_socket,
+         strlen(g_cfg.presentation_socket) + 1U);
+  if(connect(g_run.presentation_fd, (struct sockaddr *)&address,
+             sizeof(address)) != 0)
+    {
+      snprintf(message, sizeof(message),
+               "unable to connect to presenter at %s: %s",
+               g_cfg.presentation_socket, strerror(errno));
+      return _presentation_connect_failure(required, message);
+    }
+  if(default_socket)
+    {
+      if(_presentation_get_peer_uid(g_run.presentation_fd, &peer_uid) != 0)
+        {
+          snprintf(message, sizeof(message),
+                   "unable to authenticate default presenter socket: %s",
+                   strerror(errno));
+          return _presentation_connect_failure(required, message);
+        }
+      if(peer_uid != getuid())
+        {
+          snprintf(message, sizeof(message),
+                   "default presenter socket peer is not this user");
+          return _presentation_connect_failure(required, message);
+        }
+    }
+  g_run.presentation_connected = true;
+  label = g_cfg.presentation_label ? g_cfg.presentation_label : "Run";
+  label_size = strlen(label);
+  if((_presentation_send_message(OPERA_PRESENT_HELLO, label,
+                                 (uint32_t)label_size) != 0) ||
+     (_presentation_receive_ack() != 0))
+    {
+      return _presentation_connect_failure(
+        required,
+        "presenter rejected the connection or did not acknowledge it");
+    }
+  g_cfg.presentation_mode = true;
+  return 0;
+}
+
+
+static
+int
+_presentation_start(void)
+{
+  uint8_t payload[OPERA_PRESENT_START_SIZE];
+  double aspect_ratio;
+  uint32_t aspect_millionths;
+  uint32_t sample_rate;
+  uint32_t fps_millihz;
+
+  if(!g_cfg.presentation_mode)
+    return 0;
+  sample_rate = (uint32_t)llround(g_run.sample_rate);
+  fps_millihz = (uint32_t)llround(g_run.core_fps * 1000.0);
+  aspect_ratio = g_run.av_info.geometry.aspect_ratio;
+  if((!isfinite(aspect_ratio) || (aspect_ratio <= 0.0)) &&
+     (g_run.av_info.geometry.base_width > 0U) &&
+     (g_run.av_info.geometry.base_height > 0U))
+    {
+      aspect_ratio = (double)g_run.av_info.geometry.base_width /
+        (double)g_run.av_info.geometry.base_height;
+    }
+  aspect_millionths = 0U;
+  if(isfinite(aspect_ratio) && (aspect_ratio > 0.0) &&
+     (aspect_ratio <= ((double)UINT32_MAX /
+                       (double)OPERA_PRESENT_ASPECT_SCALE)))
+    {
+      aspect_millionths = (uint32_t)llround(
+        aspect_ratio * (double)OPERA_PRESENT_ASPECT_SCALE);
+    }
+  opera_present_put_u32(payload, sample_rate);
+  opera_present_put_u32(payload + 4U, fps_millihz);
+  opera_present_put_u32(payload + 8U, aspect_millionths);
+  if((_presentation_send_message(OPERA_PRESENT_START, payload,
+                                 sizeof(payload)) != 0) ||
+     (_presentation_receive_ack() != 0))
+    {
+      return _presentation_connect_failure(
+        g_cfg.presentation_required,
+        "presenter could not start video/audio presentation");
+    }
+  g_run.presentation_started = true;
+  return 0;
+}
+
+
+static
+void
+_presentation_send_video(const void             *data_,
+                         unsigned                width_,
+                         unsigned                height_,
+                         size_t                  pitch_,
+                         enum retro_pixel_format fmt_)
+{
+  size_t stride;
+  size_t pixels_size;
+  size_t payload_size;
+  uint8_t *next;
+
+  if(!g_run.presentation_started || (g_run.presentation_fd < 0) ||
+     (data_ == NULL) ||
+     (width_ == 0U) || (height_ == 0U))
+    return;
+  if((width_ > (UINT_MAX / 3U)) ||
+     ((size_t)height_ > (SIZE_MAX / ((size_t)width_ * 3U))))
+    {
+      _presentation_disconnect("invalid video dimensions");
+      return;
+    }
+  stride = (size_t)width_ * 3U;
+  pixels_size = stride * (size_t)height_;
+  if((pixels_size > (OPERA_PRESENT_MAX_PAYLOAD - 16U)) ||
+     (pixels_size > (SIZE_MAX - 16U)))
+    {
+      _presentation_disconnect("video frame exceeds protocol limit");
+      return;
+    }
+  payload_size = pixels_size + 16U;
+  if(payload_size > g_run.presentation_rgb_buffer_size)
+    {
+      next = realloc(g_run.presentation_rgb_buffer, payload_size);
+      if(next == NULL)
+        {
+          _presentation_disconnect("unable to allocate video mirror buffer");
+          return;
+        }
+      g_run.presentation_rgb_buffer = next;
+      g_run.presentation_rgb_buffer_size = payload_size;
+    }
+  opera_present_put_u64(g_run.presentation_rgb_buffer, g_run.current_frame);
+  opera_present_put_u32(g_run.presentation_rgb_buffer + 8U, width_);
+  opera_present_put_u32(g_run.presentation_rgb_buffer + 12U, height_);
+  if(!_pack_frame_rgb_into(data_, width_, height_, pitch_, fmt_,
+                           g_run.presentation_rgb_buffer + 16U, stride) ||
+     (_presentation_send_message(OPERA_PRESENT_VIDEO,
+                                 g_run.presentation_rgb_buffer,
+                                 (uint32_t)payload_size) != 0))
+    {
+      _presentation_disconnect("unable to send video frame");
+      return;
+    }
+  g_run.presentation_video_frames++;
+}
+
+
+static
+void
+_presentation_queue_audio(const int16_t *data_,
+                          size_t         frames_)
+{
+  size_t bytes;
+  size_t needed;
+  uint8_t *next;
+
+  if(!g_run.presentation_started || (g_run.presentation_fd < 0) ||
+     (data_ == NULL) || (frames_ == 0U))
+    return;
+  if(frames_ > (SIZE_MAX / (2U * sizeof(int16_t))))
+    {
+      _presentation_disconnect("audio batch exceeds host size limit");
+      return;
+    }
+  bytes = frames_ * 2U * sizeof(int16_t);
+  if(g_run.presentation_audio_buffer_used > (SIZE_MAX - bytes))
+    {
+      _presentation_disconnect("audio mirror buffer overflow");
+      return;
+    }
+  needed = g_run.presentation_audio_buffer_used + bytes;
+  if(needed > g_run.presentation_audio_buffer_size)
+    {
+      next = realloc(g_run.presentation_audio_buffer, needed);
+      if(next == NULL)
+        {
+          _presentation_disconnect("unable to allocate audio mirror buffer");
+          return;
+        }
+      g_run.presentation_audio_buffer = next;
+      g_run.presentation_audio_buffer_size = needed;
+    }
+  memcpy(g_run.presentation_audio_buffer + g_run.presentation_audio_buffer_used,
+         data_, bytes);
+  g_run.presentation_audio_buffer_used = needed;
+}
+
+
+static
+void
+_presentation_flush_audio(void)
+{
+  size_t frames;
+  size_t payload_size;
+  uint8_t *payload;
+
+  if(!g_run.presentation_started || (g_run.presentation_fd < 0) ||
+     (g_run.presentation_audio_buffer_used == 0U))
+    return;
+  frames = g_run.presentation_audio_buffer_used / (2U * sizeof(int16_t));
+  if((frames > UINT32_MAX) ||
+     (g_run.presentation_audio_buffer_used > (OPERA_PRESENT_MAX_PAYLOAD - 4U)))
+    {
+      _presentation_disconnect("audio batch exceeds protocol limit");
+      g_run.presentation_audio_buffer_used = 0;
+      return;
+    }
+  payload_size = g_run.presentation_audio_buffer_used + 4U;
+  payload = malloc(payload_size);
+  if(payload == NULL)
+    {
+      _presentation_disconnect("unable to allocate audio message");
+      g_run.presentation_audio_buffer_used = 0;
+      return;
+    }
+  opera_present_put_u32(payload, (uint32_t)frames);
+  memcpy(payload + 4U, g_run.presentation_audio_buffer,
+         g_run.presentation_audio_buffer_used);
+  if(_presentation_send_message(OPERA_PRESENT_AUDIO, payload,
+                                (uint32_t)payload_size) != 0)
+    _presentation_disconnect("unable to send audio samples");
+  else
+    g_run.presentation_audio_frames += frames;
+  free(payload);
+  g_run.presentation_audio_buffer_used = 0;
+}
+
+
+static
+void
+_presentation_end(uint32_t status_)
+{
+  uint8_t payload[4];
+
+  if(g_run.presentation_started && (g_run.presentation_fd >= 0))
+    {
+      _presentation_flush_audio();
+      opera_present_put_u32(payload, status_);
+      if(_presentation_send_message(OPERA_PRESENT_END, payload,
+                                    sizeof(payload)) != 0)
+        _presentation_disconnect("unable to send final presentation status");
+    }
+  _presentation_close();
 }
 
 
@@ -4412,6 +4971,7 @@ _harness_video_refresh(const void *data_,
 
   g_run.video_frames++;
   _store_last_frame(data_, width_, height_, pitch_, g_run.pixel_format);
+  _presentation_send_video(data_, width_, height_, pitch_, g_run.pixel_format);
 
   for(i = 0; i < g_cfg.screenshot_count; i++)
     {
@@ -4603,6 +5163,7 @@ _harness_audio_sample(int16_t left_,
   frame[0] = left_;
   frame[1] = right_;
   g_run.audio_frames++;
+  _presentation_queue_audio(frame, 1U);
 
   if(g_run.audio_file == NULL)
     return;
@@ -4623,6 +5184,8 @@ _harness_audio_sample_batch(const int16_t *data_,
   size_t bytes;
 
   g_run.audio_frames += frames_;
+
+  _presentation_queue_audio(data_, frames_);
 
   if((g_run.audio_file == NULL) || (data_ == NULL) || (frames_ == 0))
     return frames_;
@@ -8562,6 +9125,44 @@ _write_metrics(const char *status_,
           g_run.cpu_affinity_applied ? "true" : "false");
   fprintf(f, ",\n  \"terminal_mode\": %s",
           g_cfg.terminal_mode ? "true" : "false");
+  fprintf(f, ",\n  \"presentation_requested\": %s",
+          g_cfg.presentation_required ? "true" : "false");
+  fprintf(f, ",\n  \"presentation_auto_detected\": %s",
+          (g_cfg.presentation_mode && !g_cfg.presentation_required) ?
+          "true" : "false");
+  fprintf(f, ",\n  \"presentation_disabled\": %s",
+          g_cfg.presentation_disabled ? "true" : "false");
+  fprintf(f, ",\n  \"presentation_protocol_version\": %u",
+          OPERA_PRESENT_VERSION);
+  fprintf(f, ",\n  \"presentation_socket\": ");
+  if(g_cfg.presentation_socket != NULL)
+    _json_string(f, g_cfg.presentation_socket);
+  else
+    fputs("null", f);
+  fprintf(f, ",\n  \"presentation_label\": ");
+  if(g_cfg.presentation_label != NULL)
+    _json_string(f, g_cfg.presentation_label);
+  else if(g_cfg.presentation_mode)
+    _json_string(f, "Run");
+  else
+    fputs("null", f);
+  fprintf(f, ",\n  \"presentation_connected\": %s",
+          g_run.presentation_connected ? "true" : "false");
+  fprintf(f, ",\n  \"presentation_started\": %s",
+          g_run.presentation_started ? "true" : "false");
+  fprintf(f, ",\n  \"presentation_disconnected\": %s",
+          g_run.presentation_disconnected ? "true" : "false");
+  fprintf(f, ",\n  \"presentation_error\": ");
+  if(g_run.presentation_error[0] != 0)
+    _json_string(f, g_run.presentation_error);
+  else
+    fputs("null", f);
+  fprintf(f, ",\n  \"presentation_video_frames\": %" PRIu64,
+          g_run.presentation_video_frames);
+  fprintf(f, ",\n  \"presentation_audio_frames\": %" PRIu64,
+          g_run.presentation_audio_frames);
+  fprintf(f, ",\n  \"presentation_bytes\": %" PRIu64,
+          g_run.presentation_bytes);
   fprintf(f, ",\n  \"terminal_render_requested\": ");
   _json_string(f, _terminal_render_override_name(g_cfg.terminal_render_override));
   fprintf(f, ",\n  \"terminal_renderer\": ");
@@ -8748,6 +9349,7 @@ main(int    argc_,
 
   memset(&api, 0, sizeof(api));
   memset(&g_run, 0, sizeof(g_run));
+  g_run.presentation_fd = -1;
   g_run.saved_stdout = -1;
   g_run.saved_stderr = -1;
   g_run.log_fd = -1;
@@ -8758,6 +9360,25 @@ main(int    argc_,
   _validate_arg_followers(argc_, argv_);
   _parse_args(argc_, argv_);
 
+  if(g_cfg.presentation_required && g_cfg.presentation_disabled)
+    {
+      fprintf(stderr, "--present and --no-present are mutually exclusive\n");
+      return 1;
+    }
+  if(!g_cfg.presentation_required &&
+     ((g_cfg.presentation_socket != NULL) ||
+      (g_cfg.presentation_label != NULL)))
+    {
+      fprintf(stderr, "--present-socket and --present-label require --present\n");
+      return 1;
+    }
+  if((g_cfg.presentation_label != NULL) &&
+     (strlen(g_cfg.presentation_label) > OPERA_PRESENT_MAX_LABEL))
+    {
+      fprintf(stderr, "--present-label exceeds %u bytes\n",
+              OPERA_PRESENT_MAX_LABEL);
+      return 1;
+    }
   if(g_cfg.list_bios)
     {
       _print_bios_list(stdout);
@@ -8773,6 +9394,12 @@ main(int    argc_,
     }
 
   _harness_log(RETRO_LOG_INFO, "[Harness]: output directory: %s\n", g_cfg.output_dir);
+
+  if(_presentation_connect() != 0)
+    {
+      status = "presentation_error";
+      goto cleanup;
+    }
 
   if(_apply_cpu_affinity() != 0)
     {
@@ -8844,6 +9471,11 @@ main(int    argc_,
     goto cleanup;
   if(_resolve_input_events() != 0)
     goto cleanup;
+  if(_presentation_start() != 0)
+    {
+      status = "presentation_error";
+      goto cleanup;
+    }
   if(_open_audio() != 0)
     {
       _report_error("unable to open audio output: %s\n", g_cfg.audio_path);
@@ -8866,6 +9498,7 @@ main(int    argc_,
       g_run.current_frame = frame;
       double frame_start = _monotonic_seconds();
       api.run();
+      _presentation_flush_audio();
       g_run.frames_run++;
 
       if((frame >= g_run.benchmark_start_frame) &&
@@ -8884,7 +9517,14 @@ main(int    argc_,
       if(g_run.terminal_quit_requested)
         break;
 
-      if(g_cfg.terminal_mode)
+      if(g_cfg.presentation_mode)
+        {
+          double deadline;
+
+          deadline = start + ((double)g_run.frames_run / g_run.core_fps);
+          _sleep_for_seconds(deadline - _monotonic_seconds());
+        }
+      else if(g_cfg.terminal_mode)
         {
           double frame_elapsed = _monotonic_seconds() - frame_start;
           if(g_run.core_fps > 0.0)
@@ -8938,6 +9578,7 @@ main(int    argc_,
     }
 
  cleanup:
+  _presentation_end((uint32_t)exit_code);
   _terminal_close();
   _close_audio();
 
@@ -8975,7 +9616,7 @@ main(int    argc_,
   if(exit_code == 0)
     {
       fprintf(stderr,
-              "test-harness: ok, frames=%" PRIu64
+              "opera-test-harness: ok, frames=%" PRIu64
               ", elapsed=%.3fs, fps=%.2f, log=%s, metrics=%s\n",
               g_run.frames_run,
               g_run.wall_seconds,
@@ -8986,7 +9627,7 @@ main(int    argc_,
   else
     {
       fprintf(stderr,
-              "test-harness: %s, frames=%" PRIu64
+              "opera-test-harness: %s, frames=%" PRIu64
               ", elapsed=%.3fs, fps=%.2f, log=%s, metrics=%s\n",
               status,
               g_run.frames_run,
@@ -8998,6 +9639,8 @@ main(int    argc_,
 
   free(g_run.last_frame);
   free(g_run.screenshot_when_prev);
+  free(g_run.presentation_rgb_buffer);
+  free(g_run.presentation_audio_buffer);
   _free_screenshot_captures();
   return exit_code;
 }

@@ -1,6 +1,6 @@
 ---
 name: opera-test-harness
-description: Use when running, automating, or debugging the 3DO libretro "opera" core with the test-harness binary, including terminal mode, controls, BIOS/core defaults, screenshots, ROMs, scripted input, and benchmarks.
+description: Use when running, automating, or debugging the 3DO libretro "opera" core with the opera-test-harness binary, including terminal mode, controls, BIOS/core defaults, screenshots, ROMs, scripted input, and benchmarks.
 ---
 
 # opera-test-harness
@@ -16,7 +16,7 @@ Trigger when:
 
 - User asks to "run the core", "test the core", "boot a 3DO disc",
   "capture a screenshot" of a 3DO game, or "benchmark" the core.
-- User mentions `test-harness`, `test_harness.c`, "test harness" or
+- User mentions `opera-test-harness`, `test_harness.c`, "test harness" or
   headless core testing.
 - User asks to script button presses or compare runs against a
   baseline.
@@ -26,30 +26,37 @@ Trigger when:
 From the repo root:
 
 ```sh
-make harness    # builds ./test-harness
+make harness    # builds ./opera-test-harness
+make harness-presenter  # optional persistent SDL2 stream presenter
 ```
 
 The harness always compiles the vendored zlib encoder used by Kitty
 graphics. It also depends on `tools/stb_image_write.h` and links
 `-ldl -lm`.
 
+The presenter is a separate optional SDL2/FFmpeg binary, so the harness itself
+remains SDL-free. Its build requires the SDL2, libavformat, libavcodec, and
+libavutil development packages. Each harness launch checks the default
+presenter socket and mirrors automatically when it is available; otherwise it
+remains headless. Pass `--no-present` for a guaranteed headless run.
+
 ## BIOS
 
 If `--core` is omitted, the harness looks for `opera_libretro.so`
-beside the `test-harness` executable. If `--bios` is omitted, it
-prefers `panafz1.bin` beside `test-harness`, then falls back to
+beside the `opera-test-harness` executable. If `--bios` is omitted, it
+prefers `panafz1.bin` beside `opera-test-harness`, then falls back to
 filename search.
 
 `--bios` accepts either a real path or a bare filename listed in
 `BIOS_ROMS[]` (`tools/test_harness.c`). Bare filenames are searched
-beside `test-harness`, then in RetroArch system dirs
+beside `opera-test-harness`, then in RetroArch system dirs
 (`RETROARCH_ROM_DIRS[]`). Use `--list-bios` to print recognized BIOS
 ROMs and any resolved local paths.
 
 ## Canonical invocation
 
 ```sh
-./test-harness \
+./opera-test-harness \
   --core ./opera_libretro.so \
   --bios /path/to/panafz1.bin \
   --title "/path/to/Game (USA).bin" \
@@ -62,7 +69,7 @@ ROMs and any resolved local paths.
 ```
 
 `--core` and `--bios` are optional when the defaults are available
-beside `test-harness` or in the configured BIOS search
+beside `opera-test-harness` or in the configured BIOS search
 paths. Everything else is optional.
 
 ## Key flags
@@ -135,7 +142,7 @@ Examples:
 
 Example:
 ```sh
-./test-harness --core ./opera_libretro.so --bios panafz1.bin \
+./opera-test-harness --core ./opera_libretro.so --bios panafz1.bin \
   --title /path/to/game.cue --frames 600 --wall-timeout 30 \
   --option opera_random_seed=0xdeadbeef
 ```
@@ -198,6 +205,79 @@ Terminal implementation notes:
 - Termination signals exit through normal cleanup so raw mode and
   alt-screen are restored.
 
+### Persistent stream presentation
+
+Start the companion before configuring OBS or launching a presented run:
+
+```sh
+./opera-test-harness-presenter
+./opera-test-harness \
+  --core ./opera_libretro.so --bios panafz1.bin --title /path/to/game.iso \
+  --frames 600 --wall-timeout 30
+```
+
+The presenter keeps one stable SDL window and audio device alive across
+successive harness processes. On Linux/Wayland, capture its window with OBS
+Window Capture (PipeWire) and capture its playback through desktop audio or a
+dedicated output device selected with `--audio-device NAME`. Use
+`--list-audio-devices` to list SDL playback names.
+
+- With no presentation flag, the harness checks the default socket and, when
+  a same-user presenter is listening, mirrors packed RGB video at the core's
+  reported display aspect ratio and stereo s16 audio while pacing at the
+  core's reported frame rate.
+- `--present` makes presentation required. A missing, busy, or incompatible
+  presenter then fails before emulated frames run.
+- `--no-present` skips socket discovery and guarantees a headless, unpaced run.
+  Use it for performance benchmarks while a presenter is running.
+- `--present-socket PATH` overrides the default Unix socket below
+  `$XDG_RUNTIME_DIR` (or the per-user `/tmp` fallback) and requires
+  `--present`. Default discovery verifies both the socket file owner and the
+  connected peer UID; an explicit socket path is trusted as supplied.
+- `--present-label TEXT` supplies reserved run metadata for future presenter
+  UI additions; it is not currently displayed and requires `--present`.
+- The status bar and window title show only `WAITING` while idle, then the
+  current frame number and a live FPS value calculated over up to the latest 60
+  received frame timestamps while a run is active.
+- Presentation is output-only. A default socket that exists but cannot be used
+  produces a warning and continues headless unless `--present` made it
+  required. A mid-run disconnect is recorded in `metrics.json` and the
+  authoritative artifact run continues headless.
+- Metrics distinguish explicit `presentation_requested`, automatic
+  `presentation_auto_detected`, and `presentation_disabled` states.
+- `make harness-presenter-test` exercises the versioned socket protocol with
+  SDL dummy video/audio drivers and a generated FFmpeg background feed.
+
+#### FFmpeg background feed
+
+The presenter also listens for one independently managed FFmpeg feed at
+`$XDG_RUNTIME_DIR/opera-test-harness-presenter-background.sock`, or the
+per-user `/tmp` fallback. Override it with `--background-socket PATH`.
+
+For a looping local file, launch the presenter first and then run:
+
+```sh
+ffmpeg -re -stream_loop -1 -i /path/to/background.mp4 \
+  -map 0:v:0 -map 0:a:0 \
+  -c:v rawvideo -pix_fmt yuv420p \
+  -c:a pcm_s16le -ac 2 -ar 48000 \
+  -f nut \
+  "unix://$XDG_RUNTIME_DIR/opera-test-harness-presenter-background.sock"
+```
+
+Use the same output settings for a live FFmpeg input, but omit
+`-stream_loop -1`; omit `-re` when the input already arrives in real time.
+The feed contract is one even-dimensioned YUV420P raw-video stream and one
+stereo signed-16 little-endian PCM stream in a NUT container.
+
+The background fills the whole window and hides the status bar. A harness
+connection does not disturb it until a valid `START` message arrives. During
+the harness run, background timestamps continue advancing while its audio is
+discarded and its latest due frame is retained. `END` or disconnect returns to
+the current background position with a hard audio cut. If FFmpeg disconnects,
+the presenter clears the feed, returns to `WAITING`, and accepts a replacement
+producer on the same background socket.
+
 ## Exit codes / status
 
 - `0` — `ok`: ran cleanly.
@@ -207,7 +287,7 @@ Terminal implementation notes:
 - `124` — `timeout`: `--wall-timeout` fired.
 - `128+signal` — terminated by a handled process signal after cleanup.
 
-The terse stderr line is `test-harness: <status>, frames=N, log=...,
+The terse stderr line is `opera-test-harness: <status>, frames=N, log=...,
 metrics=...`.  Full detail lives in `metrics.json` under `status`,
 `exit_code`, `frames_run`, `average_fps`, `speed_multiplier`,
 `input_events[]`, `log_counts`, etc.
@@ -216,7 +296,7 @@ metrics=...`.  Full detail lives in `metrics.json` under `status`,
 
 ### Boot-to-title screenshot
 ```sh
-./test-harness --core ./opera_libretro.so --bios panafz1.bin \
+./opera-test-harness --core ./opera_libretro.so --bios panafz1.bin \
   --title "/path/to/Game.cue" --seconds 10 \
   --screenshot /tmp/title.png --wall-timeout 30
 ```
@@ -234,14 +314,14 @@ Write a `inputs.txt` with one event per line and comments:
 ```
 Then:
 ```sh
-./test-harness --core ... --bios ... --title ... \
+./opera-test-harness --core ... --bios ... --title ... \
   --frames 2400 --input-file inputs.txt \
   --screenshot-every 300=/tmp/frames --wall-timeout 60
 ```
 
 ### Multiple capture points plus contact sheet
 ```sh
-./test-harness --core ... --bios ... --title ... \
+./opera-test-harness --core ... --bios ... --title ... \
   --frames 600 \
   --screenshot-at 60=/tmp/01.png \
   --screenshot-at 600=/tmp/end.png \
@@ -251,7 +331,7 @@ Then:
 ### Regression / benchmarking
 Pin a stable frame window so rebuilds can be compared apples-to-apples:
 ```sh
-./test-harness --core ... --bios ... --title ... \
+./opera-test-harness --core ... --bios ... --title ... \
   --frames 1800 \
   --benchmark-start-frame 600 --benchmark-end-frame 1800 \
   --cpu 2 --wall-timeout 120 \
@@ -286,6 +366,6 @@ the stable comparison numbers.
 - **GPU threads are pinned with `--cpu`,** which also sets affinity
  for any threads the core spawns.
 - **Run artifacts go under `--output-dir`** (default
- `./test-harness-runs/<YYYYMMDD-HHMMSS-pid>/`); the temp `work/`
+ `./opera-test-harness-runs/<YYYYMMDD-HHMMSS-pid>/`); the temp `work/`
  subdir (system + save) is removed unless `--keep-work-dir` or
  `--work-dir` is set.

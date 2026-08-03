@@ -8,5 +8,9 @@
 /libs/
 *.a
 /test-harness
+/test-harness-presenter
 /test-harness-runs/
+/opera-test-harness
+/opera-test-harness-presenter
+/opera-test-harness-runs/
 .vscode/pro-deployer.json
