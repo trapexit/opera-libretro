@@ -32,6 +32,14 @@
 #define PRESENTER_FPS_SAMPLES 60
 #define PRESENTER_MESSAGE_TIMEOUT_MS 1000
 #define PRESENTER_BACKGROUND_AUDIO_LEAD_US INT64_C(100000)
+/* Media older than these windows behind the clock is dropped instead of
+   played: after any pipeline stall the producer catches up by reading
+   ahead of real time, and playing that backlog would permanently skew
+   audio behind video (video self-corrects via the clock, audio does not). */
+#define PRESENTER_BACKGROUND_VIDEO_STALE_US INT64_C(100000)
+#define PRESENTER_BACKGROUND_AUDIO_STALE_US INT64_C(250000)
+/* Cap on queued-but-unplayed audio sitting in the SDL device queue. */
+#define PRESENTER_BACKGROUND_AUDIO_MAX_QUEUE_US INT64_C(250000)
 #define PRESENTER_CLIENT_READ_BUDGET_BYTES (16U * 1024U * 1024U)
 #define PRESENTER_CLIENT_MESSAGE_BUDGET 32U
 
@@ -62,6 +70,7 @@ struct presenter_t
   SDL_AudioDeviceID audio_device;
   SDL_AudioStream *audio_stream;
   SDL_AudioSpec obtained_audio;
+  size_t audio_queue_limit_bytes;
   PresenterBackground *background;
   PresenterBackgroundInfo background_info;
   int listen_fd;
@@ -91,6 +100,7 @@ struct presenter_t
   bool background_socket_bound;
   bool background_info_reported;
   bool background_client_active;
+  int background_pending_fd;
   bool background_frame_ready;
   bool background_clock_started;
   bool harness_frame_ready;
@@ -209,6 +219,16 @@ static
 void
 _accept_background_client(presenter_t *presenter_);
 
+// Starts a connected background feed, taking ownership of the fd either way.
+static
+int
+_start_background_feed(presenter_t *presenter_,
+                       int          client_);
+
+// Promotes a held background connection once the active feed has ended.
+static
+void
+_maybe_start_pending_background(presenter_t *presenter_);
 static
 void
 handle_signal(int signal_)
@@ -449,6 +469,7 @@ close_audio(presenter_t *presenter_)
   if(presenter_->audio_device != 0)
     SDL_CloseAudioDevice(presenter_->audio_device);
   presenter_->audio_device = 0;
+  presenter_->audio_queue_limit_bytes = 0;
   memset(&presenter_->obtained_audio, 0, sizeof(presenter_->obtained_audio));
 }
 
@@ -512,6 +533,12 @@ configure_audio(presenter_t *presenter_,
       if(presenter_->audio_device == 0)
         return -1;
       SDL_PauseAudioDevice(presenter_->audio_device, 0);
+      presenter_->audio_queue_limit_bytes =
+        ((size_t)presenter_->obtained_audio.freq *
+         (size_t)presenter_->obtained_audio.channels *
+         ((size_t)SDL_AUDIO_BITSIZE(presenter_->obtained_audio.format) / 8U) *
+         (size_t)PRESENTER_BACKGROUND_AUDIO_MAX_QUEUE_US) /
+        UINT64_C(1000000);
     }
 
   if(presenter_->source_sample_rate == sample_rate_)
@@ -825,6 +852,7 @@ _finish_background_client(presenter_t *presenter_)
   _clear_background_media(presenter_);
   if(presenter_->source == PresenterSource_BACKGROUND)
     _show_waiting(presenter_);
+  _maybe_start_pending_background(presenter_);
 }
 
 static
@@ -867,6 +895,12 @@ _pump_background_packets(presenter_t *presenter_)
     {
       int result;
 
+      if(packet.pts_us < (current_pts - PRESENTER_BACKGROUND_VIDEO_STALE_US))
+        {
+          /* Late after a stall: skip instead of playing catch-up. */
+          presenter_background_release_packet(&packet);
+          continue;
+        }
       result = _update_background_video(presenter_, &packet);
       presenter_background_release_packet(&packet);
       if(result != 0)
@@ -881,7 +915,24 @@ _pump_background_packets(presenter_t *presenter_)
 
       result = 0;
       if(presenter_->source == PresenterSource_BACKGROUND)
-        result = queue_audio(presenter_, packet.data, (uint32_t)packet.size);
+        {
+          if(packet.pts_us < (current_pts - PRESENTER_BACKGROUND_AUDIO_STALE_US))
+            {
+              /* Late after a stall: drop so audio snaps back to video. */
+              presenter_background_release_packet(&packet);
+              continue;
+            }
+          if(SDL_GetQueuedAudioSize(presenter_->audio_device) >=
+             presenter_->audio_queue_limit_bytes)
+            {
+              /* Device backlog at the cap: stop feeding so a producer
+                 catch-up cannot push playback permanently behind video.
+                 The surplus stays queued here and is dropped once stale. */
+              presenter_background_release_packet(&packet);
+              break;
+            }
+          result = queue_audio(presenter_, packet.data, (uint32_t)packet.size);
+        }
       presenter_background_release_packet(&packet);
       if(result != 0)
         return -1;
@@ -894,11 +945,19 @@ void
 _update_background(presenter_t *presenter_)
 {
   PresenterBackgroundInfo info;
+  char error[256];
 
-  if(presenter_background_has_ended(presenter_->background, NULL, 0U))
+  error[0] = 0;
+  if(presenter_background_has_ended(presenter_->background,
+                                    error, sizeof(error)))
     {
-      _finish_background_client(presenter_);
-      return;
+      if((error[0] != 0) ||
+         !presenter_background_has_packets(presenter_->background))
+        {
+          _finish_background_client(presenter_);
+          return;
+        }
+      /* Clean EOF with a queued tail: keep draining until it has played. */
     }
   if(!presenter_background_get_info(presenter_->background, &info))
     return;
@@ -920,6 +979,7 @@ _update_background(presenter_t *presenter_)
       _clear_background_media(presenter_);
       if(presenter_->source == PresenterSource_BACKGROUND)
         _show_waiting(presenter_);
+      _maybe_start_pending_background(presenter_);
     }
 }
 
@@ -1401,15 +1461,65 @@ _accept_background_client(presenter_t *presenter_)
   client = accept(presenter_->background_listen_fd, NULL, NULL);
   if(client < 0)
     return;
-  if(presenter_->background_client_active ||
-     (_set_nonblocking(client) != 0) ||
-     (presenter_background_start(presenter_->background, client) != 0))
+  if(presenter_->background_client_active)
     {
-      close(client);
-      return;
+      if(presenter_background_has_ended(presenter_->background, NULL, 0))
+        {
+          /* The active feed has already hit EOF and is only draining its
+             tail at the wall clock. Holding the new producer until the
+             drain completes freezes it mid-file for the whole tail (the
+             tail can be seconds long after a producer catch-up). The
+             drain exists only to play out stale media: background media
+             is disposable, so drop the corpse and take the new feed. */
+          presenter_background_stop(presenter_->background);
+          presenter_->background_client_active = false;
+          _clear_background_media(presenter_);
+          if(presenter_->source == PresenterSource_BACKGROUND)
+            _show_waiting(presenter_);
+        }
+      else
+        {
+          /* The active feed is still streaming: closing the new
+             connection would kill its producer with EPIPE, so hold it
+             and start it once the current feed has ended. */
+          if(presenter_->background_pending_fd >= 0)
+            close(presenter_->background_pending_fd);
+          presenter_->background_pending_fd = client;
+          return;
+        }
+    }
+  _start_background_feed(presenter_, client);
+}
+
+static
+int
+_start_background_feed(presenter_t *presenter_,
+                       int          client_)
+{
+  if((_set_nonblocking(client_) != 0) ||
+     (presenter_background_start(presenter_->background, client_) != 0))
+    {
+      close(client_);
+      return -1;
     }
   presenter_->background_client_active = true;
   fprintf(stderr, "opera-test-harness-presenter: background feed connected\n");
+  return 0;
+}
+
+static
+void
+_maybe_start_pending_background(presenter_t *presenter_)
+{
+  int client;
+
+  if(presenter_->background_pending_fd < 0)
+    return;
+  client = presenter_->background_pending_fd;
+  presenter_->background_pending_fd = -1;
+  if(_start_background_feed(presenter_, client) != 0)
+    fprintf(stderr,
+            "opera-test-harness-presenter: cannot start pending background feed\n");
 }
 
 static
@@ -1472,6 +1582,8 @@ cleanup(presenter_t *presenter_)
     close(presenter_->listen_fd);
   if(presenter_->background_listen_fd >= 0)
     close(presenter_->background_listen_fd);
+  if(presenter_->background_pending_fd >= 0)
+    close(presenter_->background_pending_fd);
   if(presenter_->socket_bound && (presenter_->socket_path[0] != 0))
     unlink(presenter_->socket_path);
   if(presenter_->background_socket_bound &&
@@ -1504,6 +1616,7 @@ main(int    argc_,
   presenter.background_listen_fd = -1;
   presenter.client_fd = -1;
   presenter.pending_fd = -1;
+  presenter.background_pending_fd = -1;
   presenter.source = PresenterSource_WAITING;
   socket_arg = NULL;
   background_socket_arg = NULL;

@@ -52,6 +52,8 @@ bool presenter_background_has_ended(PresenterBackground *background_,
                                     char                *error_,
                                     size_t               error_size_);
 
+// Reports whether any queued media remains to be played.
+bool presenter_background_has_packets(PresenterBackground *background_);
 // Returns the earliest queued timestamp, or false while no packet is available.
 bool presenter_background_first_pts(PresenterBackground *background_,
                                     int64_t             *pts_us_);

@@ -6,16 +6,10 @@ harness=${2:-./opera-test-harness}
 tmp_dir=$(mktemp -d /tmp/opera-presenter-test.XXXXXX)
 presenter_pid=
 feed_pid=
-socket_path="$tmp_dir/opera-test-harness-presenter.sock"
-background_socket_path="$tmp_dir/opera-test-harness-presenter-background.sock"
-
-cleanup()
-{
-  if [ -n "$feed_pid" ]; then
-    kill "$feed_pid" 2>/dev/null || true
-    wait "$feed_pid" 2>/dev/null || true
-  fi
-  if [ -n "$presenter_pid" ]; then
+  if [ -n "$overlap_pid" ]; then
+    kill "$overlap_pid" 2>/dev/null || true
+    wait "$overlap_pid" 2>/dev/null || true
+  fi  if [ -n "$presenter_pid" ]; then
     kill "$presenter_pid" 2>/dev/null || true
     wait "$presenter_pid" 2>/dev/null || true
   fi
@@ -180,6 +174,76 @@ done
 wait "$feed_pid" 2>/dev/null || true
 feed_pid=
 
+<<<<<<< HEAD
+=======
+# A feed connecting while another is still active must be held, not
+# closed: closing it kills the producer with EPIPE ("Broken pipe") and
+# the file gets skipped. The held feed starts once the active feed ends.
+ffmpeg -hide_banner -loglevel error \
+  -re -f lavfi -i testsrc2=size=320x240:rate=30 \
+  -re -f lavfi -i sine=frequency=440:sample_rate=48000 \
+  -t 6 -map 0:v:0 -map 1:a:0 \
+  -c:v rawvideo -pix_fmt yuv420p \
+  -c:a pcm_s16le -ac 2 -ar 48000 -f nut \
+  "unix://$background_socket_path" \
+  >"$tmp_dir/feed-active.log" 2>&1 &
+feed_pid=$!
+i=0
+while [ "$(grep -Fc 'background feed connected' "$tmp_dir/presenter.log" || true)" -lt 4 ]; do
+  i=$((i + 1))
+  if [ "$i" -ge 200 ]; then
+    cat "$tmp_dir/presenter.log" >&2
+    cat "$tmp_dir/feed-active.log" >&2
+    echo "presenter did not activate the active feed" >&2
+    exit 1
+  fi
+  sleep 0.02
+done
+
+ffmpeg -hide_banner -loglevel error \
+  -re -f lavfi -i testsrc2=size=160x120:rate=30 \
+  -re -f lavfi -i sine=frequency=880:sample_rate=48000 \
+  -t 2 -map 0:v:0 -map 1:a:0 \
+  -c:v rawvideo -pix_fmt yuv420p \
+  -c:a pcm_s16le -ac 2 -ar 48000 -f nut \
+  "unix://$background_socket_path" \
+  >"$tmp_dir/feed-overlap.log" 2>&1 &
+overlap_pid=$!
+
+# The overlapping feed must be held, not closed: closing it kills the
+# producer with EPIPE ("Broken pipe") and the file gets skipped. Give
+# the active feed a moment to prove the overlap, then require the held
+# feed to play out only after the active feed has ended.
+sleep 3
+if grep -Fq 'Broken pipe' "$tmp_dir/feed-overlap.log"; then
+  cat "$tmp_dir/feed-active.log" >&2
+  cat "$tmp_dir/feed-overlap.log" >&2
+  echo "overlapping background feed was closed by the presenter" >&2
+  exit 1
+fi
+
+# Once the active feed ends, the held feed must be started and play out.
+wait "$feed_pid" 2>/dev/null || true
+feed_pid=
+i=0
+while [ "$(grep -Fc 'background feed connected' "$tmp_dir/presenter.log" || true)" -lt 5 ]; do
+  i=$((i + 1))
+  if [ "$i" -ge 200 ]; then
+    cat "$tmp_dir/presenter.log" >&2
+    cat "$tmp_dir/feed-overlap.log" >&2
+    echo "held background feed was not started after the active feed ended" >&2
+    exit 1
+  fi
+  sleep 0.02
+done
+if ! wait "$overlap_pid" 2>/dev/null; then
+  cat "$tmp_dir/feed-overlap.log" >&2
+  echo "held background feed failed to play out" >&2
+  exit 1
+fi
+overlap_pid=
+
+>>>>>>> 0f1ae1d (Add persistent harness stream presenter)
 if XDG_RUNTIME_DIR="$tmp_dir" "$harness" \
   --core "$harness" \
   --bios "$harness" \
