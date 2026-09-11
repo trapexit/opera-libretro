@@ -35,6 +35,7 @@ struct opera_lr_opts_t
   opera_mem_cfg_t mem_cfg;
   bool hide_lightgun_crosshairs;
   char const *madam_matrix_engine;
+  char const *arm_engine;
   bool kprint;
   bool dsp_threaded;
   bool swi_hle;

@@ -650,6 +650,43 @@ opera_lr_opts_set_madam_matrix_engine(opera_lr_opts_t const *opts_)
 
 static
 void
+opera_lr_opts_get_arm_engine(opera_lr_opts_t *opts_)
+{
+  const char *val;
+
+  opts_->arm_engine = "cache";
+
+  val = getval("arm_engine");
+  if(val == NULL)
+    return;
+
+  if(!strcmp(val,"interp"))
+    opts_->arm_engine = "interp";
+  else if(!strcmp(val,"jit"))
+    opts_->arm_engine = "jit";
+  else
+    opts_->arm_engine = "cache";
+}
+
+static
+void
+opera_lr_opts_set_arm_engine(opera_lr_opts_t const *opts_)
+{
+  if(g_OPTS.initialized_opera)
+    return;
+
+  if(!strcmp(opts_->arm_engine,"interp"))
+    opera_arm_engine_opt_set(0);
+  else if(!strcmp(opts_->arm_engine,"jit"))
+    opera_arm_engine_opt_set(3);
+  else
+    opera_arm_engine_opt_set(1);
+
+  g_OPTS.arm_engine = opts_->arm_engine;
+}
+
+static
+void
 opera_lr_opts_get_kprint(opera_lr_opts_t *opts_)
 {
   opts_->kprint = getval_is_enabled("kprint",false);
@@ -680,6 +717,14 @@ opera_lr_opts_set_dsp_threaded(opera_lr_opts_t const *opts_)
 {
   opera_lr_dsp_init(opts_->dsp_threaded);
   g_OPTS.dsp_threaded = opts_->dsp_threaded;
+
+  /* the JIT's FIQ-poll emission shape depends on the threading
+   * state (mid-slice FIQPEND writes are possible only with the
+   * worker thread); refresh the snapshot and flush resident
+   * blocks when it changed */
+  {
+    opera_arm_jit_dsp_thread_refresh();
+  }
 }
 
 static
@@ -706,6 +751,7 @@ opera_lr_opts_get(opera_lr_opts_t *opts_)
   opera_lr_opts_get_bios(opts_);
   opera_lr_opts_get_font(opts_);
   opera_lr_opts_get_madam_matrix_engine(opts_);
+  opera_lr_opts_get_arm_engine(opts_);
 
   opera_lr_opts_get_active_devices(opts_);
   opera_lr_opts_get_cd_speed(opts_);
@@ -732,6 +778,7 @@ opera_lr_opts_set(opera_lr_opts_t const *opts_)
   opera_lr_opts_set_bios(opts_);
   opera_lr_opts_set_font(opts_);
   opera_lr_opts_set_madam_matrix_engine(opts_);
+  opera_lr_opts_set_arm_engine(opts_);
 
   // Can be updated at any time
   opera_lr_opts_set_active_devices(opts_);

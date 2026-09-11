@@ -47,7 +47,10 @@ uint32_t opera_clio_line_vint0(void);
 uint32_t opera_clio_line_vint1(void);
 
 int      opera_clio_fiq_needed(void);
+const uint32_t *opera_clio_regs_ptr(void);
+const uint32_t *opera_clio_fiqpend_ptr(void);
 void     opera_clio_fiq_generate(uint32_t reason1_, uint32_t reason2_);
+uint64_t opera_clio_state_hash(void);
 
 void     opera_clio_fifo_write(uint32_t addr_, uint32_t val_);
 uint32_t opera_clio_fifo_read(uint32_t addr_);

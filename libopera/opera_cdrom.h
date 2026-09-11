@@ -31,6 +31,8 @@
 #ifndef LIBOPERA_CDROM_H_INCLUDED
 #define LIBOPERA_CDROM_H_INCLUDED
 
+#include "boolean.h"
+
 #include "extern_c.h"
 
 #include <stddef.h>
@@ -318,6 +320,7 @@ void    opera_cdrom_ode_set_root(const char *root_);
 void    opera_cdrom_ode_set_launch_callback(opera_cdrom_ode_launch_cb_t launch_);
 int     opera_cdrom_ode_consume_restart_request(void);
 int     opera_cdrom_ode_restart_requested(void);
+const bool *opera_cdrom_ode_restart_ptr(void);
 void     opera_cdrom_ode_reset_session(void);
 
 EXTERN_C_END

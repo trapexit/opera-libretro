@@ -68,10 +68,25 @@ opera_sport_set_source(const uint32_t rawidx_)
 static
 INLINE
 void
+sport_jit_touch(const uint32_t idx_)
+{
+  /* SPORT writes VRAM directly, bypassing the opera_mem write inlines
+   * the JIT invalidation hooks live in.  idx_ is VRAM-relative and
+   * VRAM == &DRAM[DRAM_SIZE], so the guest address is DRAM_SIZE+idx_;
+   * the hi-res fanout below composes the same way (each mirror is
+   * DRAM_SIZE+idx_+k*VRAM_SIZE, mirroring opera_mem_write32's). */
+  opera_mem_jit_touch_range(DRAM_SIZE + idx_,SPORT_BUFSIZE);
+}
+
+static
+INLINE
+void
 sport_set_color(const uint32_t idx_)
 {
   int i;
   uint32_t * const vram = (uint32_t * const)&VRAM[idx_];
+
+  sport_jit_touch(idx_);
 
   for(i = 0; i < SPORT_ELEM_COUNT; i++)
     vram[i] = SPORT.color;
@@ -86,6 +101,8 @@ sport_set_color_with_mask(const uint32_t idx_,
   int i;
   uint32_t * const vram = (uint32_t * const)&VRAM[idx_];
 
+  sport_jit_touch(idx_);
+
   for(i = 0; i < SPORT_ELEM_COUNT; i++)
     vram[i] = (((vram[i] ^ SPORT.color) & mask_) ^ SPORT.color);
 }
@@ -96,6 +113,7 @@ void
 sport_memcpy(const uint32_t didx_,
              const uint32_t sidx_)
 {
+  sport_jit_touch(didx_);
   memcpy(&VRAM[didx_],&VRAM[sidx_],SPORT_BUFSIZE);
 }
 
@@ -151,6 +169,8 @@ sport_copy_page_color_with_mask(const uint32_t mask_)
   int i;
   uint32_t const * const svram = (uint32_t const * const)&VRAM[SPORT.source];
   uint32_t * const       dvram = (uint32_t * const)&VRAM[SPORT.destination];
+
+  sport_jit_touch(SPORT.destination);
 
   for(i = 0; i < SPORT_ELEM_COUNT; i++)
     dvram[i] = (((dvram[i] ^ svram[i]) & mask_) ^ svram[i]);

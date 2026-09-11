@@ -34,11 +34,13 @@
 
 #include "opera_arm.h"
 #include "opera_arm_core.h"
-#include "opera_3do.h"
+#include "opera_cdrom.h"
 #include "opera_clio.h"
 #include "opera_core.h"
 #include "opera_diag_port.h"
 #include "opera_fixedpoint_math.h"
+#include "opera_3do.h"
+#include "opera_dsp.h"
 #include "opera_madam.h"
 #include "opera_mem.h"
 #include "opera_xbus.h"
@@ -49,6 +51,28 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+/* Optional block-compiling dynarec for the ARM60 core (engine id 3,
+ * selected via the opera_arm_engine core option).  The implementation is
+ * #included at the bottom of this file so it can share the file-static CPU
+ * core, handlers, classifier and poll pointers.
+ *
+ * ENCODING BACKEND MATRIX: which (arch, OS) pairs get a jit at all is
+ * decided in opera_arm_jit_backend.h (per-backend gates + the master
+ * kill-switch OPERA_JIT_BACKENDS=0).  The matrix covers: x86-64 SysV
+ * (shipped, gate-proven), x86-64 Win64, AArch64, Armv7.  When the
+ * matrix selects nothing, the jit compiles out and the engine falls
+ * back to cache/interp exactly like an unsupported host. */
+#include "opera_arm_jit_backend.h"
+#if defined(OPERA_JIT_HAVE_BACKEND)
+#define OPERA_ARM_JIT_ENABLED 1
+#endif
+
+#ifdef OPERA_ARM_JIT_ENABLED
+static int32_t arm_jit_exec_slice(int32_t budget_);
+#endif
+void opera_arm_jit_destroy(void);   /* real impl or no-op stub at EOF */
+
 
 /*
   HACK
@@ -141,6 +165,17 @@ static arm_core_t CPU;
 static int        CYCLES;	//cycle counter
 static bool       g_SOFT_RESET_PENDING = false;
 static uint32_t   carry_out = 0;
+static int        g_arm_engine = 1;
+/* ARM engine selection: 0 = interpreter, 1 = cached, 3 = JIT dynarec
+ * (2 is the internal cached-alloc-failed fallback marker) */
+/* libretro core-option selection: -1 = unset (default cache), else 0/1/3 */
+static int        g_arm_engine_opt = -1;
+
+void
+opera_arm_engine_opt_set(int engine_)
+{
+  g_arm_engine_opt = engine_;
+}
 
 static uint32_t readusr(uint32_t const rn);
 static void     loadusr(uint32_t const rn, uint32_t const val);
@@ -148,6 +183,17 @@ static uint32_t mreadb(uint32_t const addr);
 static void     mwriteb(uint32_t const addr, uint8_t const val);
 static uint32_t mreadw(uint32_t const addr);
 static void     mwritew(uint32_t const addr,uint32_t const val);
+static int32_t arm_execute_interp(void);
+
+/* one-time bound pointers for call-free per-instruction polling */
+static const uint32_t *g_clio_regs;
+static const uint32_t *g_clio_fiqpend;
+static const uint32_t *g_madam_fsm_poll;
+static const bool     *g_cdrom_restart_poll;
+
+#define arm_fiq_pending_()  (*g_clio_fiqpend)
+#define arm_madam_inprocess_()  (*g_madam_fsm_poll == FSM_INPROCESS)
+#define arm_cdrom_restart_()    (*g_cdrom_restart_poll != false)
 
 static
 bool
@@ -648,10 +694,29 @@ ROTR(const uint32_t val_,
           val_);
 }
 
+static void arm_cache_alloc(void);
+static void arm_cache_free(void);
+
 void
 opera_arm_init(void)
 {
   int i;
+
+  g_arm_engine = (g_arm_engine_opt >= 0) ? g_arm_engine_opt : 1;
+#ifndef OPERA_ARM_JIT_ENABLED
+  if(g_arm_engine == 3)
+    g_arm_engine = 1;
+#endif
+
+  if(g_arm_engine != 3)
+    arm_cache_alloc();
+
+  g_clio_regs          = opera_clio_regs_ptr();
+  g_clio_fiqpend       = opera_clio_fiqpend_ptr();
+  g_madam_fsm_poll     = opera_madam_fsm_ptr();
+  g_cdrom_restart_poll = opera_cdrom_ode_restart_ptr();
+
+  opera_arm_fetch_window_flush();
 
   g_SWI_HLE = 0;
   carry_out = 0;
@@ -683,7 +748,8 @@ opera_arm_init(void)
 void
 opera_arm_destroy(void)
 {
-
+  arm_cache_free();
+  opera_arm_jit_destroy();
 }
 
 void
@@ -965,35 +1031,58 @@ decode_swi_lle(void)
 
 static void decode_swi_hle(const uint32_t op_)
 {
+  uint32_t r0_;
+  uint32_t cnt_;
+
   switch(op_ & 0x000FFFFF)
     {
     case 0x50000:
+      r0_ = CPU.USER[0];
       opera_swi_hle_0x50000(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_mem_jit_touch_range(r0_,12u);   /* dest vec3f16 */
       return;
     case 0x50001:
+      r0_ = CPU.USER[0];
       opera_swi_hle_0x50001(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_mem_jit_touch_range(r0_,36u);   /* dest mat33f16 */
       return;
     case 0x50002:
+      r0_ = CPU.USER[0];
+      cnt_ = CPU.USER[3];
       opera_swi_hle_0x50002(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_mem_jit_touch_range(r0_,(cnt_ * 12u));   /* dest vec3[] */
       return;
     case 0x50003:
       break;
     case 0x50004:
       break;
     case 0x50005:
+      r0_ = CPU.USER[0];
+      cnt_ = CPU.USER[3];
       opera_swi_hle_0x50005(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_mem_jit_touch_range(r0_,(cnt_ * 4u));    /* dest frac16[] */
       return;
     case 0x50006:
+      r0_ = CPU.USER[0];
+      cnt_ = CPU.USER[3];
       opera_swi_hle_0x50006(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_mem_jit_touch_range(r0_,(cnt_ * 4u));    /* dest frac16[] */
       return;
     case 0x50007:
+      r0_ = CPU.USER[0];
       opera_swi_hle_0x50007(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_mem_jit_touch_range(r0_,16u);   /* dest vec4f16 */
       return;
     case 0x50008:
+      r0_ = CPU.USER[0];
       opera_swi_hle_0x50008(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_mem_jit_touch_range(r0_,64u);   /* dest mat44f16 */
       return;
     case 0x50009:
+      r0_ = CPU.USER[0];
+      cnt_ = CPU.USER[3];
       opera_swi_hle_0x50009(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_mem_jit_touch_range(r0_,(cnt_ * 16u));   /* dest vec4[] */
       return;
     case 0x5000A:
       break;
@@ -1003,7 +1092,9 @@ static void decode_swi_hle(const uint32_t op_)
       CPU.USER[0] = opera_swi_hle_0x5000C(DRAM,CPU.USER[0],CPU.USER[1]);
       return;
     case 0x5000E:
+      r0_ = CPU.USER[0];
       opera_swi_hle_0x5000E(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2]);
+      opera_mem_jit_touch_range(r0_,12u);   /* dest vec3f16 */
       return;
     case 0x5000F:
       CPU.USER[0] = opera_swi_hle_0x5000F(DRAM,CPU.USER[0]);
@@ -1012,11 +1103,19 @@ static void decode_swi_hle(const uint32_t op_)
       CPU.USER[0] = opera_swi_hle_0x50010(DRAM,CPU.USER[0]);
       return;
     case 0x50011:
+      r0_ = CPU.USER[0];
       opera_swi_hle_0x50011(DRAM,CPU.USER[0],CPU.USER[1],CPU.USER[2],CPU.USER[3]);
+      opera_mem_jit_touch_range(r0_,12u);   /* dest vec3f16 */
       return;
     case 0x50012:
-      opera_swi_hle_0x50012(DRAM,CPU.USER[0]);
-      return;
+      {
+        /* mmv3m33d: the destination pointer itself lives at [r0+0] */
+        r0_ = *(uint32_t*)&DRAM[CPU.USER[0]];
+        cnt_ = *(uint32_t*)&DRAM[CPU.USER[0] + 0x10];
+        opera_swi_hle_0x50012(DRAM,CPU.USER[0]);
+        opera_mem_jit_touch_range(r0_,(cnt_ * 12u));   /* dest vec3[] */
+        return;
+      }
     }
 
   decode_swi_lle();
@@ -1104,7 +1203,7 @@ ARM_SET_CV_sub(uint32_t rd_,
 }
 
 static
-INLINE
+OPERA_FORCEINLINE
 int
 ARM_ALU_Exec(uint32_t  inst_,
              uint8_t   opc_,
@@ -1251,6 +1350,7 @@ ARM_ALU_Exec(uint32_t  inst_,
 }
 
 static
+OPERA_FORCEINLINE
 uint32_t
 ARM_SHIFT_NSC(uint32_t value_,
               uint8_t  shift_,
@@ -1420,6 +1520,7 @@ ARM_SHIFT_SC(uint32_t value_,
 }
 
 static
+OPERA_FORCEINLINE
 void
 ARM_SWAP(uint32_t cmd_)
 {
@@ -1515,8 +1616,1787 @@ static const int is_logic[] =
     true,true,true,true
   };
 
+/* ---------------------------------------------------------------------------
+ * Cached decode engine.
+ *
+ * Per-word decode cache for the RAM and ROM/ANVIL address windows.  Each
+ * entry stores the raw instruction word as a tag plus the handler for its
+ * instruction class.  A hit validates the tag against the freshly fetched
+ * word, so self-modifying code, save-state loads, ROM swaps, and any other
+ * content mutation re-decode automatically.  Fetches outside the cached
+ * windows (MADAM/CLIO/SPORT/NVRAM/diag space or unmapped addresses) take
+ * the interpreter path verbatim, preserving 0xBADACCE5 and fault behavior.
+ *
+ * Handler bodies are line-for-line transcriptions of the interpreter case
+ * bodies: identical CYCLES arithmetic, identical CPU.USER[15] bump/restore
+ * points (pipeline exposure), identical flag update order.  The per-
+ * instruction soft-reset and FIQ tails live in arm_execute_slice()'s
+ * per-word tails and match the interpreter's sequencing.
+ * ------------------------------------------------------------------------- */
+enum
+  {
+    ARM_CLS_DP_IMM,   /* data processing, immediate operand            */
+    ARM_CLS_DP_RS,    /* data processing, register, shift-by-register  */
+    ARM_CLS_DP_RI,    /* data processing, register, shift-by-immediate */
+    ARM_CLS_SDT_IMM,  /* single data transfer, immediate offset        */
+    ARM_CLS_SDT_RI,   /* single data transfer, register offset         */
+    ARM_CLS_SDT_RS,   /* single data transfer, register-shifted offset */
+    ARM_CLS_MUL,      /* multiply / multiply-accumulate                */
+    ARM_CLS_SDS,      /* single data swap                              */
+    ARM_CLS_BDT,      /* block data transfer                           */
+    ARM_CLS_BRANCH,   /* branch / branch-with-link                     */
+    ARM_CLS_SWI,      /* SWI (LLE or HLE)                              */
+    ARM_CLS_UND,      /* undefined-instruction trap + coprocessor      */
+    ARM_CLS_SPEC,     /* 0xE5101810 CPSR-latch special                 */
+    ARM_CLS_DP_IMM_NP,/* variants with no r15 operand: the interpreter's */
+    ARM_CLS_DP_RS_NP, /* PC bump/restore pairs are provably unobserved   */
+    ARM_CLS_DP_RI_NP, /* within these bodies (no operand reads USER[15], */
+    ARM_CLS_SDT_IMM_NP,/* no write targets r15), so they are elided     */
+    ARM_CLS_SDT_RI_NP,
+
+    /* >= ARM_CLS_TIGHT_MIN: poll-free tight-loop classes.  These forms
+     * cannot perform stores, cannot write a control register (MSR forms
+     * opc 18/22 excluded at decode), cannot trap, and cannot write the
+     * PC - so no FIQ/MADAM/CD-ROM/ROM-bank state they could touch
+     * changes while they run, and the per-instruction soft-reset can
+     * never fire.  Only cycle accounting, condition evaluation, and the
+     * budget check are semantically observable; those stay. */
+    ARM_CLS_TIGHT_MIN,
+    ARM_CLS_TIGHT_DP_IMM = ARM_CLS_TIGHT_MIN,
+    ARM_CLS_TIGHT_DP_RS,
+    ARM_CLS_TIGHT_DP_RI,
+    ARM_CLS_TIGHT_MUL,
+    ARM_CLS_TIGHT_BRANCH,
+    ARM_CLS_TIGHT_SDT_LDI, /* poll-free single-data LOAD, imm offset  */
+    ARM_CLS_TIGHT_SDT_LDR, /* poll-free single-data LOAD, reg offset  */
+    ARM_CLS_TIGHT_SDT_STI, /* poll-free DRAM-safe single-data STORE,imm */
+    ARM_CLS_TIGHT_SDT_STR, /* poll-free DRAM-safe single-data STORE,reg */
+    ARM_CLS_TIGHT_DP_PC,   /* rd == 15, S = 0: inlineable pc-write DP    */
+    ARM_CLS_TIGHT_DP_PCREL, /* rn == 15: op1 = pc_k + 4, a compile-time
+                            * constant; every other shape is tight      */
+    ARM_CLS_TIGHT_DP_RMPC  /* rm == 15 (rd,rn != 15): op2 = USER[15] read
+                            * after the pipeline bump = pc_k + 8, a
+                            * compile-time constant; the op2 load
+                            * collapses to one imm32 */
+  };
+
+typedef struct
+{
+  uint32_t word;
+  uint32_t aux;
+  uint32_t cls;
+  uint32_t sealed;
+} arm_cache_entry_t;
+
+static arm_cache_entry_t *g_arm_cache_ram;
+static arm_cache_entry_t *g_arm_cache_rom;
+static uint32_t           g_arm_cache_ram_words = 0;
+static uint32_t           g_arm_cache_rom_words = 0;
+
+static
+void
+arm_cache_free(void)
+{
+  free(g_arm_cache_ram);
+  free(g_arm_cache_rom);
+  g_arm_cache_ram       = NULL;
+  g_arm_cache_rom       = NULL;
+  g_arm_cache_ram_words = 0;
+  g_arm_cache_rom_words = 0;
+}
+
+static
+void
+arm_cache_alloc(void)
+{
+  uint32_t const ram_words = (RAM_SIZE >> 2);
+  uint32_t const rom_words = ((ROM1_SIZE_MASK + 1) >> 2);
+
+  if(g_arm_cache_ram && (g_arm_cache_ram_words == ram_words))
+    return;
+
+  arm_cache_free();
+
+  {
+    arm_cache_entry_t *const ram_ = calloc(ram_words,sizeof(arm_cache_entry_t));
+    arm_cache_entry_t *const rom_ = calloc(rom_words,sizeof(arm_cache_entry_t));
+
+    if(!ram_ || !rom_)
+      {
+        /* partial failure: free both so the wrapper's g_arm_cache_ram
+         * NULL test degrades the engine to interp cleanly (a NULL rom
+         * array with a live ram array used to leave the fallback gate
+         * blind and the first ROM fetch dereferencing near-NULL) */
+        free(ram_);
+        free(rom_);
+        return;
+      }
+
+    g_arm_cache_ram       = ram_;
+    g_arm_cache_rom       = rom_;
+    g_arm_cache_ram_words = ram_words;
+    g_arm_cache_rom_words = rom_words;
+  }
+
+  opera_arm_fetch_window_flush();
+}
+
+#define ARM_CACHE_COND_OK(cmd_) \
+  (((cmd_) >> 28) == 0xE || \
+   ((cond_flags_cross[(cmd_) >> 28] >> (CPU.CPSR >> 28)) & 1))
+
+static
+OPERA_FORCEINLINE
+void
+arm_dp_tail(uint32_t cmd_,
+            uint32_t op1_,
+            uint32_t op2_,
+            uint32_t pc_tmp_,
+             int *cycp_)
+{
+  CPU.USER[15] = pc_tmp_;
+
+  if((cmd_ & (1 << 20)) && is_logic[(cmd_ >> 21) & 0xF])
+    ARM_SET_C(carry_out);
+
+  if(ARM_ALU_Exec(cmd_,((cmd_ >> 20) & 0x1F),op1_,op2_,&CPU.USER[(cmd_ >> 12) & 0xF]))
+    return;
+
+  if(((cmd_ >> 12) & 0xF) == 0xF)
+    {
+      if(cmd_ & (1 << 20))
+        arm_cpsr_set(CPU.SPSR[arm_mode_table[MODE]]);
+
+      (*cycp_) -= (ICYCLE + NCYCLE);
+    }
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_dp_imm(uint32_t cmd_,
+             uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t op1;
+  uint32_t op2;
+  uint32_t pc_tmp;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  pc_tmp        = CPU.USER[15];
+  CPU.USER[15] += 4;
+
+  op2 = ARM_SHIFT_NSC(cmd_ & ARM_DP_IMM_MASK,aux_,ARM_SHIFT_TYPE_ROR);
+  op1 = CPU.USER[(cmd_ >> 16) & 0xF];
+
+  arm_dp_tail(cmd_,op1,op2,pc_tmp,cycp_);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_dp_imm_np(uint32_t cmd_,
+                uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t op1;
+  uint32_t op2;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  op2 = ARM_SHIFT_NSC(cmd_ & ARM_DP_IMM_MASK,aux_,ARM_SHIFT_TYPE_ROR);
+  op1 = CPU.USER[(cmd_ >> 16) & 0xF];
+
+  if((cmd_ & (1 << 20)) && is_logic[(cmd_ >> 21) & 0xF])
+    ARM_SET_C(carry_out);
+
+  ARM_ALU_Exec(cmd_,((cmd_ >> 20) & 0x1F),op1,op2,&CPU.USER[(cmd_ >> 12) & 0xF]);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_dp_rs(uint32_t cmd_,
+            uint32_t aux_,
+             int *cycp_)
+{
+  uint8_t  shift;
+  uint32_t op1;
+  uint32_t op2;
+  uint32_t pc_tmp;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  pc_tmp        = CPU.USER[15];
+  CPU.USER[15] += 4;
+
+  shift         = ((cmd_ >> 8) & 0xF);
+  shift         = (CPU.USER[shift] & 0xFF);
+  CPU.USER[15] += 4;
+  op2           = CPU.USER[cmd_ & 0xF];
+  op1           = CPU.USER[(cmd_ >> 16) & 0xF];
+  (*cycp_)       -= ICYCLE;
+
+  op2 = ARM_SHIFT_NSC(op2,shift,((cmd_ >> 5) & 0x3));
+
+  arm_dp_tail(cmd_,op1,op2,pc_tmp,cycp_);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_dp_rs_np(uint32_t cmd_,
+               uint32_t aux_,
+             int *cycp_)
+{
+  uint8_t  shift;
+  uint32_t op1;
+  uint32_t op2;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  shift  = ((cmd_ >> 8) & 0xF);
+  shift  = (CPU.USER[shift] & 0xFF);
+  op2    = CPU.USER[cmd_ & 0xF];
+  op1    = CPU.USER[(cmd_ >> 16) & 0xF];
+  (*cycp_) -= ICYCLE;
+
+  op2 = ARM_SHIFT_NSC(op2,shift,((cmd_ >> 5) & 0x3));
+
+  if((cmd_ & (1 << 20)) && is_logic[(cmd_ >> 21) & 0xF])
+    ARM_SET_C(carry_out);
+
+  ARM_ALU_Exec(cmd_,((cmd_ >> 20) & 0x1F),op1,op2,&CPU.USER[(cmd_ >> 12) & 0xF]);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_dp_ri(uint32_t cmd_,
+            uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t op1;
+  uint32_t op2;
+  uint32_t pc_tmp;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  pc_tmp        = CPU.USER[15];
+  CPU.USER[15] += 4;
+
+  op2 = CPU.USER[cmd_ & 0xF];
+  op1 = CPU.USER[(cmd_ >> 16) & 0xF];
+  op2 = ARM_SHIFT_NSC(op2,(aux_ & 0x3F),((aux_ >> 8) & 0x7));
+
+  arm_dp_tail(cmd_,op1,op2,pc_tmp,cycp_);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_sdt_body(uint32_t cmd_,
+             uint32_t oper2_,
+             uint32_t pc_tmp_,
+             int *cycp_)
+{
+  uint32_t base;
+  uint32_t tbas;
+  uint32_t val;
+  uint32_t rora;
+
+  tbas = base = CPU.USER[((cmd_ >> 16) & 0xF)];
+
+  if(!(cmd_ & (1 << 23)))
+    oper2_ = (0 - oper2_);
+
+  if(cmd_ & (1 << 24))
+    tbas = base = (base + oper2_);
+  else
+    base = (base + oper2_);
+
+  if(cmd_ & (1 << 20))
+    {
+      if(cmd_ & (1 << 22))
+        {
+          val = mreadb(tbas);
+        }
+      else
+        {
+          rora = (tbas & 3);
+          val  = mreadw(tbas);
+
+          if(rora && !CPU.MAS_Access_Exept)
+            val = ROTR(val,rora*8);
+        }
+
+      CPU.USER[15] = pc_tmp_;
+      if(CPU.MAS_Access_Exept)
+        {
+          /* the abort's cycle charge lands in the file-scope CYCLES (the
+           * interpreter's accumulator); transfer it through cycp_ like
+           * arm_h_bdt does, or the cached engine drops the 3 cycles */
+          CYCLES = (*cycp_);
+          arm_data_abort();
+          (*cycp_) = CYCLES;
+          return;
+        }
+
+      if(((cmd_ >> 12) & 0xF) == 0xF)
+        (*cycp_) -= (SCYCLE + NCYCLE);
+
+      (*cycp_) -= (NCYCLE + ICYCLE);
+
+      if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+        CPU.USER[(cmd_ >> 16) & 0xF] = base;
+
+      if((cmd_ & (1 << 21)) && !(cmd_ & (1 << 24)))
+        loadusr((cmd_ >> 12) & 0xF,val);
+      else
+        CPU.USER[(cmd_ >> 12) & 0xF] = val;
+    }
+  else
+    {
+      if((cmd_ & (1 << 21)) && !(cmd_ & (1 << 24)))
+        val = readusr((cmd_ >> 12) & 0xF);
+      else
+        val = CPU.USER[(cmd_ >> 12) & 0xF];
+
+      CPU.USER[15]  = pc_tmp_;
+      (*cycp_)       -= (-SCYCLE + 2 * NCYCLE);
+
+      if(cmd_ & (1 << 22))
+        mwriteb(tbas,val);
+      else
+        mwritew(tbas,val);
+
+      if(g_SOFT_RESET_PENDING)
+        return;
+
+      if(CPU.MAS_Access_Exept)
+        {
+          CYCLES = (*cycp_);
+          arm_data_abort();
+          (*cycp_) = CYCLES;
+          return;
+        }
+
+      if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+        CPU.USER[(cmd_ >> 16) & 0xF] = base;
+    }
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_dp_ri_np(uint32_t cmd_,
+               uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t op1;
+  uint32_t op2;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  op2 = CPU.USER[cmd_ & 0xF];
+  op1 = CPU.USER[(cmd_ >> 16) & 0xF];
+  op2 = ARM_SHIFT_NSC(op2,(aux_ & 0x3F),((aux_ >> 8) & 0x7));
+
+  if((cmd_ & (1 << 20)) && is_logic[(cmd_ >> 21) & 0xF])
+    ARM_SET_C(carry_out);
+
+  ARM_ALU_Exec(cmd_,((cmd_ >> 20) & 0x1F),op1,op2,&CPU.USER[(cmd_ >> 12) & 0xF]);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_sdt_body_np(uint32_t cmd_,
+                uint32_t oper2_,
+             int *cycp_)
+{
+  uint32_t base;
+  uint32_t tbas;
+  uint32_t val;
+  uint32_t rora;
+
+  tbas = base = CPU.USER[((cmd_ >> 16) & 0xF)];
+
+  if(!(cmd_ & (1 << 23)))
+    oper2_ = (0 - oper2_);
+
+  if(cmd_ & (1 << 24))
+    tbas = base = (base + oper2_);
+  else
+    base = (base + oper2_);
+
+  if(cmd_ & (1 << 20))
+    {
+      if(cmd_ & (1 << 22))
+        {
+          val = mreadb(tbas);
+        }
+      else
+        {
+          rora = (tbas & 3);
+          val  = mreadw(tbas);
+
+          if(rora && !CPU.MAS_Access_Exept)
+            val = ROTR(val,rora*8);
+        }
+
+      if(CPU.MAS_Access_Exept)
+        {
+          CYCLES = (*cycp_);
+          arm_data_abort();
+          (*cycp_) = CYCLES;
+          return;
+        }
+
+      (*cycp_) -= (NCYCLE + ICYCLE);
+
+      if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+        CPU.USER[(cmd_ >> 16) & 0xF] = base;
+
+      if((cmd_ & (1 << 21)) && !(cmd_ & (1 << 24)))
+        loadusr((cmd_ >> 12) & 0xF,val);
+      else
+        CPU.USER[(cmd_ >> 12) & 0xF] = val;
+    }
+  else
+    {
+      if((cmd_ & (1 << 21)) && !(cmd_ & (1 << 24)))
+        val = readusr((cmd_ >> 12) & 0xF);
+      else
+        val = CPU.USER[(cmd_ >> 12) & 0xF];
+
+      (*cycp_) -= (-SCYCLE + 2 * NCYCLE);
+
+      if(cmd_ & (1 << 22))
+        mwriteb(tbas,val);
+      else
+        mwritew(tbas,val);
+
+      if(g_SOFT_RESET_PENDING)
+        return;
+
+      if(CPU.MAS_Access_Exept)
+        {
+          CYCLES = (*cycp_);
+          arm_data_abort();
+          (*cycp_) = CYCLES;
+          return;
+        }
+
+      if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+        CPU.USER[(cmd_ >> 16) & 0xF] = base;
+    }
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_imm(uint32_t cmd_,
+              uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t pc_tmp;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  pc_tmp        = CPU.USER[15];
+  CPU.USER[15] += 4;
+
+  arm_sdt_body(cmd_,(cmd_ & 0x0FFF),pc_tmp,cycp_);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_imm_np(uint32_t cmd_,
+                 uint32_t aux_,
+             int *cycp_)
+{
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  arm_sdt_body_np(cmd_,(cmd_ & 0x0FFF),cycp_);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_ri_np(uint32_t cmd_,
+                uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t oper2;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  oper2 = ARM_SHIFT_NSC(CPU.USER[cmd_ & 0xF],(aux_ & 0x3F),((aux_ >> 8) & 0x7));
+
+  arm_sdt_body_np(cmd_,oper2,cycp_);
+}
+
+/* TIGHT_SDT_STI: store counterpart of arm_h_sdt_ldi_t, mirroring the
+ * store half of arm_sdt_body_np exactly.  Fast when the address lands in
+ * DRAM without the HIRES fanout (which also performs the invalidation
+ * hooks via opera_mem_write8/32); anything else defers wholesale to the
+ * classic full body.  Identical cycle accounting: the np store half
+ * charges (-SCYCLE + 2*NCYCLE) on top of the caller's -SCYCLE base. */
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_sti_t(uint32_t cmd_,
+                uint32_t aux_,
+                int *cycp_,
+                int *slow_)
+{
+  uint32_t base;
+  uint32_t tbas;
+  uint32_t val;
+  int      oper2;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+  if(CPU.MAS_Access_Exept)
+    {
+      /* dangling abort flag (SWP-to-XBUS-abort-window can leave one):
+       * the interpreter suppresses the load rotation AND takes the
+       * data abort on the next SDT; the full handlers implement that
+       * contract (rotation guard + arm_data_abort with the cycp_
+       * charge), so a flagged state must not take the tight path. */
+      arm_h_sdt_imm(cmd_,0,cycp_);
+      *slow_ = 1;
+      return;
+    }
+
+  base  = CPU.USER[((cmd_ >> 16) & 0xF)];
+  oper2 = (cmd_ & 0x0FFF);
+
+  if(!(cmd_ & (1 << 23)))
+    oper2 = (0 - oper2);
+
+  if(cmd_ & (1 << 24))
+    tbas = base = (base + oper2);
+  else
+    {
+      tbas = base;
+      base = (base + oper2);
+    }
+
+  val = CPU.USER[(cmd_ >> 12) & 0xF];
+
+  if(cmd_ & (1 << 22))
+    {
+      if((tbas >= (uint32_t)RAM_SIZE) ||
+         (HIRESMODE && (tbas >= (uint32_t)DRAM_SIZE)))
+        {
+          arm_h_sdt_imm(cmd_,0,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      opera_mem_write8(tbas,val);
+    }
+  else
+    {
+      if(((tbas & ~3u) >= (uint32_t)RAM_SIZE) ||
+         (HIRESMODE && ((tbas & ~3u) >= (uint32_t)DRAM_SIZE)))
+        {
+          arm_h_sdt_imm(cmd_,0,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      opera_mem_write32((tbas & ~3u),val);
+    }
+
+  (*cycp_) -= (-SCYCLE + 2 * NCYCLE);
+
+  if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+    CPU.USER[(cmd_ >> 16) & 0xF] = base;
+}
+
+/* register-offset twin of arm_h_sdt_sti_t: oper2 = shifted USER[rm]
+ * (arm_h_sdt_ri_np's line, imm12 replaced).  Same DRAM-window slow
+ * gate, same store + cycle charge, never touches control state. */
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_str_t(uint32_t cmd_,
+                uint32_t aux_,
+                int *cycp_,
+                int *slow_)
+{
+  uint32_t base;
+  uint32_t tbas;
+  uint32_t val;
+  uint32_t oper2;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+  if(CPU.MAS_Access_Exept)
+    {
+      /* dangling abort flag (SWP-to-XBUS-abort-window can leave one):
+       * the interpreter suppresses the load rotation AND takes the
+       * data abort on the next SDT; the full handlers implement that
+       * contract (rotation guard + arm_data_abort with the cycp_
+       * charge), so a flagged state must not take the tight path. */
+      arm_h_sdt_ri_np(cmd_,aux_,cycp_);
+      *slow_ = 1;
+      return;
+    }
+
+  base  = CPU.USER[((cmd_ >> 16) & 0xF)];
+  oper2 = ARM_SHIFT_NSC(CPU.USER[cmd_ & 0xF],
+                        (aux_ & 0x3F),((aux_ >> 8) & 0x7));
+
+  if(!(cmd_ & (1 << 23)))
+    oper2 = (0 - oper2);
+
+  if(cmd_ & (1 << 24))
+    tbas = base = (base + oper2);
+  else
+    {
+      tbas = base;
+      base = (base + oper2);
+    }
+
+  val = CPU.USER[(cmd_ >> 12) & 0xF];
+
+  if(cmd_ & (1 << 22))
+    {
+      if((tbas >= (uint32_t)RAM_SIZE) ||
+         (HIRESMODE && (tbas >= (uint32_t)DRAM_SIZE)))
+        {
+          arm_h_sdt_ri_np(cmd_,aux_,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      opera_mem_write8(tbas,val);
+    }
+  else
+    {
+      if(((tbas & ~3u) >= (uint32_t)RAM_SIZE) ||
+         (HIRESMODE && ((tbas & ~3u) >= (uint32_t)DRAM_SIZE)))
+        {
+          arm_h_sdt_ri_np(cmd_,aux_,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      opera_mem_write32((tbas & ~3u),val);
+    }
+
+  (*cycp_) -= (-SCYCLE + 2 * NCYCLE);
+
+  if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+    CPU.USER[(cmd_ >> 16) & 0xF] = base;
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_ldi_t(uint32_t cmd_,
+                uint32_t aux_,
+                int *cycp_,
+                int *slow_)
+{
+  uint32_t base;
+  uint32_t tbas;
+  uint32_t val;
+  uint32_t rora;
+  int      oper2;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+  if(CPU.MAS_Access_Exept)
+    {
+      /* dangling abort flag (SWP-to-XBUS-abort-window can leave one):
+       * the interpreter suppresses the load rotation AND takes the
+       * data abort on the next SDT; the full handlers implement that
+       * contract (rotation guard + arm_data_abort with the cycp_
+       * charge), so a flagged state must not take the tight path. */
+      arm_h_sdt_imm(cmd_,0,cycp_);
+      *slow_ = 1;
+      return;
+    }
+
+  base  = CPU.USER[((cmd_ >> 16) & 0xF)];
+  oper2 = (cmd_ & 0x0FFF);
+
+  if(!(cmd_ & (1 << 23)))
+    oper2 = (0 - oper2);
+
+  if(cmd_ & (1 << 24))
+    tbas = base = (base + oper2);
+  else
+    {
+      tbas = base;
+      base = (base + oper2);
+    }
+
+  if(cmd_ & (1 << 22))
+    {
+      if(tbas >= (uint32_t)RAM_SIZE)
+        {
+          arm_h_sdt_imm(cmd_,0,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      val = opera_mem_read8(tbas);
+    }
+  else
+    {
+      rora = (tbas & 3);
+      if((tbas & ~3u) >= (uint32_t)RAM_SIZE)
+        {
+          arm_h_sdt_imm(cmd_,0,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      val = opera_mem_read32(tbas & ~3u);
+      if(rora)
+        val = ROTR(val,rora*8);
+    }
+
+  (*cycp_) -= (NCYCLE + ICYCLE);
+
+  if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+    CPU.USER[(cmd_ >> 16) & 0xF] = base;
+
+  CPU.USER[(cmd_ >> 12) & 0xF] = val;
+}
+
+static void arm_h_sdt_ri(uint32_t cmd_,uint32_t aux_,int *cycp_);
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_ldr_t(uint32_t cmd_,
+                uint32_t aux_,
+                int *cycp_,
+                int *slow_)
+{
+  uint32_t base;
+  uint32_t tbas;
+  uint32_t val;
+  uint32_t rora;
+  int      oper2;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+  if(CPU.MAS_Access_Exept)
+    {
+      /* dangling abort flag (SWP-to-XBUS-abort-window can leave one):
+       * the interpreter suppresses the load rotation AND takes the
+       * data abort on the next SDT; the full handlers implement that
+       * contract (rotation guard + arm_data_abort with the cycp_
+       * charge), so a flagged state must not take the tight path. */
+      arm_h_sdt_ri(cmd_,aux_,cycp_);
+      *slow_ = 1;
+      return;
+    }
+
+  oper2 = ARM_SHIFT_NSC(CPU.USER[cmd_ & 0xF],(aux_ & 0x3F),((aux_ >> 8) & 0x7));
+
+  base  = CPU.USER[((cmd_ >> 16) & 0xF)];
+
+  if(!(cmd_ & (1 << 23)))
+    oper2 = (0 - oper2);
+
+  if(cmd_ & (1 << 24))
+    tbas = base = (base + oper2);
+  else
+    {
+      tbas = base;
+      base = (base + oper2);
+    }
+
+  if(cmd_ & (1 << 22))
+    {
+      if(tbas >= (uint32_t)RAM_SIZE)
+        {
+          arm_h_sdt_ri(cmd_,aux_,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      val = opera_mem_read8(tbas);
+    }
+  else
+    {
+      rora = (tbas & 3);
+      if((tbas & ~3u) >= (uint32_t)RAM_SIZE)
+        {
+          arm_h_sdt_ri(cmd_,aux_,cycp_);
+          *slow_ = 1;
+          return;
+        }
+      val = opera_mem_read32(tbas & ~3u);
+      if(rora)
+        val = ROTR(val,rora*8);
+    }
+
+  (*cycp_) -= (NCYCLE + ICYCLE);
+
+  if((cmd_ & (1 << 21)) || (!(cmd_ & (1 << 24))))
+    CPU.USER[(cmd_ >> 16) & 0xF] = base;
+
+  CPU.USER[(cmd_ >> 12) & 0xF] = val;
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_ri(uint32_t cmd_,
+             uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t oper2;
+  uint32_t pc_tmp;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  pc_tmp        = CPU.USER[15];
+  CPU.USER[15] += 4;
+
+  oper2 = ARM_SHIFT_NSC(CPU.USER[cmd_ & 0xF],(aux_ & 0x3F),((aux_ >> 8) & 0x7));
+
+  arm_sdt_body(cmd_,oper2,pc_tmp,cycp_);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sdt_rs(uint32_t cmd_,
+             uint32_t aux_,
+             int *cycp_)
+{
+  uint8_t  shift;
+  uint32_t oper2;
+  uint32_t pc_tmp;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  pc_tmp        = CPU.USER[15];
+  CPU.USER[15] += 4;
+
+  shift         = ((cmd_ >> 8) & 0xF);
+  shift         = (CPU.USER[shift] & 0xFF);
+  CPU.USER[15] += 4;
+
+  oper2 = ARM_SHIFT_NSC(CPU.USER[cmd_ & 0xF],shift,((cmd_ >> 5) & 0x3));
+
+  arm_sdt_body(cmd_,oper2,pc_tmp,cycp_);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_mul(uint32_t cmd_,
+          uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t res;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  res = ((calcbits(CPU.USER[(cmd_ >> 8) & 0xF]) + 5) >> 1) - 1;
+  if(res > 16)
+    (*cycp_) -= 16;
+  else
+    (*cycp_) -= res;
+
+  if(((cmd_ >> 16) & 0xF) == (cmd_ & 0xF))
+    {
+      if(cmd_ & (1 << 21))
+        {
+          CPU.USER[15] += 8;
+          res           = CPU.USER[(cmd_ >> 12) & 0xF];
+          CPU.USER[15] -= 8;
+        }
+      else
+        {
+          res = 0;
+        }
+    }
+  else
+    {
+      if(cmd_ & (1 << 21))
+        {
+          res           = CPU.USER[cmd_ & 0xF] * CPU.USER[(cmd_ >> 8) & 0xF];
+          CPU.USER[15] += 8;
+          res          += CPU.USER[(cmd_ >> 12) & 0xF];
+          CPU.USER[15] -= 8;
+        }
+      else
+        {
+          res = CPU.USER[cmd_ & 0xF] * CPU.USER[(cmd_ >> 8) & 0xF];
+        }
+    }
+
+  if(cmd_ & (1 << 20))
+    ARM_SET_ZN(res);
+
+  CPU.USER[(cmd_ >> 16) & 0xF] = res;
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_mul_np(uint32_t cmd_,
+             uint32_t aux_,
+             int *cycp_)
+{
+  uint32_t res;
+
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  res = ((calcbits(CPU.USER[(cmd_ >> 8) & 0xF]) + 5) >> 1) - 1;
+  if(res > 16)
+    (*cycp_) -= 16;
+  else
+    (*cycp_) -= res;
+
+  if(((cmd_ >> 16) & 0xF) == (cmd_ & 0xF))
+    {
+      if(cmd_ & (1 << 21))
+        res = CPU.USER[(cmd_ >> 12) & 0xF];
+      else
+        res = 0;
+    }
+  else
+    {
+      if(cmd_ & (1 << 21))
+        res  = CPU.USER[cmd_ & 0xF] * CPU.USER[(cmd_ >> 8) & 0xF]
+             + CPU.USER[(cmd_ >> 12) & 0xF];
+      else
+        res  = CPU.USER[cmd_ & 0xF] * CPU.USER[(cmd_ >> 8) & 0xF];
+    }
+
+  if(cmd_ & (1 << 20))
+    ARM_SET_ZN(res);
+
+  CPU.USER[(cmd_ >> 16) & 0xF] = res;
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_sds(uint32_t cmd_,
+          uint32_t aux_,
+             int *cycp_)
+{
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  ARM_SWAP(cmd_);
+  (*cycp_) -= (2 * NCYCLE + ICYCLE);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_bdt(uint32_t cmd_,
+          uint32_t aux_,
+             int *cycp_)
+{
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  CYCLES = (*cycp_);
+  bdt_core(cmd_);
+  (*cycp_) = CYCLES;
+
+  if(CPU.MAS_Access_Exept)
+    {
+      CYCLES = (*cycp_);
+      arm_data_abort();
+      (*cycp_) = CYCLES;
+    }
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_branch(uint32_t cmd_,
+             uint32_t aux_,
+             int *cycp_)
+{
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  if(cmd_ & (1 << 24))
+    CPU.USER[14] = CPU.USER[15];
+  CPU.USER[15] += ((((cmd_ & 0x00FFFFFF) |
+                      ((cmd_ & 0x00800000) ? 0xFF000000 : 0)) << 2) + 4);
+
+  (*cycp_) -= (SCYCLE + NCYCLE);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_swi(uint32_t cmd_,
+          uint32_t aux_,
+             int *cycp_)
+{
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  CYCLES = (*cycp_);
+  decode_swi(cmd_);
+  (*cycp_) = CYCLES;
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_und(uint32_t cmd_,
+          uint32_t aux_,
+             int *cycp_)
+{
+  (void)aux_;
+
+  if(!ARM_CACHE_COND_OK(cmd_))
+    return;
+
+  CPU.SPSR[arm_mode_table[0x1b]] = CPU.CPSR;
+  SETI(1);
+  SETM(0x1b);
+  CPU.USER[14] = CPU.USER[15];
+  CPU.USER[15] = 0x00000004;
+  (*cycp_)      -= (SCYCLE + NCYCLE);
+}
+
+static
+OPERA_FORCEINLINE
+void
+arm_h_spec(uint32_t cmd_,
+           uint32_t aux_,
+             int *cycp_)
+{
+  if(CPU.CPSR == 0x80000093)
+    return;
+
+  arm_h_sdt_imm(cmd_,aux_,cycp_);
+}
+
+/* Resolve the static shift operand exactly like the interpreter's
+ * shift-amount-zero promotion (shtype 3 -> 4 i.e. RRX, others -> 32). */
+static
+INLINE
+uint32_t
+arm_cache_pack_shift(uint32_t cmd_)
+{
+  uint8_t shift;
+  uint8_t shtype;
+
+  shtype = ((cmd_ >> 5) & 0x3);
+  shift  = ((cmd_ >> 7) & 0x1F);
+
+  if(!shift)
+    {
+      if(shtype)
+        {
+          if(shtype == 3)
+            shtype++;
+          else
+            shift = 32;
+        }
+    }
+
+  return (uint32_t)shift | ((uint32_t)shtype << 8);
+}
+
+static
+void
+arm_cache_decode(arm_cache_entry_t *e_,
+                 uint32_t           cmd_)
+{
+  const uint32_t top = ((cmd_ >> 24) & 0xF);
+  const uint32_t opc = ((cmd_ >> 20) & 0x1F);
+  const int      msr = ((opc == 18) || (opc == 22));
+  const int      rd_np = (((cmd_ >> 12) & 0xF) != 0xF);
+  const int      rn_np = (((cmd_ >> 16) & 0xF) != 0xF);
+  const int      rs_np = (((cmd_ >>  8) & 0xF) != 0xF);
+  const int      rm_np = ((cmd_         & 0xF) != 0xF);
+
+  e_->word   = cmd_;
+  e_->sealed = 1;
+  e_->aux    = 0;
+  e_->cls    = 0;
+
+  if(cmd_ == 0xE5101810)
+    {
+      e_->cls = ARM_CLS_SPEC;
+      return;
+    }
+
+  switch(top)
+    {
+    case 0x0:
+    case 0x1:
+      if((cmd_ & ARM_MUL_MASK) == ARM_MUL_SIGN)
+        {
+          if(rn_np && rd_np && rs_np && rm_np)
+            e_->cls = ARM_CLS_TIGHT_MUL;
+          else
+            e_->cls = ARM_CLS_MUL;
+        }
+      else if((cmd_ & ARM_SDS_MASK) == ARM_SDS_SIGN)
+        {
+          e_->cls = ARM_CLS_SDS;
+        }
+      else if((cmd_ & 0x2000090) != 0x90)
+        {
+          if(cmd_ & (1 << 4))
+            {
+              if(rd_np && rn_np && rs_np && rm_np)
+                e_->cls = (msr ? ARM_CLS_DP_RS_NP : ARM_CLS_TIGHT_DP_RS);
+              else
+                e_->cls = ARM_CLS_DP_RS;
+            }
+          else
+            {
+              uint32_t const opc5 = ((cmd_ >> 20) & 0x1F);
+
+              if(rd_np && rn_np && rm_np)
+                e_->cls = (msr ? ARM_CLS_DP_RI_NP : ARM_CLS_TIGHT_DP_RI);
+              else if(rd_np && rn_np && ((cmd_ & 0xF) == 0xF) &&
+                      !(cmd_ & (1 << 20)) &&
+                      !((opc5 == 8) || (opc5 == 9) || (opc5 == 10) ||
+                        (opc5 == 11) || (opc5 == 16) || (opc5 == 18) ||
+                        (opc5 == 20) || (opc5 == 22)))
+                e_->cls = ARM_CLS_TIGHT_DP_RMPC;  /* op2 = pc_k + 8:
+                                                   * USER[15] after the
+                                                   * pipeline bump; the
+                                                   * shifter may still
+                                                   * rotate the constant
+                                                   * but stays constant */
+              else if(rd_np && (((cmd_ >> 16) & 0xF) == 0xF) &&
+                      ((cmd_ & 0xF) != 0xF) && !msr)
+                e_->cls = ARM_CLS_TIGHT_DP_PCREL;   /* op1 = pc+8; rm==15
+                                                     * (op2 = pc+8 too)
+                                                     * stays full-class */
+              else if(rn_np && (((cmd_ >> 12) & 0xF) == 0xF) &&
+                      ((cmd_ & 0xF) != 0xF) &&   /* rm==15 reads the
+                                                   * pipeline pc as the
+                                                   * source value: full */
+                      !(cmd_ & (1 << 20)) &&
+                      !((opc5 == 8) || (opc5 == 9) || (opc5 == 10) ||
+                        (opc5 == 11) || (opc5 == 16) || (opc5 == 18) ||
+                        (opc5 == 20) || (opc5 == 22)))
+                e_->cls = ARM_CLS_TIGHT_DP_PC;      /* mov pc, rm forms */
+              else
+                e_->cls = ARM_CLS_DP_RI;
+              e_->aux = arm_cache_pack_shift(cmd_);
+            }
+        }
+      else
+        {
+          /* mul/swap-like words matching neither signature fall through
+           * the interpreter's 6/7-UND check (never matches here) into
+           * the SDT immediate body */
+          e_->cls = ((rd_np && rn_np) ? ARM_CLS_SDT_IMM_NP : ARM_CLS_SDT_IMM);
+        }
+      break;
+
+    case 0x2:
+    case 0x3:
+      /* bit25 always set: immediate data processing; the interpreter's
+       * (cmd&0x2000090)!=0x90 guard can never fail for these */
+      if(rn_np && rd_np)
+        e_->cls = (msr ? ARM_CLS_DP_IMM_NP : ARM_CLS_TIGHT_DP_IMM);
+      else if(rn_np && (((cmd_ >> 12) & 0xF) == 0xF) &&
+              !(cmd_ & (1 << 20)) &&
+              !((opc == 8) || (opc == 9) || (opc == 10) || (opc == 11) ||
+                (opc == 16) || (opc == 18) || (opc == 20) || (opc == 22)))
+        e_->cls = ARM_CLS_TIGHT_DP_PC;   /* real rd==15 data writes only:
+                                          * excludes the compare family
+                                          * (8-11, no rd write) and the
+                                          * MRS/MSR aliases (16/18/20/22) */
+      else if((!rn_np) && rd_np && (((cmd_ >> 16) & 0xF) == 0xF) && !msr)
+        e_->cls = ARM_CLS_TIGHT_DP_PCREL;  /* ADD rX, pc, #imm etc: the
+                                            * full handler reads op1 =
+                                            * USER[15] = pc_k + 4 */
+      else
+        e_->cls = ARM_CLS_DP_IMM;
+      e_->aux = ((cmd_ >> ARM_DP_IMM_ROT_AMOUNT_SHIFT) &
+                 ARM_DP_IMM_ROT_AMOUNT_MASK);
+      break;
+
+    case 0x4:
+    case 0x5:
+      if(rn_np && rd_np &&
+         ((cmd_ & (1 << 24)) || !(cmd_ & (1 << 21))))
+        e_->cls = ((cmd_ & (1 << 20)) ? ARM_CLS_TIGHT_SDT_LDI
+                                       : ARM_CLS_TIGHT_SDT_STI);
+      else
+        e_->cls = ((rn_np && rd_np) ? ARM_CLS_SDT_IMM_NP : ARM_CLS_SDT_IMM);
+      break;
+
+    case 0x6:
+    case 0x7:
+      if((cmd_ & ARM_UND_MASK) == ARM_UND_SIGN)
+        {
+          e_->cls = ARM_CLS_UND;
+        }
+      else
+        {
+          if((cmd_ & (1 << 20)) && rn_np && rd_np && rm_np &&
+             ((cmd_ & (1 << 24)) || !(cmd_ & (1 << 21))))
+            {
+              e_->cls = ARM_CLS_TIGHT_SDT_LDR;
+              e_->aux = arm_cache_pack_shift(cmd_);
+            }
+          else if(!(cmd_ & (1 << 20)) && rn_np && rd_np && rm_np &&
+                  ((cmd_ & (1 << 24)) || !(cmd_ & (1 << 21))) &&
+                  !(((cmd_ >> 5) & 0x3) == 3))  /* RRX (#0): the NSC
+                    * shift writes carry_out -- full class only */
+            {
+              /* register-offset store: same poll-free store shape as
+               * TIGHT_SDT_STI, only oper2 comes from a shifted
+               * USER[rm] instead of the imm12 field */
+              e_->cls = ARM_CLS_TIGHT_SDT_STR;
+              e_->aux = arm_cache_pack_shift(cmd_);
+            }
+          else
+            {
+              e_->cls = ((rn_np && rd_np && rm_np) ? ARM_CLS_SDT_RI_NP
+                                                   : ARM_CLS_SDT_RI);
+              e_->aux = arm_cache_pack_shift(cmd_);
+            }
+        }
+      break;
+
+    case 0x8:
+    case 0x9:
+      e_->cls = ARM_CLS_BDT;
+      break;
+
+    case 0xa:
+    case 0xb:
+      e_->cls = ARM_CLS_TIGHT_BRANCH;
+      break;
+
+    case 0xf:
+      e_->cls = ARM_CLS_SWI;
+      break;
+
+    default:
+      e_->cls = ARM_CLS_UND;
+      break;
+    }
+}
+
+/* cached-engine fetch window: instruction fetches are amortized against
+ * the last identified region.  Flushed on ROM swaps (rom_select) and at
+ * init so a stale ROM pointer is never dereferenced. */
+static const uint32_t          *g_fetch_mem;
+static const arm_cache_entry_t *g_fetch_cache;
+static uint32_t                 g_fetch_lo;
+static uint32_t                 g_fetch_span;
+static uint32_t                 g_arm_rom_seq   = 0;
+
+void
+opera_arm_fetch_window_flush(void)
+{
+  g_fetch_span = 0;
+  g_arm_rom_seq++;
+
+  /* ROM bank swaps change the code under every cached ROM block */
+  opera_arm_jit_flush_all();
+}
+
+static
+void
+arm_fetch_window_set(uint32_t const pca_)
+{
+  uint32_t const idx = (pca_ ^ 0x03000000);
+
+  if(pca_ < RAM_SIZE)
+    {
+      g_fetch_mem   = (const uint32_t*)DRAM;
+      g_fetch_cache = g_arm_cache_ram;
+      g_fetch_lo    = 0;
+      g_fetch_span  = RAM_SIZE;
+    }
+  else if(!(idx & ~ROM1_SIZE_MASK))
+    {
+      g_fetch_mem   = (const uint32_t*)ROM;
+      g_fetch_cache = g_arm_cache_rom;
+      g_fetch_lo    = 0x03000000;
+      g_fetch_span  = (ROM1_SIZE_MASK + 1);
+    }
+  else if(!((pca_ ^ 0x06000000) & ~ROM1_SIZE_MASK))
+    {
+      g_fetch_mem   = (const uint32_t*)ROM;
+      g_fetch_cache = g_arm_cache_rom;
+      g_fetch_lo    = 0x06000000;
+      g_fetch_span  = (ROM1_SIZE_MASK + 1);
+    }
+  else
+    {
+      g_fetch_span = 0;
+    }
+}
+
+/*
+ * Execute ARM instructions until the accumulated cycle count reaches
+ * budget_ (the caller's remaining headroom to the next CLOCK_STEP
+ * boundary) or a per-instruction poll requests separation from the next
+ * instruction.  Poll cadence and cycle accounting are identical to the
+ * interpreter path: FIQ is checked after every instruction in the step
+ * tail, and the MADAM-FSM / CD-ODE-restart polls run between instructions
+ * exactly like opera_3do_process_frame() does.
+ *
+ * All hot loop state (fetch window, poll pointers, cycle accumulator) is
+ * held in function locals so the compiler keeps it register-resident; the
+ * global mirrors are only refreshed on classification misses, on ROM-swap
+ * sequence bumps, and around the out-of-line BDT/SWI/interpreter helpers
+ * that still write the file-scope CYCLES.
+ */
+
+static
+OPERA_FORCEINLINE
+void
+arm_fiq_vector(void)
+{
+  CPU.nFIQ = false;
+  CPU.SPSR[arm_mode_table[0x11]] = CPU.CPSR;
+  SETF(1);
+  SETI(1);
+  SETM(0x11);
+  CPU.USER[14] = (CPU.USER[15] + 4);
+  CPU.USER[15] = 0x0000001C;
+}
+
+static uint64_t g_lane_seq  = 0;   /* slice counter (tracer + dbg) */
+
+static void lane_trace_per_insn(int32_t const ret_,int32_t const budget_);
+
+static
 int32_t
-opera_arm_execute(void)
+arm_execute_slice(int32_t budget_)
+{
+  int32_t total = 0;
+  int     cyc;
+
+  const uint32_t          *mem;
+  const arm_cache_entry_t *ec;
+  uint32_t                 lo;
+  uint32_t                 span;
+  const uint32_t          *fpend;
+  const uint32_t          *fsm;
+  const bool              *rst;
+  uint32_t                 seq;
+
+  mem   = g_fetch_mem;
+  ec    = g_fetch_cache;
+  lo    = g_fetch_lo;
+  span  = g_fetch_span;
+  fpend = g_clio_fiqpend;
+  fsm   = g_madam_fsm_poll;
+  rst   = g_cdrom_restart_poll;
+  seq   = g_arm_rom_seq;
+
+
+  for(;;)
+    {
+      uint32_t          word;
+      uint32_t          idx;
+      arm_cache_entry_t *e;
+      uint32_t const    pc  = CPU.USER[15];
+      uint32_t const    pca = (pc & ~3u);
+
+      idx = (pca - lo);
+      if(idx >= span)
+        {
+          uint32_t const wi = (pca ^ 0x03000000);
+
+          if(pca < RAM_SIZE)
+            {
+              mem  = (const uint32_t*)DRAM;
+              ec   = g_arm_cache_ram;
+              lo   = 0;
+              span = RAM_SIZE;
+            }
+          else if(!(wi & ~ROM1_SIZE_MASK))
+            {
+              mem  = (const uint32_t*)ROM;
+              ec   = g_arm_cache_rom;
+              lo   = 0x03000000;
+              span = (ROM1_SIZE_MASK + 1);
+            }
+          else if(!((pca ^ 0x06000000) & ~ROM1_SIZE_MASK))
+            {
+              mem  = (const uint32_t*)ROM;
+              ec   = g_arm_cache_rom;
+              lo   = 0x06000000;
+              span = (ROM1_SIZE_MASK + 1);
+            }
+          else
+            {
+              int32_t const c = arm_execute_interp();
+              total += c;
+
+              if(g_arm_rom_seq != seq)
+                {
+                  seq  = g_arm_rom_seq;
+                  span = 0;   /* force reclassification next fetch */
+                }
+
+              if(*rst)
+                break;
+
+              if(total >= budget_)
+                break;
+
+              if(*fsm == FSM_INPROCESS)
+                break;
+
+              continue;
+            }
+
+          idx = (pca - lo);
+        }
+
+      word = mem[idx >> 2];
+      e    = (arm_cache_entry_t*)&ec[idx >> 2];
+
+      CPU.USER[15] = (pc + 4);
+
+      if(!e->sealed || (e->word != word))
+        arm_cache_decode(e,word);
+
+      cyc = -SCYCLE;
+      switch(e->cls)
+        {
+        case ARM_CLS_DP_IMM:     arm_h_dp_imm(word,e->aux,&cyc);     break;
+        case ARM_CLS_DP_RS:     arm_h_dp_rs(word,e->aux,&cyc);     break;
+        case ARM_CLS_DP_RI:     arm_h_dp_ri(word,e->aux,&cyc);     break;
+        case ARM_CLS_DP_IMM_NP:     arm_h_dp_imm_np(word,e->aux,&cyc);     break;
+        case ARM_CLS_DP_RS_NP:     arm_h_dp_rs_np(word,e->aux,&cyc);     break;
+        case ARM_CLS_DP_RI_NP:     arm_h_dp_ri_np(word,e->aux,&cyc);     break;
+        case ARM_CLS_SDT_IMM:     arm_h_sdt_imm(word,e->aux,&cyc);     break;
+        case ARM_CLS_SDT_IMM_NP:     arm_h_sdt_imm_np(word,e->aux,&cyc);     break;
+        case ARM_CLS_SDT_RI:     arm_h_sdt_ri(word,e->aux,&cyc);     break;
+        case ARM_CLS_SDT_RI_NP:     arm_h_sdt_ri_np(word,e->aux,&cyc);     break;
+        case ARM_CLS_SDT_RS:     arm_h_sdt_rs(word,e->aux,&cyc);     break;
+        case ARM_CLS_MUL:     arm_h_mul(word,e->aux,&cyc);     break;
+        case ARM_CLS_BRANCH:     arm_h_branch(word,e->aux,&cyc);     break;
+        case ARM_CLS_SPEC:     arm_h_spec(word,e->aux,&cyc);     break;
+        case ARM_CLS_UND:     arm_h_und(word,e->aux,&cyc);     break;
+        case ARM_CLS_SDS:     arm_h_sds(word,e->aux,&cyc);     break;
+        case ARM_CLS_BDT:     arm_h_bdt(word,e->aux,&cyc);     break;
+        case ARM_CLS_SWI:     arm_h_swi(word,e->aux,&cyc);     break;
+        case ARM_CLS_TIGHT_DP_IMM:  arm_h_dp_imm_np(word,e->aux,&cyc); goto tight;
+        /* pc-writing DP keeps the full handler + full tail here: the
+         * -S writing class only exists for the JIT; the cache run must
+         * still pay ICYCLE+NCYCLE and run the full-tail polls.  Both
+         * operand forms exist: bit25 picks the handler. */
+        case ARM_CLS_TIGHT_DP_PC:
+          if(word & (1u << 25))
+            arm_h_dp_imm(word,e->aux,&cyc);
+          else
+            arm_h_dp_ri(word,e->aux,&cyc);
+          goto full;
+        /* pc-relative op1: R15 as an operand reads instruction+8; the
+         * slice loop pre-syncs USER[15] = pc+4, so bump it to the
+         * pipeline value for the op1 read, then restore -- the tight
+         * tail's FIQ path must observe USER[15] = pc+4 exactly like
+         * every other tight word.  bit25 picks the operand decode. */
+        case ARM_CLS_TIGHT_DP_PCREL:
+          CPU.USER[15] += 4;
+          if(word & (1u << 25))
+            arm_h_dp_imm_np(word,e->aux,&cyc);
+          else
+            arm_h_dp_ri_np(word,e->aux,&cyc);
+          CPU.USER[15] -= 4;
+          goto tight;
+        case ARM_CLS_TIGHT_DP_RS:  arm_h_dp_rs_np(word,e->aux,&cyc);  goto tight;
+        case ARM_CLS_TIGHT_DP_RI:  arm_h_dp_ri_np(word,e->aux,&cyc);  goto tight;
+        case ARM_CLS_TIGHT_DP_RMPC:
+          /* op2 = pipeline pc: wrap the _np handler (no bump of its
+           * own) so USER[15] reads pc+8 for the operand but stays at
+           * pc+4 for the tight tail -- exactly like PCREL above */
+          CPU.USER[15] += 4;
+          arm_h_dp_ri_np(word,e->aux,&cyc);
+          CPU.USER[15] -= 4;
+          goto tight;
+        case ARM_CLS_TIGHT_MUL:    arm_h_mul_np(word,e->aux,&cyc);    goto tight;
+        case ARM_CLS_TIGHT_BRANCH: arm_h_branch(word,e->aux,&cyc);    goto tight;
+        case ARM_CLS_TIGHT_SDT_LDI:
+          {
+            int slow = 0;
+            arm_h_sdt_ldi_t(word,e->aux,&cyc,&slow);
+            if(!slow)
+              goto tight;
+          }
+          goto full;
+        case ARM_CLS_TIGHT_SDT_LDR:
+          {
+            int slow = 0;
+            arm_h_sdt_ldr_t(word,e->aux,&cyc,&slow);
+            if(!slow)
+              goto tight;
+          }
+          goto full;
+        case ARM_CLS_TIGHT_SDT_STI:
+          {
+            int slow = 0;
+            arm_h_sdt_sti_t(word,e->aux,&cyc,&slow);
+            if(!slow)
+              goto tight;
+          }
+          goto full;
+        case ARM_CLS_TIGHT_SDT_STR:
+          {
+            /* register-offset store, same store semantics as STI: the
+             * _np handler writes memory and never touches control
+             * state; the slow gate mirrors sti_t's MMIO/VRAM check */
+            int slow = 0;
+            arm_h_sdt_str_t(word,e->aux,&cyc,&slow);
+            if(!slow)
+              goto tight;
+          }
+          goto full;
+        }
+
+full:
+      /* full tail for non-tight classes */
+      total -= cyc;
+
+
+      if(g_SOFT_RESET_PENDING)
+        {
+          /* the interpreter returns here, before the FIQ check */
+          g_SOFT_RESET_PENDING = false;
+        }
+      else if(!ISF && *fpend)
+        arm_fiq_vector();
+
+      lane_trace_per_insn(-cyc, budget_);
+
+      if(*rst)
+        break;
+
+      if(total >= budget_)
+        break;
+
+      if(*fsm == FSM_INPROCESS)
+        break;
+
+      /* only classes capable of poking CLIO (or running SWI/UND/LDM-PC
+       * out-of-line helpers) can have swapped ROM banks mid-instruction;
+       * pure ALU/branch/mul forms cannot */
+      if((e->cls >= ARM_CLS_SDT_IMM) && (g_arm_rom_seq != seq))
+        {
+          seq  = g_arm_rom_seq;
+          span = 0;
+        }
+
+      continue;
+
+tight:
+      /* tight-run tail: these classes guarantee no store, no CPSR.I/F
+       * rewrite, no trap and no strays through shared helpers, so
+       * ROM-bank / MADAM-FSM / CD-ROM / soft-reset state is invariant
+       * mid-run.  FIQ pending, budget and the two split-worthy polls
+       * remain per-instruction; pc is still synced for the vector path
+       * because arm_fiq_vector reads USER[15]. */
+      total -= cyc;
+
+      if(!ISF && *fpend)
+        arm_fiq_vector();
+
+      lane_trace_per_insn(-cyc, budget_);
+
+      if(*rst)
+        break;
+
+      if(total >= budget_)
+        break;
+
+      if(*fsm == FSM_INPROCESS)
+        break;
+
+      continue;
+    }
+
+  return total;
+}
+
+/* dual-lane state tracer: per-slice CPU hash for engine-vs-engine
+ * divergence localization (env OPERA_JIT_TRACE_LANES=<path>) */
+static FILE *g_lane_trace   = NULL;
+
+static int      g_lane_on   = 0;
+
+static void
+lane_trace_maybe_open(void)
+{
+  /* one-shot latch: this runs from opera_arm_execute_slice on EVERY slice
+   * (~6.5K/frame).  A per-call getenv dominated the profile (~19%) — probe
+   * the environment exactly once; absent means absent forever (the tracer
+   * is a boot-time debug instrument, never enabled mid-run). */
+  static int latched_ = 0;
+  char const *p_;
+
+  if(latched_)
+    return;
+  latched_ = 1;
+
+  p_ = getenv("OPERA_JIT_TRACE_LANES");
+  if(p_ && !g_lane_trace)
+    {
+      g_lane_trace = fopen(p_, "w");
+      g_lane_on    = (g_lane_trace != NULL);
+    }
+}
+
+static int32_t g_lane_budget;
+
+static void
+lane_trace_line(int32_t const ret_)
+{
+  uint64_t h_ = 1469598103934665603ULL;
+  unsigned char const *b_ = (unsigned char const *)&CPU;
+  uint32_t i_;
+  if(!g_lane_on)
+    return;
+  for(i_ = 0; i_ < sizeof(CPU); i_++)
+    {
+      h_ ^= b_[i_];
+      h_ *= 1099511628211ULL;
+    }
+  {
+    uint32_t const nxt_ = (CPU.USER[15] & ~3u);
+    uint32_t const lst_ = (nxt_ >= 4u) ? (nxt_ - 4u) : nxt_;
+    fprintf(g_lane_trace, "%llu %d %08X %08X %016llx %08X %08X %d %016llx %016llx %016llx\n",
+            (unsigned long long)g_lane_seq++, (int)ret_,
+            CPU.USER[15], CPU.CPSR,
+            (unsigned long long)h_,
+            (nxt_ < RAM_SIZE) ? *(uint32_t *)&DRAM[nxt_] : 0xDEAD0001,
+            (lst_ < RAM_SIZE) ? *(uint32_t *)&DRAM[lst_] : 0xDEAD0002,
+            g_lane_budget,
+            (unsigned long long)opera_clio_state_hash(),
+            (unsigned long long)opera_madam_state_hash(),
+            (unsigned long long)opera_dsp_state_hash());
+  }
+}
+
+/* OPERA_TRACE_PER_INSN=1: emit a lane_trace line after EVERY instruction in
+ * the cached engine (matches the interpreter's one-word-per-slice
+ * granularity), for engine-differential stream comparison. */
+static int g_lane_per_insn = -1;
+
+static void
+lane_trace_per_insn(int32_t const ret_,int32_t const budget_)
+{
+  if(!g_lane_on)
+    return;
+  if(g_lane_per_insn < 0)
+    g_lane_per_insn = (getenv("OPERA_TRACE_PER_INSN") != NULL);
+  if(!g_lane_per_insn)
+    return;
+  {
+    int32_t const saved_ = g_lane_budget;
+    g_lane_budget = budget_;
+    lane_trace_line(ret_);
+    g_lane_budget = saved_;
+  }
+}
+
+
+int32_t
+opera_arm_execute_slice(int32_t budget_)
+{
+  int32_t r_;
+  lane_trace_maybe_open();
+#ifdef OPERA_ARM_JIT_ENABLED
+  if(g_arm_engine == 3)
+    {
+      r_ = arm_jit_exec_slice(budget_);
+      g_lane_budget = budget_;
+      lane_trace_line(r_);
+      return r_;
+    }
+#endif
+
+  if(g_arm_engine)
+    {
+      /* size-aware lazy gate: a state load whose embedded mem_cfg
+       * differs from the session's re-sizes RAM_SIZE mid-run
+       * (opera_mem_state_load applies it unconditionally); without
+       * the staleness check the arrays keep the old word count and
+       * the next fetch indexes past them (heap OOB).  arm_cache_alloc
+       * no-ops when the size already matches, so the steady-state
+       * cost is one compare. */
+      if(((g_arm_cache_ram == NULL) ||
+          (g_arm_cache_ram_words != (RAM_SIZE >> 2))) &&
+         (g_arm_engine != 2))
+        arm_cache_alloc();
+
+      if(g_arm_cache_ram != NULL)
+        {
+          r_ = arm_execute_slice(budget_);
+          g_lane_budget = budget_;
+          lane_trace_line(r_);
+          return r_;
+        }
+
+      g_arm_engine = 2;
+    }
+
+  r_ = arm_execute_interp();
+  g_lane_budget = budget_;
+  lane_trace_line(r_);
+  return r_;
+}
+
+static
+int32_t
+arm_execute_interp(void)
 {
   uint32_t op1;
   uint32_t op2;
@@ -1852,6 +3732,21 @@ opera_arm_execute(void)
   return -CYCLES;
 }
 
+/* Compat one-instruction entry point (no in-tree callers; the hot path is
+ * opera_arm_execute_slice).  Routes every engine through the slice loop
+ * with a 1-cycle budget: the slice executes at least one full word and
+ * checks the budget only after it, so interp/cache run exactly one word.
+ * Under the jit the budget-batching lever may let the rest of a block run
+ * out -- single-word exactness there requires OPERA_JIT_BUDGET_BATCH=0
+ * (the same caveat as every slice).  The previous dedicated cached-step
+ * wrapper was removed: its class switch never gained the TIGHT_* cases,
+ * so hot words executed as no-ops through it. */
+int32_t
+opera_arm_execute(void)
+{
+  return opera_arm_execute_slice(1);
+}
+
 static
 void
 mwritew(uint32_t const addr_,
@@ -2087,3 +3982,41 @@ opera_io_write(uint32_t const addr_,
 {
   mwritew(addr_,val_);
 }
+
+#ifdef OPERA_ARM_JIT_ENABLED
+#include "opera_arm_jit.c"
+#else
+/* no-op JIT hooks so the opera_mem write inlines and flush call sites do not
+ * need per-arch ifdefs.  This is also the OPERA_JIT_BACKENDS=0 shape: the
+ * jit TU (with its real hooks) is not compiled, so every external symbol
+ * the rest of the core references lands here as a no-op. */
+int opera_jit_hook_active = 0;
+
+void
+opera_arm_jit_touch(uint32_t const addr_)
+{
+  (void)addr_;
+}
+
+void
+opera_arm_jit_flush_all(void)
+{
+}
+
+int
+opera_arm_jit_page_hot(uint32_t const addr_)
+{
+  (void)addr_;
+  return 0;
+}
+
+void
+opera_arm_jit_dsp_thread_refresh(void)
+{
+}
+
+void
+opera_arm_jit_destroy(void)
+{
+}
+#endif

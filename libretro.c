@@ -748,7 +748,6 @@ retro_run(void)
   draw_crosshairs_if_enabled();
 
   opera_lr_dsp_upload();
-
   retro_video_refresh_cb(g_OPTS.video_buffer,
                          g_OPTS.video_width,
                          g_OPTS.video_height,

@@ -225,7 +225,7 @@ opera_3do_process_frame(void)
           opera_madam_fsm_set(FSM_IDLE);
         }
 
-      cnt += opera_arm_execute();
+      cnt += opera_arm_execute_slice(OPERA_3DO_CLOCK_STEP - cnt);
       if(opera_cdrom_ode_restart_requested())
         {
           g_FRAME_CYCLE_REMAINDER = cnt;

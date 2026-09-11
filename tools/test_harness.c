@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <langinfo.h>
 #include <poll.h>
+
 #ifdef __linux__
 #include <sched.h>
 #endif
@@ -2077,12 +2078,21 @@ _prepare_paths(void)
         }
     }
 
+#ifndef STATIC_CORE
   resolved = _resolve_existing_path(g_cfg.core_path);
   if(resolved == NULL)
     {
       fprintf(stderr, "unable to resolve core path: %s\n", g_cfg.core_path);
       exit(1);
     }
+#else
+  resolved = _xstrdup(g_cfg.core_path);   /* linked in; keep the shared
+                                           * free/reassign tail below valid
+                                           * (aliasing here used to leave
+                                           * g_cfg.core_path dangling after
+                                           * the free, and _write_metrics
+                                           * walks it at cleanup) */
+#endif
   free(g_cfg.core_path);
   g_cfg.core_path = resolved;
 
@@ -8091,6 +8101,19 @@ _load_symbol(void       *handle_,
              const char *name_,
              void      **out_)
 {
+#ifdef STATIC_CORE
+  /* cross-testing (qemu) build: symbols are linked in; look them up by
+   * name in our own static table. */
+  extern void static_core_lookup(const char *name_, void **out_);
+  (void)handle_;
+  static_core_lookup(name_, out_);
+  if(*out_ == NULL)
+    {
+      _report_error("missing static core symbol %s\n", name_);
+      return -1;
+    }
+  return 0;
+#else
   dlerror();
   *out_ = dlsym(handle_, name_);
   if(*out_ == NULL)
@@ -8104,8 +8127,8 @@ _load_symbol(void       *handle_,
     }
 
   return 0;
+#endif
 }
-
 
 static
 int
@@ -8114,12 +8137,18 @@ _load_core_api(core_api_t *api_,
 {
   memset(api_, 0, sizeof(*api_));
 
+#ifdef STATIC_CORE
+  /* cross-testing (qemu) build: the core is linked in; no dlopen. */
+  (void)path_;
+  api_->handle = NULL;
+#else
   api_->handle = dlopen(path_, RTLD_NOW | RTLD_LOCAL);
   if(api_->handle == NULL)
     {
       _report_error("dlopen failed for %s: %s\n", path_, dlerror());
       return -1;
     }
+#endif
 
 #define load_required(FIELD, SYMBOL)                    \
   do                                                    \

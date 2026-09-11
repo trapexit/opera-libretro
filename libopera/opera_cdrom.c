@@ -1322,6 +1322,13 @@ opera_cdrom_ode_restart_requested(void)
   return g_CDROM_STATE.ode.restart_requested;
 }
 
+/* hot-path inline poll support for the cached ARM engine */
+const bool*
+opera_cdrom_ode_restart_ptr(void)
+{
+  return &g_CDROM_STATE.ode.restart_requested;
+}
+
 void
 opera_cdrom_ode_reset_session(void)
 {

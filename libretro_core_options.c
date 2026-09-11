@@ -250,6 +250,21 @@ static struct retro_core_option_v2_definition option_defs_us_v2[] =
       },
       "disabled"
     },
+    {
+      "opera_arm_engine",
+      "ARM Emulation Engine",
+      NULL,
+      "Select the ARM60 CPU emulation core. 'Cache' is the cached sliced interpreter (default). 'JIT' re-compiles tight ARM60 blocks to native code on the host (x86-64, ARM64, ARMv7; experimental; fastest on measured titles but workload-dependent). 'Interp' is the original interpreter, kept for reference and A/B comparison. Changes take affect at core start/restart.",
+      NULL,
+      "advanced",
+      {
+        { "cache",  "Cache" },
+        { "jit",    "JIT" },
+        { "interp", "Interp" },
+        { NULL, NULL },
+      },
+      "cache"
+    },
 #if THREADED_DSP
     {
       "opera_dsp_threaded",
@@ -539,6 +554,18 @@ static struct retro_core_option_definition option_defs_us[] =
         { NULL, NULL }
       },
       "disabled"
+    },
+    {
+      "opera_arm_engine",
+      "ARM Emulation Engine",
+      "Select the ARM60 CPU emulation core. 'Cache' is the cached sliced interpreter (default). 'JIT' re-compiles tight ARM60 blocks to native code on the host (x86-64, ARM64, ARMv7; experimental; fastest on measured titles but workload-dependent). 'Interp' is the original interpreter, kept for reference and A/B comparison. Changes take affect at core start/restart.",
+      {
+        { "cache",  "Cache" },
+        { "jit",    "JIT" },
+        { "interp", "Interp" },
+        { NULL, NULL },
+      },
+      "cache"
     },
 #if THREADED_DSP
     {

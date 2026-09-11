@@ -1480,3 +1480,35 @@ opera_dsp_arm_semaphore_read(void)
 {
   return ((DSP.dregs.Sema4Status << 16) | DSP.dregs.Sema4Data);
 }
+
+/* FNV-1a 64 hash of the live DSP state (regs/flags/CPUSupply only; the
+ * IMem program store is written once at load and INSTTRAS is a decode
+ * cache), for the engine-differential lane tracer (opera_arm.c). */
+uint64_t
+opera_dsp_state_hash(void)
+{
+  uint64_t        h_ = 1469598103934665603ULL;
+  unsigned char const *b_;
+  uint32_t        i_;
+
+  b_ = (unsigned char const *)&DSP.dregs;
+  for(i_ = 0; i_ < sizeof(DSP.dregs); i_++)
+    {
+      h_ ^= b_[i_];
+      h_ *= 1099511628211ULL;
+    }
+  b_ = (unsigned char const *)&DSP.flags;
+  for(i_ = 0; i_ < sizeof(DSP.flags); i_++)
+    {
+      h_ ^= b_[i_];
+      h_ *= 1099511628211ULL;
+    }
+  b_ = (unsigned char const *)&DSP.CPUSupply;
+  for(i_ = 0; i_ < sizeof(DSP.CPUSupply); i_++)
+    {
+      h_ ^= b_[i_];
+      h_ *= 1099511628211ULL;
+    }
+
+  return h_;
+}

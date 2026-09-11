@@ -34,13 +34,25 @@
 #include <stdint.h>
 
 #include "extern_c.h"
+#include <stdbool.h>
 
 EXTERN_C_BEGIN
 
 int32_t  opera_arm_execute(void);
+int32_t  opera_arm_execute_slice(const int32_t budget_);
+void     opera_arm_fetch_window_flush(void);
+void     opera_arm_engine_opt_set(int engine_);
 void     opera_arm_init(void);
 void     opera_arm_reset(void);
 void     opera_arm_destroy(void);
+/* JIT dynarec hooks (engine id 3; no-ops when no host encoding backend
+ * was selected (see opera_arm_jit_backend.h) or another engine runs) */
+extern int opera_jit_hook_active;
+void     opera_arm_jit_touch(uint32_t addr_);
+int      opera_arm_jit_page_hot(uint32_t addr_);
+void     opera_arm_jit_flush_all(void);
+void     opera_arm_jit_dsp_thread_refresh(void);
+void     opera_arm_jit_destroy(void);
 
 void     opera_io_write(const uint32_t addr_, const uint32_t val_);
 

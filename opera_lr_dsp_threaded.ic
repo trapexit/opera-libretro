@@ -144,6 +144,15 @@ opera_lr_dsp_destroy(void)
     }
 }
 
+/* runtime state for the JIT's FIQ-poll emission decision:
+ * true means the DSP worker thread exists and can raise
+ * CLIO_FIQPEND mid-slice, so per-word FIQ polls are required */
+bool
+opera_lr_dsp_threaded_active(void)
+{
+  return g_DSP_THREADED;
+}
+
 void
 opera_lr_dsp_init(const bool threaded_)
 {

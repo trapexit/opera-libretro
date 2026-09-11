@@ -4,6 +4,7 @@
 #include "boolean.h"
 
 void opera_lr_dsp_init(const bool threaded);
+bool opera_lr_dsp_threaded_active(void);
 void opera_lr_dsp_destroy(void);
 
 void opera_lr_dsp_upload(void);

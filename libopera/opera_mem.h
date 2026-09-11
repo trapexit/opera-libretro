@@ -77,6 +77,8 @@ void opera_mem_rom2_byteswap32_if_le();
 
 void opera_mem_rom_select(void *rom);
 
+#include "opera_arm.h"   /* JIT write/flush hooks (no-ops unless engine=jit) */
+
 uint32_t opera_mem_state_size();
 uint32_t opera_mem_state_size_v1();
 uint32_t opera_mem_state_save(void *data);
@@ -117,6 +119,56 @@ opera_mem_read32(uint32_t const addr_)
   return *((uint32_t const *)&DRAM[addr_]);
 }
 
+/* JIT block-invalidation hook for one affected guest byte address, with
+ * the full prefilter (engine active, in-bounds, covering-block census) so
+ * a store into a never-compiled region costs one predictable branch.  The
+ * HIRES fanout mirrors above DRAM_SIZE go through this same gate. */
+static
+INLINE
+void
+opera_mem_jit_touch(uint32_t const addr_)
+{
+  if(opera_jit_hook_active &&
+     (addr_ < RAM_SIZE) &&
+     opera_arm_jit_page_hot(addr_))
+    opera_arm_jit_touch(addr_);
+}
+
+/* range variant for bulk writers that bypass the per-word write inlines
+ * (SPORT flash/copy into VRAM).  addr_ is a guest address in the RAM
+ * window ([0,RAM_SIZE)); VRAM-relative indices must add DRAM_SIZE
+ * first (VRAM == &DRAM[DRAM_SIZE]).  When the jit is inactive the
+ * whole thing is one predictable branch; when active but the target
+ * pages are cold it is one prefiltered check per guest word. */
+static
+INLINE
+void
+opera_mem_jit_touch_range(uint32_t const addr_,
+                          uint32_t const len_)
+{
+  if(opera_jit_hook_active && (addr_ < RAM_SIZE))
+    {
+      uint32_t const end = ((addr_ + len_ < addr_) ? RAM_SIZE
+                                                   : (addr_ + len_));
+      uint32_t       a   = (addr_ & ~3u);
+      for(; a < end; a += 4u)
+        if(opera_arm_jit_page_hot(a))
+          opera_arm_jit_touch(a);
+    }
+}
+
+/* halfword variant: an addr%4==3 store straddles two guest words, and a
+ * block covering either word must die */
+static
+INLINE
+void
+opera_mem_jit_touch16(uint32_t const addr_)
+{
+  opera_mem_jit_touch(addr_);
+  if((addr_ & 3u) == 3u)
+    opera_mem_jit_touch(addr_ + 1u);
+}
+
 static
 INLINE
 void
@@ -130,11 +182,15 @@ opera_mem_write8(uint32_t const addr_,
 #endif
 
   DRAM[addr] = val_;
+  opera_mem_jit_touch(addr);
   if(!HIRESMODE || (addr < DRAM_SIZE))
     return;
   DRAM[addr + 1*VRAM_SIZE] =
     DRAM[addr + 2*VRAM_SIZE] =
     DRAM[addr + 3*VRAM_SIZE] = val_;
+  opera_mem_jit_touch(addr + 1*VRAM_SIZE);
+  opera_mem_jit_touch(addr + 2*VRAM_SIZE);
+  opera_mem_jit_touch(addr + 3*VRAM_SIZE);
 }
 
 static
@@ -150,6 +206,7 @@ opera_mem_write16_base(uint32_t const addr_,
 #endif
 
   *((uint16_t*)&DRAM[addr]) = val_;
+  opera_mem_jit_touch16(addr);
 }
 
 static
@@ -165,11 +222,15 @@ opera_mem_write16(uint32_t const addr_,
 #endif
 
   *((uint16_t*)&DRAM[addr]) = val_;
+  opera_mem_jit_touch16(addr);
   if(!HIRESMODE || (addr < DRAM_SIZE))
     return;
   *((uint16_t*)&DRAM[addr + 1*VRAM_SIZE]) =
     *((uint16_t*)&DRAM[addr + 2*VRAM_SIZE]) =
     *((uint16_t*)&DRAM[addr + 3*VRAM_SIZE]) = val_;
+  opera_mem_jit_touch16(addr + 1*VRAM_SIZE);
+  opera_mem_jit_touch16(addr + 2*VRAM_SIZE);
+  opera_mem_jit_touch16(addr + 3*VRAM_SIZE);
 }
 
 static
@@ -178,12 +239,18 @@ void
 opera_mem_write32(uint32_t const addr_,
                   uint32_t const val_)
 {
+  /* word stores are 4-aligned by caller contract (mwritew masks, the CLIO
+   * DMA paths write whole words) */
   *((uint32_t*)&DRAM[addr_]) = val_;
+  opera_mem_jit_touch(addr_);
   if(!HIRESMODE || (addr_ < DRAM_SIZE))
     return;
   *((uint32_t*)&DRAM[addr_ + 1*VRAM_SIZE]) =
     *((uint32_t*)&DRAM[addr_ + 2*VRAM_SIZE]) =
     *((uint32_t*)&DRAM[addr_ + 3*VRAM_SIZE]) = val_;
+  opera_mem_jit_touch(addr_ + 1*VRAM_SIZE);
+  opera_mem_jit_touch(addr_ + 2*VRAM_SIZE);
+  opera_mem_jit_touch(addr_ + 3*VRAM_SIZE);
 }
 
 #endif

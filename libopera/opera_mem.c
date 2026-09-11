@@ -8,6 +8,7 @@
 #include "opera_mem.h"
 #include "endianness.h"
 #include "opera_state.h"
+#include "opera_arm.h"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -227,7 +228,10 @@ opera_mem_seed_low_boot_word()
     booting.
   */
   if(DRAM && ROM)
-    memcpy(DRAM,ROM,LOW_BOOT_ROM_WORD_SIZE);
+    {
+      memcpy(DRAM,ROM,LOW_BOOT_ROM_WORD_SIZE);
+      opera_arm_jit_flush_all();
+    }
 }
 
 void
@@ -254,7 +258,16 @@ opera_mem_rom_select(void *rom_)
   if((rom_ != ROM1) && (rom_ != ROM2))
     rom_ = ROM1;
 
+  if(rom_ == ROM)
+    return;                        /* same bank: no window drop, no jit
+                                    * flush (guest writes to CLIO 0x84
+                                    * re-select the current bank and
+                                    * must not pay a full flush) */
+
   ROM = rom_;
+
+  /* the cached ARM engine fetch window may hold a stale ROM pointer */
+  opera_arm_fetch_window_flush();
 }
 
 uint32_t
@@ -317,6 +330,11 @@ opera_mem_state_load_v1(void const     *data_,
   opera_mem_state_t memstate;
   uint32_t rv;
 
+  opera_arm_jit_flush_all();      /* wholesale DRAM/ROM restore: flush UP
+                                   * FRONT so every early-return failure
+                                   * path (truncated v1 state) leaves no
+                                   * live block over half-restored memory */
+
   rv = opera_state_load_sized(&memstate,"MCFG",data,(uint32_t)(end - data),sizeof(memstate));
   if(rv == 0)
     return 0;
@@ -369,6 +387,8 @@ opera_mem_state_load(void const     *data_,
      !opera_state_read_bytes(&payload,NVRAM,NVRAM_SIZE) ||
      !opera_state_reader_finished(&payload))
     return 0;
+
+  opera_arm_jit_flush_all();      /* wholesale DRAM/ROM restore */
 
   return opera_state_reader_used(&reader);
 }

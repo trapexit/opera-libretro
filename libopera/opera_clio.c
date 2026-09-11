@@ -40,6 +40,7 @@
 #include "boolean.h"
 #include "prng32.h"
 
+#include <stddef.h>
 #include <string.h>
 
 #define DECREMENT    0x1
@@ -93,6 +94,11 @@ int TIMER_VAL = 0; //0x415
 
 static uint32_t *MADAM_REGS;
 static clio_t    CLIO = {0};
+/* maintained mirror of ((regs[0x40]&regs[0x48]) || (regs[0x60]&regs[0x68])) */
+static uint32_t  CLIO_FIQPEND = 0;
+#define CLIO_FIQPEND_UPDATE() \
+  (CLIO_FIQPEND = ((CLIO.regs[0x40] & CLIO.regs[0x48]) || \
+                   (CLIO.regs[0x60] & CLIO.regs[0x68])))
 static uint32_t  TIMER_CARRY = 0;
 
 static
@@ -214,6 +220,7 @@ opera_clio_state_load_v1(const void     *buf_,
       flagtime = 0;
       TIMER_CARRY = 0;
       opera_clio_set_rom();
+      CLIO_FIQPEND_UPDATE();
     }
 
   return rv;
@@ -288,6 +295,7 @@ opera_clio_state_load(const void     *buf_,
   TIMER_VAL = timer_val_state;
   TIMER_CARRY = timer_carry_state;
   opera_clio_set_rom();
+  CLIO_FIQPEND_UPDATE();
 
   return opera_state_reader_used(&reader);
 }
@@ -328,8 +336,68 @@ opera_clio_line_vint1(void)
 int
 opera_clio_fiq_needed(void)
 {
-  return ((CLIO.regs[0x40] & CLIO.regs[0x48]) ||
-          (CLIO.regs[0x60] & CLIO.regs[0x68]));
+  return CLIO_FIQPEND;
+}
+
+const uint32_t*
+opera_clio_fiqpend_ptr(void)
+{
+  return &CLIO_FIQPEND;
+}
+
+/* hot-path inline poll support for the cached ARM engine: stable address
+ * of the CLIO register block; the fiq_needed expression reads regs
+ * 0x40/0x48/0x60/0x68 directly */
+const uint32_t*
+opera_clio_regs_ptr(void)
+{
+  return CLIO.regs;
+}
+
+/* FNV-1a 64 hash of the live CLIO state, for the engine-differential
+ * lane tracer (opera_arm.c).  The regs[65536] bulk above 0x600 is never
+ * written after init (the poke/read switch fully covers the used
+ * surface), so hash only the live prefix + the fifo/dsp tail, keeping
+ * the per-slice cost bounded (~1.6KB). */
+uint64_t
+opera_clio_state_hash(void)
+{
+  uint64_t        h_ = 1469598103934665603ULL;
+  unsigned char const *b_;
+  uint32_t        i_;
+  size_t          tail_off_;
+  size_t          tail_len_;
+
+  b_ = (unsigned char const *)CLIO.regs;
+  for(i_ = 0; i_ < (0x600 * 4); i_++)   /* regs WORD indices 0..0x5FF
+                                         * (byte-addressed register space
+                                         * 0x000-0x17FF): timers, FIQ,
+                                         * XBUS/CDROM, DMA, FIFO control */
+    {
+      h_ ^= b_[i_];
+      h_ *= 1099511628211ULL;
+    }
+
+  /* tail: dsp_word1..fifo_o[4] (everything after the regs bulk) */
+  tail_off_ = offsetof(clio_t,dsp_word1);
+  tail_len_ = sizeof(CLIO) - tail_off_;
+  b_        = (unsigned char const *)&CLIO + tail_off_;
+  for(i_ = 0; i_ < tail_len_; i_++)
+    {
+      h_ ^= b_[i_];
+      h_ *= 1099511628211ULL;
+    }
+
+  h_ ^= (uint64_t)(uint32_t)flagtime;
+  h_ *= 1099511628211ULL;
+  h_ ^= (uint64_t)(uint32_t)TIMER_VAL;
+  h_ *= 1099511628211ULL;
+  h_ ^= (uint64_t)CLIO_FIQPEND;
+  h_ *= 1099511628211ULL;
+  h_ ^= (uint64_t)TIMER_CARRY;
+  h_ *= 1099511628211ULL;
+
+  return h_;
 }
 
 void
@@ -341,6 +409,7 @@ opera_clio_fiq_generate(uint32_t reason1_,
   /* irq31 if exist irq32 and high */
   if(CLIO.regs[0x60])
     CLIO.regs[0x40] |= 0x80000000;
+  CLIO_FIQPEND_UPDATE();
 }
 
 /*
@@ -466,6 +535,7 @@ opera_clio_poke(uint32_t addr_,
             if(CLIO.regs[0x40]&CLIO.regs[0x48])
             _arm_SetFIQ();
           */
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
       else if(addr_ == 0x44)
@@ -473,6 +543,7 @@ opera_clio_poke(uint32_t addr_,
           CLIO.regs[0x40] &= ~val_;
           if(!CLIO.regs[0x60])
             CLIO.regs[0x40] &= ~0x80000000;
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
       else if(addr_ == 0x48)
@@ -482,6 +553,7 @@ opera_clio_poke(uint32_t addr_,
             if(CLIO.regs[0x40] & CLIO.regs[0x48])
             _arm_SetFIQ();
           */
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
       else if(addr_ == 0x4C)
@@ -489,17 +561,21 @@ opera_clio_poke(uint32_t addr_,
           /* always one for irq31 */
           CLIO.regs[0x48] &= ~val_;
           CLIO.regs[0x48] |= 0x80000000;
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
 #if 0
       else if(addr_ == 0x50)
         {
           CLIO.regs[0x50] |= (val_ & 0x3FFF0000);
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
       else if(addr_ == 0x54)
         {
           CLIO.regs[0x50] &= ~val;
+          CLIO_FIQPEND_UPDATE();
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
 #endif
@@ -512,6 +588,7 @@ opera_clio_poke(uint32_t addr_,
             if(CLIO.regs[0x60] & CLIO.regs[0x68])
             _arm_SetFIQ();
           */
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
       else if(addr_ == 0x64)
@@ -519,6 +596,7 @@ opera_clio_poke(uint32_t addr_,
           CLIO.regs[0x60] &= ~val_;
           if(!CLIO.regs[0x60])
             CLIO.regs[0x40] &= ~0x80000000;
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
       else if(addr_ == 0x68)
@@ -528,11 +606,13 @@ opera_clio_poke(uint32_t addr_,
             if(CLIO.regs[0x60] & CLIO.regs[0x68])
             _arm_SetFIQ();
           */
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
       else if(addr_ == 0x6C)
         {
           CLIO.regs[0x68] &= ~val_;
+          CLIO_FIQPEND_UPDATE();
           return 0;
         }
     }
@@ -912,6 +992,7 @@ opera_clio_timer_get_delay(void)
 void opera_clio_init(int reason_)
 {
   memset(&CLIO,0,sizeof(CLIO));
+  CLIO_FIQPEND = 0;
 
   //CLIO.regs[8]=240;
 
@@ -929,6 +1010,7 @@ void
 opera_clio_reset(void)
 {
   memset(&CLIO,0,sizeof(CLIO));
+  CLIO_FIQPEND = 0;
   TIMER_CARRY = 0;
 }
 

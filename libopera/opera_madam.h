@@ -31,6 +31,8 @@
 #ifndef	LIBOPERA_MADAM_H_INCLUDED
 #define LIBOPERA_MADAM_H_INCLUDED
 
+#include <stdint.h>
+
 #include "extern_c.h"
 
 #define FSM_IDLE 1
@@ -48,6 +50,7 @@ void      opera_madam_init();
 void      opera_madam_reset(void);
 
 uint32_t  opera_madam_fsm_get(void);
+const uint32_t *opera_madam_fsm_ptr(void);
 void      opera_madam_fsm_set(uint32_t val_);
 uint32_t  opera_madam_mctl(void);
 
@@ -62,7 +65,7 @@ void      opera_madam_kprint_enable(void);
 void      opera_madam_kprint_disable(void);
 void      opera_madam_me_mode_software(void);
 void      opera_madam_me_mode_hardware(void);
-
+uint64_t  opera_madam_state_hash(void);
 uint32_t  opera_madam_state_size(void);
 uint32_t  opera_madam_state_size_v1(void);
 uint32_t  opera_madam_state_save(void *buf_);

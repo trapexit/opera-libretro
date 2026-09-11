@@ -514,6 +514,13 @@ opera_madam_fsm_get(void)
   return MADAM.FSM;
 }
 
+/* hot-path inline poll support for the cached ARM engine */
+const uint32_t*
+opera_madam_fsm_ptr(void)
+{
+  return &MADAM.FSM;
+}
+
 uint32_t
 opera_madam_mctl(void)
 {
@@ -1874,6 +1881,24 @@ uint32_t*
 opera_madam_registers(void)
 {
   return MADAM.mregs;
+}
+
+/* FNV-1a 64 hash of the MADAM registers + PLUT + mode/clip/FSM state,
+ * for the engine-differential lane tracer (opera_arm.c). */
+uint64_t
+opera_madam_state_hash(void)
+{
+  uint64_t        h_ = 1469598103934665603ULL;
+  unsigned char const *b_ = (unsigned char const *)&MADAM;
+  uint32_t        i_;
+
+  for(i_ = 0; i_ < sizeof(MADAM); i_++)
+    {
+      h_ ^= b_[i_];
+      h_ *= 1099511628211ULL;
+    }
+
+  return h_;
 }
 
 static
