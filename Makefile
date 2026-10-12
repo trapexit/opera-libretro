@@ -649,14 +649,15 @@ HARNESS_ZLIB_DIR := $(DEPS_DIR)/zlib-1.3.1.2
 HARNESS_ZLIB_CFLAGS := -I$(HARNESS_ZLIB_DIR)
 HARNESS_ZLIB_SOURCES := \
 	$(HARNESS_ZLIB_DIR)/adler32.c \
+	$(HARNESS_ZLIB_DIR)/compress.c \
 	$(HARNESS_ZLIB_DIR)/crc32.c \
 	$(HARNESS_ZLIB_DIR)/deflate.c \
 	$(HARNESS_ZLIB_DIR)/trees.c \
 	$(HARNESS_ZLIB_DIR)/zutil.c
 HARNESS_ZLIB_DEPS := $(HARNESS_ZLIB_SOURCES) \
 	$(wildcard $(HARNESS_ZLIB_DIR)/*.h)
-HARNESS_CFLAGS := -O2 -g -Wall -Wextra $(HARNESS_ZLIB_CFLAGS) $(INCFLAGS)
-HARNESS_LIBS := -ldl -lm
+HARNESS_CFLAGS := -O2 -g -Wall -Wextra -pthread $(HARNESS_ZLIB_CFLAGS) $(INCFLAGS)
+HARNESS_LIBS := -ldl -lm -pthread
 HARNESS_PRESENTER_PACKAGES := sdl2 libavformat libavcodec libavutil
 HARNESS_PRESENTER_CFLAGS := $(shell pkg-config --cflags $(HARNESS_PRESENTER_PACKAGES) 2>/dev/null)
 HARNESS_PRESENTER_LIBS := $(shell pkg-config --libs $(HARNESS_PRESENTER_PACKAGES) 2>/dev/null)
@@ -669,8 +670,17 @@ harness-presenter-test: $(HARNESS_TARGET) $(HARNESS_PRESENTER_TARGET)
 	sh tools/tests/test_presenter.sh \
 		./$(HARNESS_PRESENTER_TARGET) ./$(HARNESS_TARGET)
 
-$(HARNESS_TARGET): tools/test_harness.c tools/test_harness_present.h tools/stb_image_write.h $(HARNESS_ZLIB_DEPS)
-	$(CC) -o $@ tools/test_harness.c $(HARNESS_ZLIB_SOURCES) \
+harness-capture-test:
+	@capture_test=$$(mktemp /tmp/opera-capture-test.XXXXXX); \
+	trap 'rm -f "$$capture_test"' EXIT HUP INT TERM; \
+	$(CC) -std=c99 -Wall -Wextra -pthread -Itools \
+		tools/tests/test_capture_queue.c tools/test_harness_capture.c \
+		-o "$$capture_test" && "$$capture_test"
+
+$(HARNESS_TARGET): tools/test_harness.c tools/test_harness_capture.c \
+	tools/test_harness_capture.h tools/test_harness_present.h \
+	tools/stb_image_write.h $(HARNESS_ZLIB_DEPS)
+	$(CC) -o $@ tools/test_harness.c tools/test_harness_capture.c $(HARNESS_ZLIB_SOURCES) \
 		$(HARNESS_CFLAGS) $(HARNESS_LIBS)
 
 $(HARNESS_PRESENTER_TARGET): tools/test_harness_presenter.c \
@@ -685,7 +695,7 @@ $(HARNESS_PRESENTER_TARGET): tools/test_harness_presenter.c \
 clean:
 	rm -f $(TARGET) $(OBJECTS) $(HARNESS_TARGET) $(HARNESS_PRESENTER_TARGET)
 
-.PHONY: clean harness harness-presenter harness-presenter-test
+.PHONY: clean harness harness-presenter harness-presenter-test harness-capture-test
 endif
 
 print-%:

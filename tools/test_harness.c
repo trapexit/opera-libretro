@@ -2,10 +2,8 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "libretro.h"
+#include "test_harness_capture.h"
 #include "test_harness_present.h"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -42,11 +40,24 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
+// STB owns and frees the returned malloc buffer after writing its PNG.
+static
+unsigned char *
+_compress_png(unsigned char *data_,
+              int            size_,
+              int           *compressed_size_,
+              int            quality_);
+
+#define STBIW_ZLIB_COMPRESS _compress_png
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
 
 #define HARNESS_TERMINAL_BUTTONS 16
+#define HARNESS_PNG_CHANNELS 3
 #define HARNESS_TERMINAL_HOLD_FRAMES_DEFAULT 6
 #define HARNESS_TERMINAL_FPS_DEFAULT 30.0
 
@@ -322,6 +333,7 @@ struct harness_run_t
   bool loaded_game;
   bool core_initialized;
   bool artifact_error;
+  HarnessCaptureQueue *capture_queue;
   bool timed_out;
   bool benchmark_started;
   bool benchmark_finished;
@@ -3572,6 +3584,132 @@ _presentation_end(uint32_t status_)
 
 
 static
+unsigned char *
+_compress_png(unsigned char *data_,
+              int            size_,
+              int           *compressed_size_,
+              int            quality_)
+{
+  unsigned char *compressed;
+  uLongf capacity;
+  int status;
+
+  if((data_ == NULL) || (size_ < 0) || (compressed_size_ == NULL))
+    return NULL;
+
+  // Fast lossless compression keeps periodic captures within the playback
+  // budget; PNG filters and decoded pixels are independent of this level.
+  (void)quality_;
+  capacity = compressBound((uLong)size_);
+  if(capacity > INT_MAX)
+    return NULL;
+  compressed = malloc((size_t)capacity);
+  if(compressed == NULL)
+    return NULL;
+  status = compress2(compressed,
+                     &capacity,
+                     data_,
+                     (uLong)size_,
+                     Z_BEST_SPEED);
+  if(status != Z_OK)
+    {
+      free(compressed);
+      return NULL;
+    }
+
+  *compressed_size_ = (int)capacity;
+  return compressed;
+}
+
+
+static
+int
+_write_capture_png(const char          *path_,
+                   const unsigned char *pixels_,
+                   unsigned             width_,
+                   unsigned             height_)
+{
+  unsigned char *png;
+  FILE *file;
+  int size;
+  int result;
+
+  if((width_ > (INT_MAX / HARNESS_PNG_CHANNELS)) || (height_ > INT_MAX))
+    return -1;
+  png = stbi_write_png_to_mem(pixels_,
+                              (int)(width_ * HARNESS_PNG_CHANNELS),
+                              (int)width_,
+                              (int)height_,
+                              HARNESS_PNG_CHANNELS,
+                              &size);
+  if(png == NULL)
+    return -1;
+  file = fopen(path_, "wb");
+  if(file == NULL)
+    {
+      free(png);
+      return -1;
+    }
+
+  result = (fwrite(png, 1, (size_t)size, file) == (size_t)size) ? 0 : -1;
+  if(fclose(file) != 0)
+    result = -1;
+  free(png);
+  return result;
+}
+
+
+static
+int
+_queue_capture_png(const char             *path_,
+                   const void             *data_,
+                   unsigned                width_,
+                   unsigned                height_,
+                   size_t                  pitch_,
+                   enum retro_pixel_format fmt_)
+{
+  unsigned char *packed;
+  size_t stride;
+
+  packed = _pack_frame_rgb(data_, width_, height_, pitch_, fmt_, &stride);
+  if(packed == NULL)
+    return -1;
+  if(harness_capture_queue_submit(g_run.capture_queue,
+                                  path_,
+                                  packed,
+                                  width_,
+                                  height_) != 0)
+    {
+      free(packed);
+      return -1;
+    }
+
+  return 0;
+}
+
+
+static
+void
+_finish_capture_queue(void)
+{
+  size_t written;
+  int result;
+
+  if(g_run.capture_queue == NULL)
+    return;
+  result = harness_capture_queue_finish(g_run.capture_queue, &written);
+  g_run.capture_queue = NULL;
+  g_cfg.screenshot_every_written = written;
+  if(result != 0)
+    {
+      _report_error("failed writing queued periodic screenshots in %s\n",
+                    g_cfg.screenshot_every_dir);
+      g_run.artifact_error = true;
+    }
+}
+
+
+static
 int
 _write_png(const char             *path_,
            const void             *data_,
@@ -5011,8 +5149,8 @@ _harness_video_refresh(const void *data_,
                        g_cfg.screenshot_every_dir, g_run.current_frame);
           if((n > 0) && ((size_t)n < sizeof(path)))
             {
-              if(_write_png(path, data_, width_, height_, pitch_,
-                            g_run.pixel_format) != 0)
+              if(_queue_capture_png(path, data_, width_, height_, pitch_,
+                                    g_run.pixel_format) != 0)
                 {
                   _harness_log(RETRO_LOG_ERROR,
                                "[Harness]: failed writing periodic screenshot %s\n",
@@ -5021,7 +5159,6 @@ _harness_video_refresh(const void *data_,
                 }
               else
                 {
-                  g_cfg.screenshot_every_written++;
                   if(g_cfg.screenshot_when_mode == SCREENSHOT_WHEN_CHANGED)
                     _store_screenshot_when_prev(data_, width_, height_,
                                                 pitch_, g_run.pixel_format);
@@ -9344,6 +9481,7 @@ main(int    argc_,
   double start;
   double end;
   double benchmark_start = 0.0;
+  double capture_flush_start;
   double average_fps;
   uint64_t frame;
 
@@ -9471,6 +9609,16 @@ main(int    argc_,
     goto cleanup;
   if(_resolve_input_events() != 0)
     goto cleanup;
+  if(g_cfg.screenshot_every_step > 0)
+    {
+      g_run.capture_queue = harness_capture_queue_create(_write_capture_png);
+      if(g_run.capture_queue == NULL)
+        {
+          _report_error("unable to start periodic screenshot worker\n");
+          goto cleanup;
+        }
+    }
+
   if(_presentation_start() != 0)
     {
       status = "presentation_error";
@@ -9539,8 +9687,13 @@ main(int    argc_,
         }
 
     }
+  capture_flush_start = _monotonic_seconds();
+  _finish_capture_queue();
   end = _monotonic_seconds();
   g_run.wall_seconds = end - start;
+  if(g_run.benchmark_finished &&
+     (g_run.frames_run == g_run.benchmark_end_frame))
+    g_run.benchmark_wall_seconds += (end - capture_flush_start);
   if(g_run.benchmark_started && !g_run.benchmark_finished)
     g_run.benchmark_wall_seconds = end - benchmark_start;
 
@@ -9578,6 +9731,7 @@ main(int    argc_,
     }
 
  cleanup:
+  _finish_capture_queue();
   _presentation_end((uint32_t)exit_code);
   _terminal_close();
   _close_audio();

@@ -29,3 +29,22 @@ For certain Japanese games a second "Kanji" ROM is necessary.
 Compatibility lists:
 * [fourdo.com](http://wiki.fourdo.com/index.php?title=Compatibility_List)
 * [3dodev.com](https://3dodev.com/doku.php?id=software:emulation:compatibility:opera)
+
+## Test harness capture
+
+Build the headless harness with `make harness` and run the capture queue checks
+with `make harness-capture-test`. The harness requires POSIX threads but does
+not require SDL.
+
+`--screenshot-every N=DIR` copies selected frames into an eight-frame FIFO.
+One worker compresses and saves PNGs using the vendored zlib encoder. The
+queue blocks when full so captures are never dropped; all accepted captures
+finish before the run returns. PNG compression is lossless, and
+`screenshot_every_written` counts successful writes. A worker write failure
+sets the run's `artifact_error` status. `CHANGED` and `NONBLANK` filtering
+still happen on the emulation thread.
+
+Use `--no-present` when measuring capture or core throughput. A connected
+presenter paces the harness to the core's nominal refresh rate. `--cpu` pins
+the capture worker as well as the core to the selected CPU, limiting the
+benefit of running capture and emulation concurrently.
